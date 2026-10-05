@@ -21,7 +21,7 @@ query($issueQ: String!, $prQ: String!) {
     nodes {
       ... on Issue {
         number title url updatedAt
-        repository { nameWithOwner }
+        repository { name nameWithOwner }
         labels(first: 3) { nodes { name } }
         milestone { title }
       }
@@ -32,7 +32,7 @@ query($issueQ: String!, $prQ: String!) {
     nodes {
       ... on PullRequest {
         number title url updatedAt isDraft reviewDecision mergeable
-        repository { nameWithOwner }
+        repository { name nameWithOwner }
         commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }
       }
     }
@@ -42,10 +42,13 @@ GRAPHQL
 
 read -r -d '' FORMAT <<'JQ' || true
 def ago: ((now - fromdateiso8601) / 86400 | floor) as $d
-  | if $d < 1 then "今日更新"
-    elif $d < 30 then "\($d)日前更新"
-    elif $d < 365 then "\($d / 30 | floor)か月前更新"
-    else "\($d / 365 | floor)年前更新" end;
+  | if $d < 1 then "今日"
+    elif $d < 30 then "\($d)日前"
+    elif $d < 365 then "\($d / 30 | floor)か月前"
+    else "\($d / 365 | floor)年前" end;
+
+# 表のセル内で | が列区切りと解釈されないようにする
+def cell: gsub("\\|"; "\\|");
 
 def pr_meta: [
   (if .isDraft then "Draft" else empty end),
@@ -59,25 +62,28 @@ def issue_meta: [
   (if .milestone then "🎯 \(.milestone.title)" else empty end)
 ];
 
-def section($title; $res; meta):
+def section($title; $res; $metaCol; meta):
   "## \($title)（\($res.issueCount)件）",
   "",
   if $res.issueCount == 0 then "なし", "" else
-    # 最近動きのあるリポジトリから順に並べる
+    "| リポジトリ | # | タイトル | \($metaCol) | 更新 |",
+    "| --- | --- | --- | --- | --- |",
+    # 最近動きのあるリポジトリから順に並べ、リポジトリ名は各グループの先頭行にだけ出す
     ($res.nodes | group_by(.repository.nameWithOwner)
       | map(sort_by(.updatedAt) | reverse) | sort_by(.[0].updatedAt) | reverse[]
-      | "**\(.[0].repository.nameWithOwner)**",
-        (.[]
-          | "- [#\(.number)](\(.url)) \(.title) — \(meta + [.updatedAt | ago] | join(" · "))"),
-        ""),
+      | to_entries[]
+      | (if .key == 0 then .value.repository.name else "" end) as $repo
+      | .value
+      | "| \($repo) | [#\(.number)](\(.url)) | \(.title | cell) | \(meta | join(" · ") | cell) | \(.updatedAt | ago) |"),
+    "",
     (($res.issueCount - ($res.nodes | length)) as $rest
       | if $rest > 0 then "…ほか \($rest) 件（表示は最新 50 件まで）", "" else empty end)
   end;
 
 "# 自分の担当（\(now | strflocaltime("%Y-%m-%d %H:%M")) 時点）",
 "",
-section("Pull Requests"; .data.prs; pr_meta),
-section("Issues"; .data.issues; issue_meta)
+section("Pull Requests"; .data.prs; "状態"; pr_meta),
+section("Issues"; .data.issues; "ラベル"; issue_meta)
 JQ
 
 gh api graphql \
