@@ -8,7 +8,7 @@
 
 | スキル | できること | 使い方の例 | 前提 |
 | --- | --- | --- | --- |
-| [gh-my-work](.claude/skills/gh-my-work/SKILL.md) | 自分にアサインされている open な Issue / PR を表形式で一覧化する | `/gh-my-work`<br>「自分の担当を見せて」<br>「achromono の PR だけ」 | `gh` にログイン済み |
+| [gh-my-work](.claude/skills/gh-my-work/SKILL.md) | 自分にアサインされている open な Issue / PR を組織ごとの表で一覧化する | `/gh-my-work`<br>「自分の担当を見せて」<br>「achromono の PR だけ」 | `gh` にログイン済み |
 
 ## 他のフォルダでも使う
 

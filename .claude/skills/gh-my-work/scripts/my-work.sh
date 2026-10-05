@@ -62,28 +62,39 @@ def issue_meta: [
   (if .milestone then "🎯 \(.milestone.title)" else empty end)
 ];
 
-def section($title; $res; $metaCol; meta):
-  "## \($title)（\($res.issueCount)件）",
-  "",
-  if $res.issueCount == 0 then "なし", "" else
+# 入力: 同じ組織の Issue または PR の配列
+def table($title; $metaCol; meta):
+  if length == 0 then empty else
+    "### \($title)（\(length)件）",
+    "",
     "| リポジトリ | # | タイトル | \($metaCol) | 更新 |",
     "| --- | --- | --- | --- | --- |",
     # 最近動きのあるリポジトリから順に並べ、リポジトリ名は各グループの先頭行にだけ出す
-    ($res.nodes | group_by(.repository.nameWithOwner)
+    (group_by(.repository.name)
       | map(sort_by(.updatedAt) | reverse) | sort_by(.[0].updatedAt) | reverse[]
       | to_entries[]
       | (if .key == 0 then .value.repository.name else "" end) as $repo
       | .value
       | "| \($repo) | [#\(.number)](\(.url)) | \(.title | cell) | \(meta | join(" · ") | cell) | \(.updatedAt | ago) |"),
-    "",
-    (($res.issueCount - ($res.nodes | length)) as $rest
-      | if $rest > 0 then "…ほか \($rest) 件（表示は最新 50 件まで）", "" else empty end)
+    ""
   end;
 
-"# 自分の担当（\(now | strflocaltime("%Y-%m-%d %H:%M")) 時点）",
-"",
-section("Pull Requests"; .data.prs; "状態"; pr_meta),
-section("Issues"; .data.issues; "ラベル"; issue_meta)
+.data as $d
+| ([$d.prs.nodes[] | .kind = "pr"] + [$d.issues.nodes[] | .kind = "issue"]
+   | map(.org = (.repository.nameWithOwner | split("/")[0]))) as $all
+| (($d.prs.issueCount > ($d.prs.nodes | length)) or ($d.issues.issueCount > ($d.issues.nodes | length))) as $truncated
+| "# 自分の担当（\(now | strflocaltime("%Y-%m-%d %H:%M")) 時点）",
+  "",
+  "PR \($d.prs.issueCount)件 · Issue \($d.issues.issueCount)件\(if $truncated then "（それぞれ最新 50 件まで表示）" else "" end)",
+  "",
+  if ($all | length) == 0 then "担当中の Issue / PR はありません。" else
+    # 最近動きのある組織から順に並べる
+    ($all | group_by(.org) | sort_by(map(.updatedAt) | max) | reverse[]
+      | "## \(.[0].org)",
+        "",
+        (map(select(.kind == "pr")) | table("Pull Requests"; "状態"; pr_meta)),
+        (map(select(.kind == "issue")) | table("Issues"; "ラベル"; issue_meta)))
+  end
 JQ
 
 gh api graphql \
