@@ -1,1 +1,1 @@
-# agent-settings
+# agent-skills
