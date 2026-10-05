@@ -9,7 +9,7 @@
 #   repo.sh search <owner/repo> <キーワード>...           # リポジトリ全体のコード検索（path: などの修飾子は使えない）
 #   repo.sh log    <owner/repo> [パス]                    # 最近のコミット 15 件（誰がいつ触ったか）
 #   repo.sh pr     <owner/repo> <番号>                    # PR の概要・本文・変更ファイル
-#   repo.sh prs    <owner/repo> <キーワード>...           # キーワードに合う PR を関連度順に（open / closed とも）
+#   repo.sh prs    <owner/repo> <キーワード>...           # タイトルがキーワードに合う PR（open / closed とも）
 set -euo pipefail
 
 usage() { sed -n '4,12p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 1; }
@@ -121,7 +121,8 @@ case $cmd in
     ;;
   prs)
     [[ $# -gt 0 ]] || usage
-    gh search prs "$@" --repo "$repo" --limit 15 \
+    # 本文まで検索すると PR テンプレートの定型文に当たってノイズが多いので、タイトルだけを見る
+    gh search prs "$@" --repo "$repo" --match title --limit 15 \
       --json number,title,url,state,author,updatedAt,isDraft --jq '
       if length == 0 then "ヒットなし" else
         .[] | "- [#\(.number)](\(.url)) \(.state)\(if .isDraft then "・Draft" else "" end) — \(.title)（@\(.author.login)、更新 \(.updatedAt[0:10])）"
