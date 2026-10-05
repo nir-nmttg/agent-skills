@@ -65,7 +65,7 @@ def issue_meta: [
 # 入力: 同じ組織の Issue または PR の配列
 def table($title; $metaCol; meta):
   if length == 0 then empty else
-    "### \($title)（\(length)件）",
+    "**\($title)**",
     "",
     "| リポジトリ | # | タイトル | \($metaCol) | 更新 |",
     "| --- | --- | --- | --- | --- |",
@@ -88,12 +88,19 @@ def table($title; $metaCol; meta):
   "PR \($d.prs.issueCount)件 · Issue \($d.issues.issueCount)件\(if $truncated then "（それぞれ最新 50 件まで表示）" else "" end)",
   "",
   if ($all | length) == 0 then "担当中の Issue / PR はありません。" else
-    # 最近動きのある組織から順に並べる
+    # 最近動きのある組織から順に、区切り線 + 件数付き見出しで区切って並べる
     ($all | group_by(.org) | sort_by(map(.updatedAt) | max) | reverse[]
-      | "## \(.[0].org)",
+      | map(select(.kind == "pr")) as $prs
+      | map(select(.kind == "issue")) as $issues
+      | "---",
         "",
-        (map(select(.kind == "pr")) | table("Pull Requests"; "状態"; pr_meta)),
-        (map(select(.kind == "issue")) | table("Issues"; "ラベル"; issue_meta)))
+        "## 🏢 \(.[0].org)（\([
+          ($prs | length | select(. > 0) | "PR \(.)件"),
+          ($issues | length | select(. > 0) | "Issue \(.)件")
+        ] | join(" · "))）",
+        "",
+        ($prs | table("Pull Requests"; "状態"; pr_meta)),
+        ($issues | table("Issues"; "ラベル"; issue_meta)))
   end
 JQ
 
