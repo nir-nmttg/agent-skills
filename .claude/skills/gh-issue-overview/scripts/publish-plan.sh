@@ -7,7 +7,7 @@
 #   --open   既定のブラウザでも開く（Claude の組み込みブラウザが使えないとき用）
 #   --saved  標準入力は使わず、保存済みの .md から HTML を作り直す（.md を直接直したあと用）
 #
-# 保存先は $ISSUE_PLAN_DIR（既定: ~/issue-plans）/<owner>/<repo>/<番号>.md と .html。
+# 保存先は $ISSUE_PLAN_DIR（既定: このリポジトリ直下の artifacts/gh-issue-overview）/<owner>/<repo>/<番号>.md と .html。
 # file:// で開くと組み込みブラウザでは図が描画されないため、127.0.0.1 の簡易サーバーで配信する（12 時間で自動停止）。
 set -euo pipefail
 
@@ -24,7 +24,9 @@ for opt in "$@"; do
   esac
 done
 
-root=${ISSUE_PLAN_DIR:-$HOME/issue-plans}
+# ~/.claude/skills のシンボリックリンク経由で呼ばれても、リンク先のリポジトリに保存する
+repo_root=$(cd -P "$(dirname "$0")/../../../.." && pwd)
+root=${ISSUE_PLAN_DIR:-$repo_root/artifacts/gh-issue-overview}
 dir="$root/$repo"
 mkdir -p "$dir"
 md="$dir/$number.md" html="$dir/$number.html"

@@ -2,7 +2,7 @@
 name: gh-issue-overview
 description: GitHub Issue の URL を受け取り、Issue・関連 Issue / PR・リポジトリを gh コマンドで調べて、「なにをどうするか」がひと目でわかる実装計画の概要を 5W1H と Mermaid 図でまとめ、組み込みブラウザで表示する。参画して日が浅いプロジェクトでも読めるよう前提から短く説明し、ファイルや関数レベルの細かい実装には踏み込まない。「この Issue の実装計画を立てて」「Issue の概要をつかみたい」「5W1H で整理して」「この Issue どう進めればいい？」など、Issue の URL を添えた依頼で使う。
 argument-hint: <Issue の URL>
-allowed-tools: Bash(bash *gh-issue-overview/scripts/fetch-issue.sh*), Bash(bash *gh-issue-overview/scripts/repo.sh*), Bash(bash *gh-issue-overview/scripts/publish-plan.sh*), Bash(git ls-files *), Read, Grep, Glob, Edit(~/issue-plans/**), mcp__Claude_Browser__preview_start, mcp__Claude_Browser__find
+allowed-tools: Bash(bash *gh-issue-overview/scripts/fetch-issue.sh*), Bash(bash *gh-issue-overview/scripts/repo.sh*), Bash(bash *gh-issue-overview/scripts/publish-plan.sh*), Bash(git ls-files *), Read, Grep, Glob, Edit(//**/artifacts/gh-issue-overview/**), mcp__Claude_Browser__preview_start, mcp__Claude_Browser__find
 ---
 
 # Issue の実装計画（概要）
@@ -63,7 +63,7 @@ bash "${CLAUDE_SKILL_DIR}/scripts/publish-plan.sh" owner/repo <番号> <<'__PLAN
 __PLAN__
 ```
 
-Markdown を `~/issue-plans/owner/repo/<番号>.md` に保存し、図入りの HTML を `http://127.0.0.1:<port>/...` で配信する。出力の「表示」が URL、「保存」がファイルパス。
+Markdown をスキル集リポジトリ直下の `artifacts/gh-issue-overview/owner/repo/<番号>.md`（git 管理外）に保存し、図入りの HTML を `http://127.0.0.1:<port>/...` で配信する。出力の「表示」が URL、「保存」がファイルパス。
 
 - `mcp__Claude_Browser__preview_start` が使えるときは、表示 URL を `url` に渡して組み込みブラウザで開く（`navigate` では開けないことがある）。
 - 開いたら `mcp__Claude_Browser__find` で「描画」を検索し、画面上部の表示を確かめる。見つからなければ図の描画中なので、数秒おいて検索し直す。
