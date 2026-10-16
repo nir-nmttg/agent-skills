@@ -1,6 +1,6 @@
 ---
 name: repo-security-audit
-description: Cloudflare の security-audit スキル（Full audit モード）を使い、指定したリポジトリ（省略時は今のフォルダの下にあるリポジトリすべて）を 1 つずつ包括的にセキュリティ監査する。対象以外のリポジトリは調べず、ソースの変更や本番・外部サービスへのアクセスはしない。結果はスキル標準の形式で artifacts/repo-security-audit/ に保存し、確定した問題・未検証事項・未調査領域・保存先を日本語で報告する。「〇〇 のセキュリティ監査をして」「配下のリポジトリを全部セキュリティ監査して」「脆弱性診断して」「security audit して」などの依頼で使う。
+description: Cloudflare の security-audit スキル（Full audit モード）を使い、指定したリポジトリ（省略時は今のフォルダの下にあるリポジトリすべて）を 1 つずつ包括的にセキュリティ監査する。対象以外のリポジトリは調べず、ソースの変更や本番・外部サービスへのアクセスはしない。結果はスキル標準の形式で artifacts/repo-security-audit/ に保存し、確定した問題・未検証事項・未調査領域・保存先を日本語で報告する。「〇〇 のセキュリティ監査をして」「配下のリポジトリを全部セキュリティ監査して」「脆弱性診断して」「security audit して」などの依頼で使う。スキル名を言われなくても、「このリポジトリを公開して大丈夫？」「OSS 化・リリース前に危ないところがないか見て」「引き継いだリポジトリの安全性を確かめたい」など、リポジトリ全体の安全性を尋ねられたら積極的に使う。作業中に秘密情報のハードコード、認証の抜け、危険な入力処理などリポジトリ全体に広がっていそうな問題に気づいたときは、監査を提案する。個々の変更のセキュリティ確認には使わない（codex-impl-review の役割）。
 argument-hint: "[--profile quick|standard|deep] [リポジトリ名またはパス...]"
 allowed-tools: Bash(bash *repo-security-audit/scripts/resolve-targets.sh*), Bash(bash *repo-security-audit/scripts/summarize.sh*), Bash(node *security-audit/validate-findings.cjs *), Bash(node *security-audit/validate-coverage-ledger.cjs *), Bash(mkdir -p *artifacts/repo-security-audit/*), Bash(mkdir -p *security-audit-skill/*), Bash(git -C * rev-parse*), Bash(git -C * status*), Bash(git -C * log*), Bash(git -C * show*), Bash(git -C * diff*), Bash(git -C * ls-files*), Bash(git -C * grep*), Bash(git -C * blame*), Read, Grep, Glob, Agent, Write(//**/artifacts/repo-security-audit/**), Edit(//**/artifacts/repo-security-audit/**), Write(~/security-audit-skill/**), Edit(~/security-audit-skill/**)
 ---
@@ -10,6 +10,12 @@ allowed-tools: Bash(bash *repo-security-audit/scripts/resolve-targets.sh*), Bash
 対象: $ARGUMENTS
 
 Cloudflare の security-audit スキルを **Full audit モード**で使い、対象リポジトリを包括的に監査する。監査の進め方・エージェント構成・調査項目・独立検証・レポート形式・検証基準は Cloudflare 側の `SKILL.md` と関連ファイルに従い、書き換えたり省いたりしない。このスキルが決めるのは「対象と保存先」「守ること」「日本語の報告」だけ。
+
+## スキル名を言われずに使うとき
+
+- 「このリポジトリを公開して大丈夫？」「リリース前に危ないところがないか見て」など、リポジトリ全体の安全性を尋ねられたら、「リポジトリ全体をセキュリティ監査します」と 1 行伝えてこのスキルで進める。対象が 2 件以上になるときの確認は 1. のとおり行う。
+- 別の作業中に、秘密情報のハードコード、認証・権限の抜け、危険な入力処理など、リポジトリ全体に広がっていそうな問題に気づいたときは、自分では始めず「〇〇 が見つかったので、リポジトリ全体の監査（repo-security-audit）をおすすめします」と提案する。監査は時間とトークンがかかるため、ユーザーの了承を得てから始める。
+- 今回の変更だけのセキュリティ確認は、このスキルではなく codex-impl-review で行う。
 
 ## 手順
 
