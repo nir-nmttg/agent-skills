@@ -1,6 +1,6 @@
 ---
 name: codex-risk-impl-review
-description: リスクの高い実装（git の差分）を Codex CLI の GPT-6 Astra に「どう壊れるか」の観点でレビューさせる。データの破損・消失、セキュリティ、並行処理、課金や外部への副作用、移行と互換性、失敗時の動きを重点的に見る。推論レベルは今の Claude と同じにそろえ、指定があれば Fast モードで動かす。範囲は既定ブランチからの変更（未コミットを含む）が既定で、ブランチ・コミット・未コミットだけも選べる。Codex は読み取り専用で、Claude は指摘ごとに採用・不採用を判断して直し方を示す。結果は artifacts/codex-risk-impl-review/ に保存する。「実装を Astra にレビューしてもらって」「リスクの高い変更なので Codex で厳しくレビューして」「本番に出す前に Astra で確認して」「fast で Astra に実装レビュー」などの依頼で使う。Astra は重くて使用量が多いので、頼まれていないときは自分の判断で実行しない。実装を終えた変更が DB スキーマ・データ移行・データの削除や変換、認証・権限、課金・決済、個人情報・秘密情報、並行処理・トランザクション、外部への送信、公開 API の破壊的変更など、壊れると影響が大きく戻しにくいものに触れるときだけ、完了報告やコミットの前に「Astra でリスクレビューしますか」とユーザーに聞き、了承されたら使う。
+description: リスクの高い実装（git の差分）を Codex CLI の GPT-6 Astra に「どう壊れるか」の観点でレビューさせ、Claude が指摘ごとに採否を判断して直す。「実装を Astra にレビューしてもらって」「本番に出す前に Astra で確認して」などの依頼で使う。Astra は重いので自分の判断では実行しない。DB 移行・認可・課金・外部への送信など、壊れると影響が大きく戻しにくい変更のときだけ、完了報告やコミットの前に使うかをユーザーに聞く（詳しい基準は本文）。
 argument-hint: "[--fast] [--base <ref> | --commit <sha> | --uncommitted] [補足]"
 allowed-tools: Bash(bash *codex-risk-impl-review/scripts/new-run.sh*), Bash(bash *codex-risk-impl-review/scripts/review.sh*), Read, Grep, Glob, Write(//**/artifacts/codex-risk-impl-review/**), Edit(//**/artifacts/codex-risk-impl-review/**)
 ---
@@ -10,7 +10,7 @@ allowed-tools: Bash(bash *codex-risk-impl-review/scripts/new-run.sh*), Bash(bash
 引数: $ARGUMENTS
 Claude の推論レベル: ${CLAUDE_EFFORT}
 
-壊れると影響の大きい変更を、最も強いモデル（Codex CLI の GPT-6 Astra）に「どう壊れるか」の観点で独立してレビューさせ、その指摘を Claude が吟味する。差分の取り出し・Codex の呼び出し・保存はスクリプトに任せ（codex-impl-review のスクリプトを、モデルとレビューの指示書だけ差し替えて使う）、Claude は「実装の説明をまとめる」「指摘を判断する」「採用した指摘を直す」だけを行う。
+壊れると影響の大きい変更を、最も強いモデル（Codex CLI の GPT-6 Astra）に「どう壊れるか」の観点で独立してレビューさせ、その指摘を Claude が吟味する。差分の取り出し・Codex の呼び出し・保存はスクリプトに任せ（codex-impl-review のスクリプトを、モデルとレビューの指示書だけ差し替えて使う）、Claude は「実装の説明をまとめる」「指摘を判断する」「採用した指摘を直す」だけを行う。結果は `artifacts/codex-risk-impl-review/` に保存される。
 
 ## 使うかどうかをユーザーに聞くとき
 

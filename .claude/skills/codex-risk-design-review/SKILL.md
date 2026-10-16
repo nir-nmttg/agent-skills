@@ -1,6 +1,6 @@
 ---
 name: codex-risk-design-review
-description: リスクの高い設計（会話中の設計案や設計書ファイル）を、実装に入る前に Codex CLI の GPT-6 Astra に「どう壊れるか」の観点でレビューさせる。後から戻しにくい判断、データの破損・消失、セキュリティ、並行処理、課金や外部への副作用、移行とリリースの手順を重点的に見る。推論レベルは今の Claude と同じにそろえ、指定があれば Fast モードで動かす。Codex は読み取り専用で既存コードと照らし合わせ、Claude は指摘ごとに採用・不採用を判断して設計の直し方を提案する。結果は artifacts/codex-risk-design-review/ に保存する。「この設計を Astra にレビューしてもらって」「リスクの高い設計なので Codex で厳しく見て」「実装前に Astra で設計を確認して」「fast で Astra に設計レビュー」などの依頼で使う。Astra は重くて使用量が多いので、頼まれていないときは自分の判断で実行しない。Claude がまとめた設計・実装計画が DB スキーマ・データ移行・データの削除や変換、認証・権限、課金・決済、個人情報・秘密情報、並行処理・トランザクション・分散、外部への送信、公開 API や保存形式の決定・破壊的変更など、壊れると影響が大きく後から戻しにくいものに触れるときだけ、提示や実装の前に「Astra で設計のリスクレビューをしますか」とユーザーに聞き、了承されたら使う。
+description: リスクの高い設計（会話中の設計案や設計書ファイル）を、実装に入る前に Codex CLI の GPT-6 Astra に「どう壊れるか」の観点でレビューさせ、Claude が指摘ごとに採否を判断して設計の直し方を提案する。「この設計を Astra にレビューしてもらって」「実装前に Astra で設計を確認して」などの依頼で使う。Astra は重いので自分の判断では実行しない。DB 移行・認可・課金・外部への送信など、壊れると影響が大きく戻しにくい設計のときだけ、提示や実装の前に使うかをユーザーに聞く（詳しい基準は本文）。
 argument-hint: "[--fast] [設計書のパス] [補足]"
 allowed-tools: Bash(bash *codex-risk-design-review/scripts/new-run.sh*), Bash(bash *codex-risk-design-review/scripts/review.sh*), Read, Grep, Glob, Write(//**/artifacts/codex-risk-design-review/**), Edit(//**/artifacts/codex-risk-design-review/**)
 ---
@@ -10,7 +10,7 @@ allowed-tools: Bash(bash *codex-risk-design-review/scripts/new-run.sh*), Bash(ba
 引数: $ARGUMENTS
 Claude の推論レベル: ${CLAUDE_EFFORT}
 
-壊れると影響が大きく後から戻しにくい設計を、実装に入る前に、最も強いモデル（Codex CLI の GPT-6 Astra）に「どう壊れるか」の観点で独立してレビューさせ、その指摘を Claude が吟味する。Codex の呼び出しと保存はスクリプトに任せ（codex-design-review のスクリプトを、モデルとレビューの指示書だけ差し替えて使う）、Claude は「設計書をまとめる」「指摘を判断する」だけを行う。
+壊れると影響が大きく後から戻しにくい設計を、実装に入る前に、最も強いモデル（Codex CLI の GPT-6 Astra）に「どう壊れるか」の観点で独立してレビューさせ、その指摘を Claude が吟味する。Codex の呼び出しと保存はスクリプトに任せ（codex-design-review のスクリプトを、モデルとレビューの指示書だけ差し替えて使う）、Claude は「設計書をまとめる」「指摘を判断する」だけを行う。結果は `artifacts/codex-risk-design-review/` に保存される。
 
 ## 使うかどうかをユーザーに聞くとき
 
