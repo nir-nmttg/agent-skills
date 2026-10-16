@@ -23,7 +23,7 @@ for skill in "$src_dir"/*/; do
   if [[ -L "$dest" ]]; then
     current=$(readlink "$dest")
     if [[ "$current" == "$skill" ]]; then
-      echo "済  $name"
+      echo "linked  $name"
       continue
     fi
     if [[ "$current" != "$src_dir"/* ]]; then
@@ -36,7 +36,7 @@ for skill in "$src_dir"/*/; do
   fi
 
   ln -sfn "$skill" "$dest"
-  echo "追加 $name"
+  echo "added   $name"
 done
 
 # このリポジトリから消えたスキルを指す、切れたリンクを片付ける
@@ -44,5 +44,5 @@ for link in "$dest_dir"/*; do
   [[ -L "$link" && ! -e "$link" ]] || continue
   [[ "$(readlink "$link")" == "$src_dir"/* ]] || continue
   rm "$link"
-  echo "削除 $(basename "$link")（リンク切れ）"
+  echo "removed $(basename "$link")（リンク切れ）"
 done
