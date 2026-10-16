@@ -1,6 +1,7 @@
 ---
 name: gh-issue-overview
-description: GitHub Issue の URL を受け取り、Issue・関連 Issue / PR・リポジトリを gh コマンドで調べて、「なにをどうするか」がひと目でわかる実装計画の概要を 5W1H と Mermaid 図でまとめ、組み込みブラウザで表示する。参画して日が浅いプロジェクトでも読めるよう前提から短く説明し、ファイルや関数レベルの細かい実装には踏み込まない。「この Issue の実装計画を立てて」「Issue の概要をつかみたい」「5W1H で整理して」「この Issue どう進めればいい？」など、Issue の URL を添えた依頼で使う。スキル名を言われなくても、Issue の URL を添えて「これ何？」「この Issue 見て」と聞かれたとき、また「この Issue を対応して」「実装して」と頼まれ、その Issue が複数のモジュールや PR にまたがる、要件が本文とコメントに散らばっている、なじみの薄いリポジトリのもの、のどれかに当たるときは、実装に入る前に積極的に使って全体像をそろえる。
+description: GitHub Issue の URL を受け取り、Issue・関連 Issue / PR・リポジトリを gh コマンドで調べて、「なにをどうするか」がひと目でわかる実装計画の概要を 5W1H と Mermaid 図でまとめ、組み込みブラウザで表示する。参画して日が浅いプロジェクトでも読めるよう前提から短く説明し、ファイルや関数レベルの細かい実装には踏み込まない。`/gh-issue-overview <Issue の URL>` で明示的に呼び出したときだけ動く。
+disable-model-invocation: true
 argument-hint: <Issue の URL>
 allowed-tools: Bash(bash *gh-issue-overview/scripts/fetch-issue.sh*), Bash(bash *gh-issue-overview/scripts/repo.sh*), Bash(bash *gh-issue-overview/scripts/publish-plan.sh*), Bash(git ls-files *), Read, Grep, Glob, Edit(//**/artifacts/gh-issue-overview/**), mcp__Claude_Browser__preview_start, mcp__Claude_Browser__find
 ---
@@ -13,10 +14,6 @@ Issue を読み、**その Issue に初めて触れる人が「なにをどう�
 
 - 細かい実装（ファイル・関数・行単位の変更内容、テストケース、詳細な手順）には触れない。それは別スキルの役割。
 - コードの変更や Issue へのコメント投稿はしない。
-
-## 自分の判断で使ったとき
-
-「この Issue を対応して」などの依頼の途中で使ったときは、始める前に「実装に入る前に Issue の全体像をまとめます」と 1 行だけ伝え、確認は待たずに進める。概要を表示したら元の依頼（設計・実装）に戻る。ただし「確認したいこと」のうち、ユーザーにしか決められず実装の方向を左右するものがあれば、先にそれを尋ねる。
 
 ## 手順
 
