@@ -1,7 +1,7 @@
 ---
 name: repo-security-audit
 description: Cloudflare の security-audit スキル（Full audit モード）を使い、指定したリポジトリ（省略時は今のフォルダの下にあるリポジトリすべて）を 1 つずつ包括的にセキュリティ監査する。対象以外のリポジトリは調べず、ソースの変更や本番・外部サービスへのアクセスはしない。結果はスキル標準の形式で artifacts/repo-security-audit/ に保存し、確定した問題・未検証事項・未調査領域・保存先を日本語で報告する。「〇〇 のセキュリティ監査をして」「配下のリポジトリを全部セキュリティ監査して」「脆弱性診断して」「security audit して」などの依頼で使う。
-argument-hint: [--profile quick|standard|deep] [リポジトリ名またはパス...]
+argument-hint: "[--profile quick|standard|deep] [リポジトリ名またはパス...]"
 allowed-tools: Bash(bash *repo-security-audit/scripts/resolve-targets.sh*), Bash(bash *repo-security-audit/scripts/summarize.sh*), Bash(node *security-audit/validate-findings.cjs *), Bash(node *security-audit/validate-coverage-ledger.cjs *), Bash(mkdir -p *artifacts/repo-security-audit/*), Bash(mkdir -p *security-audit-skill/*), Bash(git -C * rev-parse*), Bash(git -C * status*), Bash(git -C * log*), Bash(git -C * show*), Bash(git -C * diff*), Bash(git -C * ls-files*), Bash(git -C * grep*), Bash(git -C * blame*), Read, Grep, Glob, Agent, Write(//**/artifacts/repo-security-audit/**), Edit(//**/artifacts/repo-security-audit/**), Write(~/security-audit-skill/**), Edit(~/security-audit-skill/**)
 ---
 
