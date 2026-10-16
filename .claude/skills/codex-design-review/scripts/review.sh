@@ -6,7 +6,8 @@
 #   --fast    Fast モード（service_tier=fast）で実行する。速いぶん使用量が増える
 #   --cd      Codex が既存コードを確かめるときの作業フォルダ（既定: 今のフォルダ）
 #
-# 環境変数 CODEX_DESIGN_REVIEW_MODEL でモデルを変えられる（既定: gpt-6.1-sol）。
+# 環境変数 CODEX_DESIGN_REVIEW_MODEL でモデルを、CODEX_DESIGN_REVIEW_PROMPT でレビューの指示書を、
+# CODEX_DESIGN_REVIEW_TITLE で出力の見出しを変えられる（codex-risk-design-review が使う）。
 set -euo pipefail
 
 usage() { sed -n '4,8p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 1; }
@@ -24,6 +25,8 @@ done
 [[ -n $run_dir ]] || usage
 
 model=${CODEX_DESIGN_REVIEW_MODEL:-gpt-6.1-sol}
+prompt_file=${CODEX_DESIGN_REVIEW_PROMPT:-$(dirname "$0")/../assets/review-prompt.md}
+title=${CODEX_DESIGN_REVIEW_TITLE:-Codex の設計レビュー}
 effort=${effort:-${CLAUDE_EFFORT:-}}
 case $effort in
   low | medium | high | xhigh | max) ;;
@@ -32,6 +35,7 @@ case $effort in
 esac
 
 command -v codex >/dev/null || { echo "エラー: codex コマンドが見つかりません（brew install --cask codex）" >&2; exit 1; }
+[[ -f $prompt_file ]] || { echo "エラー: レビューの指示書 $prompt_file がありません" >&2; exit 1; }
 [[ -f $run_dir/design.md ]] || { echo "エラー: $run_dir/design.md がありません" >&2; exit 1; }
 [[ -d $workdir ]] || { echo "エラー: 作業フォルダ $workdir がありません" >&2; exit 1; }
 run_dir=$(cd -P "$run_dir" && pwd)
@@ -52,7 +56,7 @@ fast_label=off
 [[ -n $fast ]] && { args+=(-c 'service_tier="fast"'); fast_label=on; }
 
 {
-  cat "$(dirname "$0")/../assets/review-prompt.md"
+  cat "$prompt_file"
   printf '\n\n<design>\n'
   cat "$run_dir/design.md"
   printf '\n</design>\n'
@@ -76,7 +80,7 @@ jq -r 'select(.item.type == "error") | "警告: " + .item.message' "$run_dir/eve
 thread_id=$(jq -r 'select(.type == "thread.started") | .thread_id' "$run_dir/events.jsonl" | head -1)
 tokens=$(jq -r 'select(.type == "turn.completed") | .usage | "入力 \(.input_tokens) / 出力 \(.output_tokens)（うち推論 \(.reasoning_output_tokens)）"' "$run_dir/events.jsonl" | tail -1)
 
-echo "## Codex の設計レビュー"
+echo "## $title"
 echo
 echo "- 設定: $model / effort=$effort / fast=$fast_label"
 echo "- 所要時間: $((SECONDS - started)) 秒、トークン: ${tokens:-不明}"

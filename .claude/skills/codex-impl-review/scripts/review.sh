@@ -10,7 +10,8 @@
 #   --uncommitted  未コミットの変更（ステージ済み・未ステージ・未追跡）だけをレビューする
 #   範囲を指定しなければ、既定ブランチ（origin/HEAD、なければ main / master）からの変更をすべてレビューする。
 #
-# 環境変数 CODEX_IMPL_REVIEW_MODEL でモデルを変えられる（既定: gpt-6.1-sol）。
+# 環境変数 CODEX_IMPL_REVIEW_MODEL でモデルを、CODEX_IMPL_REVIEW_PROMPT でレビューの指示書を、
+# CODEX_IMPL_REVIEW_TITLE で出力の見出しを変えられる（codex-risk-impl-review が使う）。
 set -euo pipefail
 
 usage() { sed -n '4,12p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 1; }
@@ -32,6 +33,8 @@ done
 [[ -n $run_dir ]] || usage
 
 model=${CODEX_IMPL_REVIEW_MODEL:-gpt-6.1-sol}
+prompt_file=${CODEX_IMPL_REVIEW_PROMPT:-$(dirname "$0")/../assets/review-prompt.md}
+title=${CODEX_IMPL_REVIEW_TITLE:-Codex の実装レビュー}
 effort=${effort:-${CLAUDE_EFFORT:-}}
 case $effort in
   low | medium | high | xhigh | max) ;;
@@ -40,6 +43,7 @@ case $effort in
 esac
 
 command -v codex >/dev/null || { echo "エラー: codex コマンドが見つかりません（brew install --cask codex）" >&2; exit 1; }
+[[ -f $prompt_file ]] || { echo "エラー: レビューの指示書 $prompt_file がありません" >&2; exit 1; }
 [[ -f $run_dir/context.md ]] || { echo "エラー: $run_dir/context.md がありません" >&2; exit 1; }
 [[ -d $workdir ]] || { echo "エラー: 作業フォルダ $workdir がありません" >&2; exit 1; }
 run_dir=$(cd -P "$run_dir" && pwd)
@@ -104,7 +108,7 @@ max_bytes=200000
 size=$(wc -c <"$run_dir/diff.patch" | tr -d ' ')
 
 {
-  cat "$(dirname "$0")/../assets/review-prompt.md"
+  cat "$prompt_file"
   printf '\n\n<scope>\n'
   echo "リポジトリ: $workdir"
   echo "範囲: $scope"
@@ -153,7 +157,7 @@ jq -r 'select(.item.type == "error") | "警告: " + .item.message' "$run_dir/eve
 thread_id=$(jq -r 'select(.type == "thread.started") | .thread_id' "$run_dir/events.jsonl" | head -1)
 tokens=$(jq -r 'select(.type == "turn.completed") | .usage | "入力 \(.input_tokens) / 出力 \(.output_tokens)（うち推論 \(.reasoning_output_tokens)）"' "$run_dir/events.jsonl" | tail -1)
 
-echo "## Codex の実装レビュー"
+echo "## $title"
 echo
 echo "- 設定: $model / effort=$effort / fast=$fast_label"
 echo "- 範囲: $scope（$files ファイル、$lines 行）"
