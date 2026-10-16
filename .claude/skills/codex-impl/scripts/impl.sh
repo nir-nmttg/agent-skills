@@ -1,22 +1,29 @@
 #!/usr/bin/env bash
-# Codex CLI（GPT-6 Luna、推論レベル max、Fast モード）に作業フォルダで実装させ、Codex が変えた差分を保存する。
+# Codex CLI（GPT-6 Luna、推論レベル max、Fast モード）に実装させ、Codex が変えた差分を保存する。
 #
-# 使い方: impl.sh [--cd <dir>] [--resume <thread_id>] <実行フォルダ>
-#   --cd      実装するリポジトリ（既定: 今のフォルダ）
-#   --resume  前回の Codex のスレッドを再開し、<実行フォルダ>/feedback.md を修正の依頼として渡す
+# 使い方: impl.sh [--cd <dir>] [--worktree] [--resume <thread_id>] <実行フォルダ>
+#   --cd        実装するリポジトリ（既定: 今のフォルダ）
+#   --worktree  作業フォルダではなく、専用の git worktree（<実行フォルダ>/worktree）で実装させる。
+#               並行して何本も動かすときや、その間に Claude が作業フォルダで作業するときに使う。
+#               結果は apply.sh で作業フォルダに反映する（2 回目以降は自動で同じ worktree を使う）
+#   --resume    前回の Codex のスレッドを再開し、<実行フォルダ>/feedback.md を修正の依頼として渡す
 #   --resume がなければ <実行フォルダ>/task.md を実装の指示として渡す。
 #
 # Codex は workspace-write のサンドボックス（作業フォルダだけ書き込み可、ネットワークなし）で動く。
 # 結果は回ごとに <実行フォルダ>/result-<回>.md、差分は diff-<回>.patch に保存する。
 # 環境変数 CODEX_IMPL_MODEL でモデルを変えられる（既定: gpt-6-luna）。
+# worktree には、作業フォルダにある依存パッケージのフォルダ（.gitignore 対象の node_modules / .venv / venv /
+# .bundle / vendor。CODEX_IMPL_LINK_DIRS で変えられる）をシンボリックリンクする。
 set -euo pipefail
 
-usage() { sed -n '4,7p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 1; }
+usage() { sed -n '4,10p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 1; }
+source "$(dirname "$0")/lib.sh"
 
-workdir=$PWD run_dir="" thread=""
+workdir=$PWD run_dir="" thread="" use_worktree=""
 while (($#)); do
   case $1 in
     --cd) workdir=${2:-}; shift 2 || usage ;;
+    --worktree) use_worktree=1; shift ;;
     --resume) thread=${2:-}; [[ -n $thread ]] || usage; shift 2 ;;
     -*) usage ;;
     *) [[ -z $run_dir ]] || usage; run_dir=$1; shift ;;
@@ -32,28 +39,49 @@ run_dir=$(cd -P "$run_dir" && pwd)
 input=$run_dir/task.md
 [[ -n $thread ]] && input=$run_dir/feedback.md
 [[ -s $input ]] || { echo "エラー: $input がないか空です" >&2; exit 1; }
-[[ -d $workdir ]] || { echo "エラー: 作業フォルダ $workdir がありません" >&2; exit 1; }
-workdir=$(git -C "$workdir" rev-parse --show-toplevel 2>/dev/null) || { echo "エラー: $workdir は git リポジトリではありません" >&2; exit 1; }
-git -C "$workdir" rev-parse -q --verify HEAD >/dev/null || { echo "エラー: $workdir にはまだコミットがありません" >&2; exit 1; }
 
 # 何回目の依頼か（結果ファイルの番号）
 n=1
 while [[ -e $run_dir/result-$n.md ]]; do n=$((n + 1)); done
 [[ -n $thread || $n == 1 ]] || { echo "エラー: この実行フォルダは実装済みです。修正の依頼は --resume <thread_id> で渡してください" >&2; exit 1; }
 
-# 作業ツリーの状態（未コミット・未追跡を含む）を、本物のインデックスに触れずにツリーとして記録する。
-# 実行前後のツリーを比べれば、もとからあった未コミットの変更と混ざらずに Codex の変更だけを取り出せる。
-tmp=$(mktemp -d)
-trap 'rm -rf "$tmp"' EXIT
-snapshot() {
-  local idx=$tmp/index real
-  real=$(git -C "$workdir" rev-parse --path-format=absolute --git-path index)
-  if [[ -f $real ]]; then cp "$real" "$idx"; else rm -f "$idx"; fi
-  GIT_INDEX_FILE=$idx git -C "$workdir" add -A
-  GIT_INDEX_FILE=$idx git -C "$workdir" write-tree
-}
+wt=$run_dir/worktree excl=""
+if [[ -f $run_dir/repo ]]; then
+  # 前回 worktree で実装した実行フォルダ
+  [[ -d $wt ]] || { echo "エラー: $wt がありません（反映・破棄済みです）。続きは新しい実行フォルダで依頼してください" >&2; exit 1; }
+  repo=$(<"$run_dir/repo")
+  workdir=$wt excl=$run_dir/linked
+else
+  [[ -d $workdir ]] || { echo "エラー: 作業フォルダ $workdir がありません" >&2; exit 1; }
+  workdir=$(git -C "$workdir" rev-parse --show-toplevel 2>/dev/null) || { echo "エラー: $workdir は git リポジトリではありません" >&2; exit 1; }
+  git -C "$workdir" rev-parse -q --verify HEAD >/dev/null || { echo "エラー: $workdir にはまだコミットがありません" >&2; exit 1; }
+  repo=$workdir
+  if [[ -n $use_worktree ]]; then
+    # 作業フォルダの今の状態（未コミットの変更を含む）を HEAD の子コミットにし、そこから worktree を切る。
+    # ブランチや本物のインデックスには触れない
+    base_tree=$(snapshot "$repo")
+    echo "$base_tree" >"$run_dir/base-tree"
+    base_commit=$(GIT_AUTHOR_NAME=codex-impl GIT_AUTHOR_EMAIL=codex-impl@localhost \
+      GIT_COMMITTER_NAME=codex-impl GIT_COMMITTER_EMAIL=codex-impl@localhost \
+      git -C "$repo" commit-tree "$base_tree" -p HEAD -m "codex-impl base")
+    git -C "$repo" -c core.hooksPath=/dev/null worktree add -q --detach "$wt" "$base_commit"
+    # 依存パッケージのフォルダをリンクし、Codex がテストを動かせるようにする（差分からは除く）
+    : >"$run_dir/linked"
+    link_names=" ${CODEX_IMPL_LINK_DIRS:-node_modules .venv venv .bundle vendor} "
+    while IFS= read -r -d '' d; do
+      d=${d%/}
+      [[ $link_names == *" ${d##*/} "* && ! -e $wt/$d ]] || continue
+      mkdir -p "$(dirname "$wt/$d")"
+      ln -s "$repo/$d" "$wt/$d"
+      echo "$d" >>"$run_dir/linked"
+    done < <(git -C "$repo" ls-files -z --others --ignored --exclude-standard --directory)
+    echo "$repo" >"$run_dir/repo"
+    workdir=$wt excl=$run_dir/linked
+  fi
+fi
+
 head_before=$(git -C "$workdir" rev-parse HEAD)
-tree_before=$(snapshot)
+tree_before=$(snapshot "$workdir" "$excl")
 dirty=""
 [[ $tree_before == "$(git -C "$workdir" rev-parse 'HEAD^{tree}')" ]] || dirty=1
 
@@ -95,7 +123,7 @@ fi
 
 # 失敗しても途中までの変更は残るので、差分は必ず保存する
 head_after=$(git -C "$workdir" rev-parse HEAD)
-tree_after=$(snapshot)
+tree_after=$(snapshot "$workdir" "$excl")
 git -C "$workdir" diff --binary "$tree_before" "$tree_after" >"$run_dir/diff-$n.patch"
 shortstat=$(git -C "$workdir" diff --shortstat "$tree_before" "$tree_after" | sed 's/^ *//')
 stat=$(git -C "$workdir" diff --stat "$tree_before" "$tree_after")
@@ -104,7 +132,7 @@ if ((status != 0)) || [[ ! -s $run_dir/result-$n.md ]]; then
   echo "エラー: Codex の実行に失敗しました（終了コード $status）" >&2
   jq -r 'select(.type == "error" or .item.type == "error") | .message // .item.message' "$run_dir/events-$n.jsonl" 2>/dev/null | tail -5 >&2 || true
   tail -20 "$run_dir/codex-$n.log" >&2
-  [[ -s $run_dir/diff-$n.patch ]] && echo "途中までの変更が作業フォルダに残っています: ${shortstat}（差分: $run_dir/diff-$n.patch）" >&2
+  [[ -s $run_dir/diff-$n.patch ]] && echo "途中までの変更が $workdir に残っています: ${shortstat}（差分: $run_dir/diff-$n.patch）" >&2
   exit 1
 fi
 
@@ -117,7 +145,11 @@ tokens=$(jq -r 'select(.type == "turn.completed") | .usage | "入力 \(.input_to
 echo "## Codex の実装結果（$n 回目）"
 echo
 echo "- 設定: $model / effort=max / fast=on"
-echo "- 作業フォルダ: $workdir"
+if [[ $workdir == "$wt" ]]; then
+  echo "- 作業場所: $wt（$repo の worktree。反映は apply.sh $run_dir）"
+else
+  echo "- 作業フォルダ: $workdir"
+fi
 echo "- 変更: ${shortstat:-なし}"
 echo "- 所要時間: $((SECONDS - started)) 秒、トークン: ${tokens:-不明}"
 echo "- 差分: $run_dir/diff-$n.patch"
