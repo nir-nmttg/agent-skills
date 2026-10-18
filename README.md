@@ -6,13 +6,13 @@
 
 `/スキル名` で呼び出すか、「使い方の例」のように話しかける。初めて使うときは `/setup-check` で、必要なコマンドやログインがそろっているかを確認する。
 
-setup-check・gh-my-work・gh-issue-overview・repo-security-audit は `/スキル名` でしか動かない（話しかけても、Claude が自分の判断で使うこともない）。
+setup-check・gh-todo・gh-issue-overview・repo-security-audit は `/スキル名` でしか動かない（話しかけても、Claude が自分の判断で使うこともない）。
 
 | スキル | できること | 使い方の例 | 前提 |
 | --- | --- | --- | --- |
 | [setup-check](.claude/skills/setup-check/SKILL.md) | このリポジトリのスキルを使うのに必要なもの（`git`・`jq`・`codex`・`claude`・`gh`・`python3`・`curl`・`node` のコマンド、Codex・Claude・gh のログイン、Cloudflare の security-audit スキル）がそろっているかを確認し、スキルごとに使える / 使えないをまとめる。足りないものはインストール・ログインの方法（Homebrew 前提）を案内する。`~/.claude/skills` へのリンクの有無も確認する。何もインストール・変更しない | `/setup-check` | なし |
 | [japanese-report](.claude/skills/japanese-report/SKILL.md) | ユーザーへの報告（完了報告・調査結果・レビュー結果・質問や確認）を、見出しやラベルまで含めて自然な日本語で書く。英語で返ってきたサブエージェントや Codex の出力、英語のログも貼らずに日本語で要約する。コードの識別子・パス・コマンド・エラーの原文・一般的な技術用語は英語のまま残す。コミットメッセージや PR 本文などファイルに残すものはリポジトリの慣習に従う。頼まなくても、Claude が結果を報告する前（とくに英語の材料をもとに書くとき）に使う。`/japanese-report` で直前の報告を日本語に書き直す | `/japanese-report`<br>「さっきの報告を日本語で書き直して」<br>「日本語で報告して」 | なし |
-| [gh-my-work](.claude/skills/gh-my-work/SKILL.md) | レビュー依頼されている PR、直近のメンションで未返信のもの、自分にアサインされている open な Issue / PR を組織ごとの表で一覧化する | `/gh-my-work`<br>`/gh-my-work レビュー依頼とメンションだけ` | `gh` にログイン済み |
+| [gh-todo](.claude/skills/gh-todo/SKILL.md) | レビュー依頼されている PR、直近のメンションで未返信のもの、自分にアサインされている open な Issue / PR を組織ごとの表で一覧化する | `/gh-todo`<br>`/gh-todo レビュー依頼とメンションだけ` | `gh` にログイン済み |
 | [gh-issue-overview](.claude/skills/gh-issue-overview/SKILL.md) | Issue を調べ、「なにをどうするか」がひと目でわかる実装計画の概要（前提・5W1H・全体像の図・進め方）を組み込みブラウザに表示する（`artifacts/gh-issue-overview/` に保存）。細かい実装には触れない | `/gh-issue-overview <Issue の URL>`<br>`/gh-issue-overview <Issue の URL> バックエンドだけ` | `gh` にログイン済み、`python3` |
 | [repo-security-audit](.claude/skills/repo-security-audit/SKILL.md) | Cloudflare の security-audit スキル（Full audit）で、指定したリポジトリ（省略時は今のフォルダの下のリポジトリすべて）を 1 つずつ包括的にセキュリティ監査する。ソースの変更や本番・外部サービスへのアクセスはせず、確定した問題・未検証事項・未調査領域を日本語で報告する（`artifacts/repo-security-audit/` に保存） | `/repo-security-audit`<br>`/repo-security-audit asked_backend asked_frontend`<br>`/repo-security-audit --profile quick` | [security-audit](https://github.com/cloudflare/security-audit-skill) スキルを導入済み（`npx skills add cloudflare/security-audit-skill`）、`node`、`jq` |
 | [codex-design-review](.claude/skills/codex-design-review/SKILL.md) | Claude が考えた設計を Codex CLI の GPT-6.1 Sol にセカンドオピニオンとしてレビューさせる。推論レベルは今の Claude と同じ（high なら high）、`--fast` で Fast モード。Codex は読み取り専用で既存コードと照らし合わせ、Claude が指摘ごとに採用・不採用を判断して設計の修正案を出す（`artifacts/codex-design-review/` に保存）。`--focus requirements,security` のように観点（requirements / reliability / security / simplicity）を指定すると、観点ごとに分けて Sol を並列に動かす。頼まなくても、3 ファイル以上・新しい機能や API・複数案から選んだ設計や、DB・公開 API・認証・課金などに触れる設計は、Claude が提示前に積極的にレビューさせる（迷ったら使う。1〜2 ファイルの局所的な変更は除く）。基本は Sol 1 本で、頼まれたとき、新しいモジュールを 2 つ以上作るか 10 ファイル以上に手を入れる設計、DB・認証・課金などの高リスク領域に 2 つ以上触れる設計のときだけ、観点ごとに 2〜3 本並列にする | `/codex-design-review`<br>`/codex-design-review --focus requirements,reliability docs/design.md`<br>「この設計を Codex にレビューしてもらって」 | `codex` にログイン済み、`jq` |

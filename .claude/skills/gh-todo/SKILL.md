@@ -1,19 +1,19 @@
 ---
-name: gh-my-work
-description: 自分宛ての GitHub の仕事（レビュー依頼されている PR、直近のメンションで未返信のもの、自分にアサインされている open な Issue / PR）を gh コマンドで取得し、組織ごとの表にまとめる。`/gh-my-work` で明示的に呼び出したときだけ動く。
+name: gh-todo
+description: 自分宛ての GitHub の仕事（レビュー依頼されている PR、直近のメンションで未返信のもの、自分にアサインされている open な Issue / PR）を gh コマンドで取得し、組織ごとの表にまとめる。`/gh-todo` で明示的に呼び出したときだけ動く。
 disable-model-invocation: true
-allowed-tools: Bash(bash *gh-my-work/scripts/my-work.sh*)
+allowed-tools: Bash(bash *gh-todo/scripts/todo.sh*)
 ---
 
 # 自分宛ての仕事の一覧
 
 ## 取得結果
 
-!`bash "${CLAUDE_SKILL_DIR}/scripts/my-work.sh" 2>&1`
+!`bash "${CLAUDE_SKILL_DIR}/scripts/todo.sh" 2>&1`
 
 ## 手順
 
-1. 上の「取得結果」が空、またはエラーの場合は、Bash で `bash "${CLAUDE_SKILL_DIR}/scripts/my-work.sh"` を実行して取り直す。
+1. 上の「取得結果」が空、またはエラーの場合は、Bash で `bash "${CLAUDE_SKILL_DIR}/scripts/todo.sh"` を実行して取り直す。
    - 未ログインのエラーなら `gh auth login` を案内して終了する。
 2. 取得結果の表を**そのまま**ユーザーに表示する（ユーザーには取得結果が見えていないため、省略せず出力する）。
    - 表の列・並び順・リンク・ステータス表記は変えない。翻訳もしない。

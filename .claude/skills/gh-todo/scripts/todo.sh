@@ -2,10 +2,10 @@
 # 自分宛ての GitHub の仕事（レビュー依頼・返信待ちのメンション・担当 PR / Issue）を取得し、
 # Markdown の一覧として出力する。
 #
-# 使い方: my-work.sh [検索修飾子...]
-#   例: my-work.sh                  # すべて
-#       my-work.sh org:achromono    # Organization で絞り込み
-#       my-work.sh repo:owner/name  # リポジトリで絞り込み
+# 使い方: todo.sh [検索修飾子...]
+#   例: todo.sh                  # すべて
+#       todo.sh org:achromono    # Organization で絞り込み
+#       todo.sh repo:owner/name  # リポジトリで絞り込み
 set -euo pipefail
 
 # 返信待ちとして拾うメンションの期間（日）
