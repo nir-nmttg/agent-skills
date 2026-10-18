@@ -4,13 +4,13 @@
 
 ## スキル一覧
 
-`/スキル名` で呼び出すか、「使い方の例」のように話しかける。初めて使うときは `/setup-check` で、必要なコマンドやログインがそろっているかを確認する。
+`/スキル名` で呼び出すか、「使い方の例」のように話しかける。初めて使うときは `/skills-preflight` で、必要なコマンドやログインがそろっているかを確認する。
 
-setup-check・gh-todo・gh-issue-overview・repo-security-audit は `/スキル名` でしか動かない（話しかけても、Claude が自分の判断で使うこともない）。
+skills-preflight・gh-todo・gh-issue-overview・repo-security-audit は `/スキル名` でしか動かない（話しかけても、Claude が自分の判断で使うこともない）。
 
 | スキル | できること | 使い方の例 | 前提 |
 | --- | --- | --- | --- |
-| [setup-check](.claude/skills/setup-check/SKILL.md) | このリポジトリのスキルを使うのに必要なもの（`git`・`jq`・`codex`・`claude`・`gh`・`python3`・`curl`・`node` のコマンド、Codex・Claude・gh のログイン、Cloudflare の security-audit スキル）がそろっているかを確認し、スキルごとに使える / 使えないをまとめる。足りないものはインストール・ログインの方法（Homebrew 前提）を案内する。`~/.claude/skills` へのリンクの有無も確認する。何もインストール・変更しない | `/setup-check` | なし |
+| [skills-preflight](.claude/skills/skills-preflight/SKILL.md) | このリポジトリのスキルを使うのに必要なもの（`git`・`jq`・`codex`・`claude`・`gh`・`python3`・`curl`・`node` のコマンド、Codex・Claude・gh のログイン、Cloudflare の security-audit スキル）がそろっているかを確認し、スキルごとに使える / 使えないをまとめる。足りないものはインストール・ログインの方法（Homebrew 前提）を案内する。`~/.claude/skills` へのリンクの有無も確認する。何もインストール・変更しない | `/skills-preflight` | なし |
 | [japanese-report](.claude/skills/japanese-report/SKILL.md) | ユーザーへの報告（完了報告・調査結果・レビュー結果・質問や確認）を、見出しやラベルまで含めて自然な日本語で書く。英語で返ってきたサブエージェントや Codex の出力、英語のログも貼らずに日本語で要約する。コードの識別子・パス・コマンド・エラーの原文・一般的な技術用語は英語のまま残す。コミットメッセージや PR 本文などファイルに残すものはリポジトリの慣習に従う。頼まなくても、Claude が結果を報告する前（とくに英語の材料をもとに書くとき）に使う。`/japanese-report` で直前の報告を日本語に書き直す | `/japanese-report`<br>「さっきの報告を日本語で書き直して」<br>「日本語で報告して」 | なし |
 | [gh-todo](.claude/skills/gh-todo/SKILL.md) | レビュー依頼されている PR、直近のメンションで未返信のもの、自分にアサインされている open な Issue / PR を組織ごとの表で一覧化する | `/gh-todo`<br>`/gh-todo レビュー依頼とメンションだけ` | `gh` にログイン済み |
 | [gh-issue-overview](.claude/skills/gh-issue-overview/SKILL.md) | Issue を調べ、「なにをどうするか」がひと目でわかる実装計画の概要（前提・5W1H・全体像の図・進め方）を組み込みブラウザに表示する（`artifacts/gh-issue-overview/` に保存）。細かい実装には触れない | `/gh-issue-overview <Issue の URL>`<br>`/gh-issue-overview <Issue の URL> バックエンドだけ` | `gh` にログイン済み、`python3` |
