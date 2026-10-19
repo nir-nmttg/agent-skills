@@ -28,4 +28,8 @@ repo=$(jq -r 'if (.repo | type) == "string" then .repo else "" end' "$dir/plan.j
 
 echo "実行フォルダ: $run_dir"
 echo "実装の指示: $run_dir/task.md（指示書をコピー済み）"
-echo "次: bash $skills_dir/codex-impl/scripts/impl.sh ${repo:+--cd $repo }--worktree $run_dir（run_in_background で実行）"
+cmd=(bash "$skills_dir/codex-impl/scripts/impl.sh")
+[[ -n $repo ]] && cmd+=(--cd "$repo")
+cmd+=(--worktree "$run_dir")
+# パスに空白があってもそのまま実行できるようにクォートする
+echo "次: $(printf '%q ' "${cmd[@]}" | sed 's/ $//')（run_in_background で実行）"

@@ -55,6 +55,7 @@ allowed-tools: Bash(bash *parallel-tasks/scripts/new-plan.sh*), Bash(bash *paral
 
 - `codex` が見つからない・ログインしていないときは、`self` か `session` に置き換える。
 - `start_session` がない環境（ターミナルの Claude Code など）では、`session` を `self` に置き換える。
+- 対象が今のフォルダ以外のリポジトリ（`plan.json` に `repo` を書く）なら、`session` は使わず `self` か `codex` にする。提案カードには作業するフォルダを付けられないため。ユーザーがそのリポジトリでの別セッションを自分の言葉で頼んだときだけ、`initiation: "user_asked"` と `cwd` で始めてよい。
 - 同時に動かすのは、Luna・別セッション・Explore のそれぞれ 4 本までを目安にする。それより多ければ、終わった分から次を動かす。
 
 ## 手順
@@ -62,7 +63,7 @@ allowed-tools: Bash(bash *parallel-tasks/scripts/new-plan.sh*), Bash(bash *paral
 ### 1. 引数を読む
 
 - 進めたいことを読み取る。足りない前提があり、推測では決められなければユーザーに確認する。
-- 対象が今のフォルダ以外のリポジトリなら、3. で `plan.json` の `repo` にそのリポジトリの絶対パスを書く（plan-check.sh と to-codex.sh が使う）。別セッションの `start_session` には `cwd` としてそのパスを渡す。
+- 対象が今のフォルダ以外のリポジトリなら、3. で `plan.json` の `repo` にそのリポジトリの絶対パスを書く（plan-check.sh と to-codex.sh が使う。Explore の指示書にもこのパスが入る）。
 
 ### 2. 分け方を決める
 
@@ -138,7 +139,7 @@ bash "${CLAUDE_SKILL_DIR}/scripts/plan-check.sh" <計画フォルダ>
    bash "${CLAUDE_SKILL_DIR}/scripts/next.sh" <計画フォルダ>
    ```
 
-3. 出てきた作業を、**1 つのメッセージでまとめて**始める。
+3. 出てきた作業を、**1 つのメッセージでまとめて**始める。その前に、codex の作業ごとに to-codex.sh を実行し、session の作業の指示書を Read で読んでおく。
 
    - **explore**: Agent ツールで `subagent_type: "Explore"`、`model: "sonnet"`（または `"haiku"`）、`run_in_background: true`。prompt は「次の指示書を Read で読み、その指示に従って調査し、指示書の『報告の形式』だけで報告して: <指示書のパス>」とする。
    - **codex**: 指示書を codex-impl に渡してから、codex-impl の手順 4. のとおり `run_in_background: true` で実装させる。codex-impl の SKILL.md を読み込んでいなければ、`${CLAUDE_SKILL_DIR}/../codex-impl/SKILL.md` の 4.〜6. を Read で読む。
@@ -147,7 +148,7 @@ bash "${CLAUDE_SKILL_DIR}/scripts/plan-check.sh" <計画フォルダ>
      bash "${CLAUDE_SKILL_DIR}/scripts/to-codex.sh" <計画フォルダ> <id>
      ```
 
-     to-codex.sh が出力した impl.sh のコマンド（`repo` があれば `--cd` つき）を、そのまま実行する。
+     to-codex.sh が出力した impl.sh のコマンド（`repo` があれば `--cd` つき）を、そのまま `run_in_background: true` で実行する。
 
    - **session**: `start_session` を `initiation: "own_initiative"`、`context: "fresh"`、作業ごとに 1 枚で出す。prompt には指示書の中身をそのまま入れる（別セッションは計画フォルダを読めないことがあるため、この作業の指示書だけは Read で読む）。title は作業の `title` にする。
    - **self**: ほかの作業を始めたあと、作業フォルダで Claude が進める。
@@ -165,7 +166,7 @@ bash "${CLAUDE_SKILL_DIR}/scripts/plan-check.sh" <計画フォルダ>
 - **session**: 報告をうのみにせず、ブランチの差分で結果を確かめる。作業フォルダへのマージは、ユーザーが自分の言葉で頼んだときだけ行う（マージするかをユーザーに聞く）。
 - **self**: 終わったら次へ進む。
 
-終わった作業に依存する作業があるなら、その報告（Claude 本体なら、後の作業に要ることの要約）を Write で計画フォルダの `results/<id>.md` に保存し、もう一度 4. を実行してから次の作業を始める。指示書が作り直され、依存する作業の指示書に「依存先の結果」として入る（Explore の調査結果は、こうしないと後の作業に渡らない）。すでに始めた作業には影響しない。
+終わった作業に依存する `self` 以外の作業があるなら、その報告（Claude 本体なら、後の作業に要ることの要約）を Write で計画フォルダの `results/<id>.md` に保存し、もう一度 4. を実行してから次の作業を始める。指示書が作り直され、依存する作業の指示書に「依存先の結果」として入る（Explore の調査結果は、こうしないと後の作業に渡らない）。すでに始めた作業には影響しない。依存する作業が `self` だけなら、Claude が報告を読んでいるので保存は要らない。
 
 終わったら、すぐに次に始められる作業を出し、出てきた作業を始める（段の全体が終わるのを待たない）。
 

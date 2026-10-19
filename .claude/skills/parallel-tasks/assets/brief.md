@@ -10,6 +10,10 @@
 
 {{goal}}
 
+## 対象のリポジトリ
+
+{{repo}}
+
 ## {{files_heading}}
 
 {{files}}

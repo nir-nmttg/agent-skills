@@ -20,7 +20,8 @@ plan="$dir/plan.json"
 [[ -f $plan ]] || { echo "plan.json がありません: $plan" >&2; exit 1; }
 jq empty "$plan" 2>/dev/null || { echo "plan.json を JSON として読めません: $plan" >&2; exit 1; }
 repo=$(jq -r 'if (.repo | type) == "string" then .repo else "." end' "$plan")
-git -C "$repo" rev-parse --git-dir >/dev/null 2>&1 || { echo "repo が git リポジトリではありません: $repo" >&2; exit 1; }
+top=$(git -C "$repo" rev-parse --show-toplevel 2>/dev/null) || { echo "repo が git リポジトリではありません: $repo" >&2; exit 1; }
+repo=$top
 
 script_dir=$(cd -P "$(dirname "$0")" && pwd)
 skill_dir=$(dirname "$script_dir")
@@ -28,7 +29,12 @@ tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 git -C "$repo" ls-files -co --exclude-standard >"$tmp/files" 2>/dev/null || : >"$tmp/files"
 
-result=$(jq -L "$script_dir" --rawfile files "$tmp/files" '
+# 今のフォルダと対象のリポジトリが違うか（別セッションの提案カードには作業するフォルダを付けられない）
+here=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+other_repo=false
+[[ $(cd -P "$here" && pwd) == $(cd -P "$repo" && pwd) ]] || other_repo=true
+
+result=$(jq -L "$script_dir" --rawfile files "$tmp/files" --argjson other_repo "$other_repo" '
   include "plan";
   ($files | split("\n") | map(select(length > 0))) as $files
   | . as $plan
@@ -91,6 +97,8 @@ result=$(jq -L "$script_dir" --rawfile files "$tmp/files" '
                     | [$T[] | select((.depends_on // []) | index($id)) | .id] as $dependents
                     | select(($dependents | length) > 0)
                     | "\($id): 別セッションの結果がこの作業フォルダに入るのはマージしてからなので、依存する \($dependents | join("、")) が止まります"),
+                  (if $other_repo and any($T[]; .runner == "session")
+                   then "repo が今のフォルダと違うので、別セッションの提案カードは出せません。session の作業は self か codex にします" else empty end),
                   (if (($plan.contracts // []) | length) > 0 and any($T[]; .runner == "session")
                    then "共通部分（contracts）は、コミットするまで別セッションからは見えません" else empty end),
                   (($plan.contracts // [])[] as $c | $T[] | select(writes and any(.files[]; overlaps(.; $c.file; $files)))
@@ -130,7 +138,7 @@ for f in "$dir"/results/*.md; do
   results=$(jq -Rs --argjson acc "$results" --arg id "$(basename "$f" .md)" '$acc + {($id): .}' "$f")
 done
 for id in $(jq -r '.briefs[]' <<<"$result"); do
-  jq -r -L "$script_dir" --arg id "$id" --rawfile tpl "$template" --argjson results "$results" '
+  jq -r -L "$script_dir" --arg id "$id" --arg repo "$repo" --rawfile tpl "$template" --argjson results "$results" '
     include "plan";
     def bullets: if length == 0 then "- なし" else map("- \(.)") | join("\n") end;
     def code_bullets: if length == 0 then "- なし" else map("- `\(.)`") | join("\n") end;
@@ -147,6 +155,9 @@ for id in $(jq -r '.briefs[]' <<<"$result"); do
         title: $t.title,
         plan_goal: ($plan.goal // "（書かれていない）"),
         goal: ($t.goal // $t.title),
+        # Explore は Claude の作業フォルダで動くので絶対パスを渡す。codex と session は専用の worktree で動く
+        repo: (if $w then "今の作業フォルダ（このリポジトリの専用の worktree）。ファイルのパスはここからの相対で書いてある"
+               else "`\($repo)`。ファイルのパスはここからの相対で書いてある。このフォルダの中だけを調べる" end),
         files_heading: (if $w then "触ってよいファイル" else "読む範囲" end),
         files: (($t.files // []) | if length == 0 then "- 指定なし（目的に必要な範囲だけ読む）" else code_bullets end),
         not_files: (if $w
@@ -200,7 +211,8 @@ for id in $(jq -r '.briefs[]' <<<"$result"); do
   ' "$plan" >"$dir/briefs/$id.md"
 done
 
-jq -r -L "$script_dir" --arg dir "$dir" --arg next "$script_dir/next.sh" '
+next_cmd=$(printf '%q ' bash "$script_dir/next.sh" "$dir" | sed 's/ $//')
+jq -r -L "$script_dir" --arg dir "$dir" --arg next_cmd "$next_cmd" '
   include "plan";
   "計画: \(if .goal == "" then "（goal が書かれていない）" else .goal end)",
   "作業: \([.waves[][]] | length) 本（\(.counts | to_entries | map("\(.key | runner_label) \(.value)") | join("・"))）",
@@ -212,5 +224,5 @@ jq -r -L "$script_dir" --arg dir "$dir" --arg next "$script_dir/next.sh" '
   "",
   (if (.briefs | length) > 0 then "指示書:", (.briefs[] | "  \(.): \($dir)/briefs/\(.).md") else empty end),
   "",
-  "今すぐ始められる作業を出す: bash \($next) \($dir)"
+  "今すぐ始められる作業を出す: \($next_cmd)"
 ' <<<"$result"
