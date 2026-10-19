@@ -4,7 +4,7 @@
 #
 # 使い方: todo.sh [検索修飾子...]
 #   例: todo.sh                  # すべて
-#       todo.sh org:achromono    # Organization で絞り込み
+#       todo.sh org:my-org       # Organization で絞り込み
 #       todo.sh repo:owner/name  # リポジトリで絞り込み
 set -euo pipefail
 
