@@ -27,11 +27,11 @@ for skill in "$src_dir"/*/; do
       continue
     fi
     if [[ "$current" != "$src_dir"/* ]]; then
-      echo "skip $name: 別の場所へのリンクがあります（$current）" >&2
+      echo "skip $name: 別の場所へのリンクがあります（${current}）" >&2
       continue
     fi
   elif [[ -e "$dest" ]]; then
-    echo "skip $name: 同名のファイルかディレクトリがあります（$dest）" >&2
+    echo "skip $name: 同名のファイルかディレクトリがあります（${dest}）" >&2
     continue
   fi
 

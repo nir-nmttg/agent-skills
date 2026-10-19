@@ -289,10 +289,10 @@ echo
 echo "## 差分"
 echo
 if gh pr diff "$pnum" --repo "$po/$pr" >"$diff_file" 2>"$tmp/diff.err"; then
-  echo "- 保存: $diff_file（$(awk 'END { print NR }' "$diff_file") 行）"
+  echo "- 保存: ${diff_file}（$(awk 'END { print NR }' "$diff_file") 行）"
 elif git cat-file -e "$base_oid^{commit}" 2>/dev/null && git cat-file -e "$head_oid^{commit}" 2>/dev/null &&
      git diff "$base_oid...$head_oid" >"$diff_file"; then
-  echo "- 保存: $diff_file（$(awk 'END { print NR }' "$diff_file") 行。GitHub から取れなかったためローカルの git で作成）"
+  echo "- 保存: ${diff_file}（$(awk 'END { print NR }' "$diff_file") 行。GitHub から取れなかったためローカルの git で作成）"
 else
   rm -f "$diff_file"
   echo "- ⚠️ 差分を取得できませんでした: $(head -1 "$tmp/diff.err")"
@@ -311,7 +311,7 @@ if remotes=$(git remote -v 2>/dev/null) && grep -qiE "github\.com[:/]$match(\.gi
   branch=$(git branch --show-current)
   head=$(git rev-parse HEAD)
   dirty=$(git status --porcelain | awk 'END { print NR }')
-  echo "- いまのフォルダ（$root、ブランチ ${branch:-（detached）}）はこのリポジトリの clone"
+  echo "- いまのフォルダ（${root}、ブランチ ${branch:-（detached）}）はこのリポジトリの clone"
   if [[ $head == "$head_oid" ]]; then
     echo "- HEAD が PR の head と一致。PR のコードはローカルで Read / Grep できる"
     ((dirty == 0)) || echo "- ⚠️ 未コミットの変更が $dirty 件ある（PR には含まれていない）"

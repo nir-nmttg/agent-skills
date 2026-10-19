@@ -177,7 +177,7 @@ JQ
 printf '%s\n' "$data" "$mentions" "$projects" | jq -rs "$FORMAT"
 
 if [[ -n $local_root ]]; then
-  echo "- ローカル: いまのフォルダ（$local_root、ブランチ $local_branch）がこのリポジトリの clone。コードはローカルで調べられる"
+  echo "- ローカル: いまのフォルダ（${local_root}、ブランチ ${local_branch}）がこのリポジトリの clone。コードはローカルで調べられる"
 else
   echo "- ローカル: いまのフォルダはこのリポジトリではない。コードは repo.sh（GitHub API）で調べる"
 fi

@@ -9,6 +9,6 @@ set -euo pipefail
 # ~/.claude/skills のシンボリックリンク経由で呼ばれても、リンク先のリポジトリのスクリプトを使う
 here=$(cd -P "$(dirname "$0")" && pwd)
 base=$here/../../gh-issue-overview/scripts/repo.sh
-[[ -f $base ]] || { echo "エラー: gh-issue-overview スキルが見つかりません（$base）" >&2; exit 1; }
+[[ -f $base ]] || { echo "エラー: gh-issue-overview スキルが見つかりません（${base}）" >&2; exit 1; }
 
 exec bash "$base" "$@"
