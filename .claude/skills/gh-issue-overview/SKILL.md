@@ -1,6 +1,6 @@
 ---
 name: gh-issue-overview
-description: GitHub Issue の URL を受け取り、Issue・関連 Issue / PR・リポジトリを gh コマンドで調べて、「なにをどうするか」がひと目でわかる実装計画の概要を 5W1H と Mermaid 図でまとめ、組み込みブラウザで表示する。参画して日が浅いプロジェクトでも読めるよう前提から短く説明し、ファイルや関数レベルの細かい実装には踏み込まない。`/gh-issue-overview <Issue の URL>` で明示的に呼び出したときだけ動く。
+description: GitHub Issue を gh コマンドで調べ、「なにをどうするか」がひと目でわかる実装計画の概要を 5W1H と Mermaid 図にまとめ、組み込みブラウザで表示する。
 disable-model-invocation: true
 argument-hint: <Issue の URL>
 allowed-tools: Bash(bash *gh-issue-overview/scripts/fetch-issue.sh*), Bash(bash *gh-issue-overview/scripts/repo.sh*), Bash(bash *gh-issue-overview/scripts/publish-plan.sh*), Bash(git ls-files *), Read, Grep, Glob, Edit(//**/artifacts/gh-issue-overview/**), mcp__Claude_Browser__preview_start, mcp__Claude_Browser__find

@@ -1,6 +1,6 @@
 ---
 name: codex-risk-impl-review
-description: リスクの高い実装（git の差分）を Codex CLI の GPT-6 Astra に「どう壊れるか」の観点でレビューさせ、Claude が指摘ごとに採否を判断して直す。「実装を Astra にレビューしてもらって」「本番に出す前に Astra で確認して」などの依頼で使う。Astra は重いので自分の判断では実行しない。DB 移行・認可・課金・外部への送信など、壊れると影響が大きく戻しにくい変更のときだけ、完了報告やコミットの前に使うかをユーザーに聞く（詳しい基準は本文）。
+description: リスクの高い実装（git の差分）を Codex CLI の GPT-6 Astra に「どう壊れるか」の観点でレビューさせて直す。「実装を Astra にレビューしてもらって」「本番に出す前に Astra で確認して」などの依頼で使う。重いので自分の判断では実行せず、DB 移行・認可・課金・外部への送信など戻しにくい変更のときだけ、使うかをユーザーに聞く（詳しい基準は本文）。
 argument-hint: "[--fast] [--base <ref> | --commit <sha> | --uncommitted] [補足]"
 allowed-tools: Bash(bash *codex-risk-impl-review/scripts/new-run.sh*), Bash(bash *codex-risk-impl-review/scripts/review.sh*), Read, Grep, Glob, Write(//**/artifacts/codex-risk-impl-review/**), Edit(//**/artifacts/codex-risk-impl-review/**)
 ---

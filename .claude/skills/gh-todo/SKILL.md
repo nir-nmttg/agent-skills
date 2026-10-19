@@ -1,6 +1,6 @@
 ---
 name: gh-todo
-description: 自分宛ての GitHub の仕事（レビュー依頼されている PR、直近のメンションで未返信のもの、自分にアサインされている open な Issue / PR）を gh コマンドで取得し、組織ごとの表にまとめる。`/gh-todo` で明示的に呼び出したときだけ動く。
+description: 自分宛ての GitHub の仕事（レビュー依頼、未返信のメンション、アサインされた Issue / PR）を gh コマンドで集め、組織ごとの表にまとめる。
 disable-model-invocation: true
 allowed-tools: Bash(bash *gh-todo/scripts/todo.sh*)
 ---

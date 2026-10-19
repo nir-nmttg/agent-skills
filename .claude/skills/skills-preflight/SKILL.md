@@ -1,6 +1,6 @@
 ---
 name: skills-preflight
-description: このリポジトリのスキルを使うのに必要なもの（git・jq・codex・claude・gh・python3・curl・node のコマンド、Codex・Claude・gh のログイン、Cloudflare の security-audit スキル）がそろっているかを確認し、スキルごとに使える / 使えないをまとめる。足りないものはインストール・ログインの方法を案内する。`/skills-preflight` で明示的に呼び出したときだけ動く。
+description: このリポジトリのスキルに必要なコマンド・ログイン・外部スキルがそろっているかを確認し、スキルごとの使える / 使えないと、足りないものの入れ方をまとめる。
 disable-model-invocation: true
 allowed-tools: Bash(bash *skills-preflight/scripts/check.sh*)
 ---

@@ -1,6 +1,6 @@
 ---
 name: codex-impl-review
-description: Claude が実装した変更（git の差分）を Codex CLI の GPT-6.1 Sol にセカンドオピニオンとしてコードレビューさせ、Claude が指摘ごとに採否を判断して直す。「実装を Codex にレビューしてもらって」「コミット前に Codex でクロスレビューして」「観点ごとに分けて Codex で並列レビューして」などの依頼で使う。依頼がなくても、2 ファイル以上か 30 行以上のロジック変更や、DB・認証・課金などに触れる変更を終えたら、完了報告やコミットの前に使い、迷ったら使う。基本は Sol 1 本で、条件に当たるときだけ観点ごとに並列にする（詳しい基準は本文）。
+description: Claude が実装した変更を Codex CLI の GPT-6.1 Sol にコードレビューさせて直す。「実装を Codex にレビューしてもらって」「コミット前に Codex でクロスレビューして」などの依頼で使う。依頼がなくても、2 ファイル以上か 30 行以上のロジック変更や DB・認証・課金などに触れる変更を終えたら、完了報告やコミットの前に使い、迷ったら使う（詳しい基準は本文）。
 argument-hint: "[--fast] [--base <ref> | --commit <sha> | --uncommitted] [--focus <観点>,...] [補足]"
 allowed-tools: Bash(bash *codex-impl-review/scripts/new-run.sh*), Bash(bash *codex-impl-review/scripts/review.sh*), Read, Grep, Glob, Write(//**/artifacts/codex-impl-review/**), Edit(//**/artifacts/codex-impl-review/**)
 ---
