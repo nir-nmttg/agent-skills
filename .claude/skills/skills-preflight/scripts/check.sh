@@ -128,6 +128,7 @@ skill_needs() {
   case $1 in
     codex-*) echo "git jq codex codex-login" ;;
     opus-final-review) echo "git jq claude claude-login" ;;
+    parallel-tasks) echo "git jq" ;;
     gh-todo) echo "jq gh gh-login" ;;
     gh-issue-overview) echo "jq gh gh-login python3 curl" ;;
     gh-pr-precheck) echo "jq gh gh-login curl" ;;
