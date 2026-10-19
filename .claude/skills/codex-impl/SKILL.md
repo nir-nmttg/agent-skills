@@ -1,6 +1,6 @@
 ---
 name: codex-impl
-description: 実装を Codex CLI の GPT-6 Luna に任せ、Claude は分割・指示書づくり・差分のレビューと反映だけを行って Claude のトークンを節約する。独立した小タスクに分ければ複数の Luna を並行で動かす。「実装を Codex に任せて」「Luna に並列で実装させて」「トークン節約で Codex に書かせて」などの依頼で使う。依頼がなくても、要件と完了の条件がはっきりした 100 行以上の実装に取りかかるときは自分の判断で任せ、迷ったら任せる（任せない作業など、詳しい基準は本文）。
+description: 実装を Codex CLI の GPT-6 Luna に任せ、Claude は指示書づくりと差分のレビュー・反映だけを行ってトークンを節約する。「実装を Codex に任せて」「Luna に並列で実装させて」などの依頼で使う。依頼がなくても、要件と完了の条件がはっきりした 100 行以上の実装に取りかかるときは任せ、迷ったら任せる（詳しい基準は本文）。
 argument-hint: "[--cd <リポジトリ>] <実装してほしいこと>"
 allowed-tools: Bash(bash *codex-impl/scripts/new-run.sh*), Bash(bash *codex-impl/scripts/impl.sh*), Bash(bash *codex-impl/scripts/apply.sh*), Read, Grep, Glob, Write(//**/artifacts/codex-impl/**), Edit(//**/artifacts/codex-impl/**)
 ---

@@ -1,6 +1,6 @@
 ---
 name: parallel-tasks
-description: 依頼を独立した作業に分けられるかを判断し、分けられるときは作業ごとにいちばん安い手段（読むだけの調査は Explore サブエージェント、要件がはっきりした実装は codex-impl の Luna、判断を含む作業は別セッション、最長の道筋の上の作業は Claude 本体）に振り分けて並列に進める。触るファイルの重なり・依存の循環・実行の順番のチェックと指示書づくりはスクリプトが行う。「並列で進めて」「手分けして効率よくやって」「この作業を分けて同時に進めて」などの依頼で使う。依頼がなくても、独立して進められる作業が 2 つ以上ある依頼（複数の場所にまたがる調査、下調べと実装、独立した複数の修正など）に取りかかるときや、作業の途中で並行できる調査や実装が見えたときは自分の判断で使い、迷ったら使う。調査を並行させるだけなら計画を省いた軽い進め方で使う（使わない場合など、詳しい基準は本文）。
+description: 依頼を独立した作業に分け、Explore・codex-impl の Luna・別セッション・Claude 本体のうち安い手段に振り分けて並列に進める。「並列で進めて」「手分けして効率よくやって」などの依頼で使う。依頼がなくても、独立して進められる調査や実装が 2 つ以上あるときは自分の判断で使い、迷ったら使う（詳しい基準は本文）。
 argument-hint: "[--cd <リポジトリ>] <進めたいこと>"
 allowed-tools: Bash(bash *parallel-tasks/scripts/new-plan.sh*), Bash(bash *parallel-tasks/scripts/plan-check.sh*), Bash(bash *parallel-tasks/scripts/next.sh*), Bash(bash *parallel-tasks/scripts/to-codex.sh*), Bash(bash *codex-impl/scripts/impl.sh*), Bash(bash *codex-impl/scripts/apply.sh*), Read, Grep, Glob, Write(//**/artifacts/parallel-tasks/**), Edit(//**/artifacts/parallel-tasks/**)
 ---

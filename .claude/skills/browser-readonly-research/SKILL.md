@@ -1,6 +1,6 @@
 ---
 name: browser-readonly-research
-description: 組み込みブラウザか Chrome（ユーザーのログイン状態のまま）でページを読むだけの情報収集をし、要点と出典を日本語のレポートにまとめる。クリックでの送信・入力・ログイン・同意など、ページやアカウントの状態を変える操作は一切しない。WebFetch では読めない、ログインが必要な社内ツールや JavaScript で描画されるページの調査に向く。`/browser-readonly-research <URL や調べたいこと>` で明示的に呼び出したときだけ動く。
+description: 組み込みブラウザか Chrome でページを読むだけの情報収集をし、要点と出典を日本語のレポートにまとめる。ページやアカウントの状態を変える操作はしない。
 disable-model-invocation: true
 argument-hint: [--chrome] <URL や調べたいこと>
 allowed-tools: Bash(bash *browser-readonly-research/scripts/save-report.sh*), WebSearch, WebFetch, mcp__Claude_Browser__preview_start, mcp__Claude_Browser__navigate, mcp__Claude_Browser__get_page_text, mcp__Claude_Browser__read_page, mcp__Claude_Browser__find, mcp__Claude_Browser__tabs_context, mcp__Claude_Browser__tabs_create, mcp__claude-in-chrome__tabs_context_mcp, mcp__claude-in-chrome__tabs_create_mcp, mcp__claude-in-chrome__navigate, mcp__claude-in-chrome__get_page_text, mcp__claude-in-chrome__read_page, mcp__claude-in-chrome__find

@@ -1,6 +1,6 @@
 ---
 name: codex-design-review
-description: Claude が考えた設計（会話中の設計案や設計書ファイル）を Codex CLI の GPT-6.1 Sol にセカンドオピニオンとしてレビューさせ、Claude が指摘ごとに採否を判断して設計の直し方を提案する。「この設計を Codex にレビューしてもらって」「GPT にセカンドオピニオンをもらって」「観点ごとに分けて Codex で並列レビューして」などの依頼で使う。依頼がなくても、3 ファイル以上・新しい機能や API・DB や認証などに触れる設計を提示する前に使い、迷ったら使う。基本は Sol 1 本で、条件に当たるときだけ観点ごとに並列にする（詳しい基準は本文）。
+description: Claude が考えた設計（会話中の案や設計書）を Codex CLI の GPT-6.1 Sol にセカンドオピニオンとしてレビューさせる。「この設計を Codex にレビューしてもらって」「GPT にセカンドオピニオンをもらって」などの依頼で使う。依頼がなくても、3 ファイル以上・新しい機能や API・DB や認証などに触れる設計を提示する前に使い、迷ったら使う（詳しい基準は本文）。
 argument-hint: "[--fast] [--focus <観点>,...] [設計書のパス] [補足]"
 allowed-tools: Bash(bash *codex-design-review/scripts/new-run.sh*), Bash(bash *codex-design-review/scripts/review.sh*), Read, Grep, Glob, Write(//**/artifacts/codex-design-review/**), Edit(//**/artifacts/codex-design-review/**)
 ---

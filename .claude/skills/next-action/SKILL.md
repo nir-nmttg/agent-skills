@@ -1,6 +1,6 @@
 ---
 name: next-action
-description: 並行して進めているセッションの目的・終わったこと・残っていること・待っているものをまとめ、次にやるべきアクションを 1 つ示す。`--all` でほかのセッションも含めた一覧にする。報告するだけで実行はしない。`/next-action` で明示的に呼び出したときだけ動く。
+description: 並行して進めているセッションの状況をまとめ、次にやるべきアクションを 1 つ示す。`--all` でほかのセッションも含めた一覧にする。報告するだけで実行はしない。
 disable-model-invocation: true
 argument-hint: [--all] [補足]
 allowed-tools: Bash(bash *next-action/scripts/state.sh*), mcp__ccd_session_mgmt__get_session, mcp__ccd_session_mgmt__list_sessions, mcp__ccd_session_mgmt__list_events

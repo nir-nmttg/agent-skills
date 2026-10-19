@@ -1,6 +1,6 @@
 ---
 name: codex-test
-description: テスト・型チェック・リンター・ビルドの実行を Codex CLI の GPT-6 Luna に任せ、失敗の要点・場所・原因の見立てだけを報告させて、テストログを Claude が読むトークンを節約する。「テストして」「Codex でテストを回して結果を教えて」「CI 通る？」などの依頼で使う。依頼がなくても、Claude がテスト・型チェック・リンター・ビルドを実行するときは原則これで任せ、迷ったら任せる（Claude が直接実行してよい場合など、詳しい基準は本文）。
+description: テスト・型チェック・リンター・ビルドの実行を Codex CLI の GPT-6 Luna に任せ、失敗の要点・場所・原因の見立てだけを報告させてトークンを節約する。「テストして」「CI 通る？」などの依頼で使う。依頼がなくても、Claude がテスト・型チェック・リンター・ビルドを実行するときは原則これで任せ、迷ったら任せる（詳しい基準は本文）。
 argument-hint: "[--cd <リポジトリ>] [--network] [実行するコマンドや範囲]"
 allowed-tools: Bash(bash *codex-test/scripts/run.sh*), Read, Grep, Glob
 ---

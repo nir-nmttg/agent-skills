@@ -1,6 +1,6 @@
 ---
 name: codex-risk-design-review
-description: リスクの高い設計（会話中の設計案や設計書ファイル）を、実装に入る前に Codex CLI の GPT-6 Astra に「どう壊れるか」の観点でレビューさせ、Claude が指摘ごとに採否を判断して設計の直し方を提案する。「この設計を Astra にレビューしてもらって」「実装前に Astra で設計を確認して」などの依頼で使う。Astra は重いので自分の判断では実行しない。DB 移行・認可・課金・外部への送信など、壊れると影響が大きく戻しにくい設計のときだけ、提示や実装の前に使うかをユーザーに聞く（詳しい基準は本文）。
+description: リスクの高い設計を、実装に入る前に Codex CLI の GPT-6 Astra に「どう壊れるか」の観点でレビューさせる。「この設計を Astra にレビューしてもらって」「実装前に Astra で設計を確認して」などの依頼で使う。重いので自分の判断では実行せず、DB 移行・認可・課金・外部への送信など戻しにくい設計のときだけ、使うかをユーザーに聞く（詳しい基準は本文）。
 argument-hint: "[--fast] [設計書のパス] [補足]"
 allowed-tools: Bash(bash *codex-risk-design-review/scripts/new-run.sh*), Bash(bash *codex-risk-design-review/scripts/review.sh*), Read, Grep, Glob, Write(//**/artifacts/codex-risk-design-review/**), Edit(//**/artifacts/codex-risk-design-review/**)
 ---

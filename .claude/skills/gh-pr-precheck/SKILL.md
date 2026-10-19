@@ -1,6 +1,6 @@
 ---
 name: gh-pr-precheck
-description: GitHub Issue の URL を受け取り、Issue の本文・コメント・関連 Issue / PR・リンク先の資料・画像から要件を洗い出して、対応する PR が要件を満たしているか、要件にない変更をしていないか、プロジェクトの方針（CLAUDE.md・CONTRIBUTING・PR テンプレート・既存コードの書き方）に沿っているか、CI・コンフリクト・未解決のレビューなどレビューに出せる状態かを確かめ、人間のレビューに進めてよいかを判定する。コードの変更や GitHub への書き込みはしない。`/gh-pr-precheck <Issue の URL> [PR の URL]` で明示的に呼び出したときだけ動く。
+description: GitHub Issue から要件を洗い出し、対応する PR が要件とプロジェクトの方針を満たしてレビューに出せる状態かを確かめ、人間のレビューに進めてよいかを判定する。
 disable-model-invocation: true
 argument-hint: <Issue の URL> [PR の URL] [補足]
 allowed-tools: Bash(bash *gh-pr-precheck/scripts/fetch-pr.sh*), Bash(bash *gh-pr-precheck/scripts/issue.sh*), Bash(bash *gh-pr-precheck/scripts/repo.sh*), Bash(bash *gh-pr-precheck/scripts/pr-file.sh*), Bash(bash *gh-pr-precheck/scripts/pr-comments.sh*), Bash(bash *gh-pr-precheck/scripts/fetch-images.sh*), Bash(bash *gh-pr-precheck/scripts/save-report.sh*), Bash(git show *), Bash(git log *), Bash(git ls-files *), Read, Grep, Glob, WebFetch

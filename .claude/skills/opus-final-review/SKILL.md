@@ -1,6 +1,6 @@
 ---
 name: opus-final-review
-description: この会話を共有しない別の Claude（Opus 5.5）に、要件と git の差分だけを渡して最終レビューさせ、要件を満たしているか・抜けや要件にない変更・バグがないかを先入観なしに確かめる。Claude は指摘ごとに採否を判断して直す。「仕上げに Opus でレビューして」「コンテキストなしの Claude に最終チェックさせて」などの依頼で使う。依頼がなくても、15 ファイル以上か 500 行以上の変更、または DB・認証・課金などの領域に 2 つ以上触れる変更では、ほかのレビューの指摘を直し終えた最後の確認として使う（詳しい基準は本文）。
+description: この会話を共有しない別の Claude（Opus 5.5）に、要件と git の差分だけを渡して最終レビューさせて直す。「仕上げに Opus でレビューして」「コンテキストなしの Claude に最終チェックさせて」などの依頼で使う。依頼がなくても、15 ファイル以上か 500 行以上の変更、または DB・認証・課金などに 2 つ以上触れる変更で、最後の確認として使う（詳しい基準は本文）。
 argument-hint: "[--base <ref> | --commit <sha> | --uncommitted] [補足]"
 allowed-tools: Bash(bash *opus-final-review/scripts/new-run.sh*), Bash(bash *opus-final-review/scripts/review.sh*), Read, Grep, Glob, Write(//**/artifacts/opus-final-review/**), Edit(//**/artifacts/opus-final-review/**)
 ---
