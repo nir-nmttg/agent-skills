@@ -95,7 +95,7 @@ else
 fi
 
 if [[ ! -s $run_dir/diff.patch ]]; then
-  echo "エラー: レビューする変更がありません（範囲: $scope）。--base / --commit / --uncommitted で範囲を指定してください" >&2
+  echo "エラー: レビューする変更がありません（範囲: ${scope}）。--base / --commit / --uncommitted で範囲を指定してください" >&2
   exit 1
 fi
 files=$(grep -c '^diff --git ' "$run_dir/diff.patch" || true)
@@ -146,13 +146,13 @@ args=(
   --output-format json
 )
 
-echo "Opus でレビュー中: model=$model effort=$effort 範囲=$scope（$files ファイル、$lines 行）" >&2
+echo "Opus でレビュー中: model=$model effort=$effort 範囲=${scope}（$files ファイル、$lines 行）" >&2
 started=$SECONDS
 status=0
 (cd "$workdir" && claude "${args[@]}" <"$run_dir/prompt.md") >"$run_dir/result.json" 2>"$run_dir/claude.log" || status=$?
 
 if ((status != 0)) || ! jq -e '.is_error == false and (.result | type == "string" and length > 0)' "$run_dir/result.json" >/dev/null 2>&1; then
-  echo "エラー: Opus の実行に失敗しました（終了コード $status）" >&2
+  echo "エラー: Opus の実行に失敗しました（終了コード ${status}）" >&2
   jq -r '.result // empty' "$run_dir/result.json" 2>/dev/null | tail -5 >&2 || true
   tail -20 "$run_dir/claude.log" >&2
   if [[ $(jq -r '.api_error_code // empty' "$run_dir/result.json" 2>/dev/null) == claude_code_version_too_old ]]; then
@@ -170,7 +170,7 @@ denied=$(jq -r '[.permission_denials[]? | .tool_input.command // .tool_name] | u
 echo "## Opus の最終レビュー（要件だけを渡したレビュー）"
 echo
 echo "- 設定: $model / effort=$effort"
-echo "- 範囲: $scope（$files ファイル、$lines 行）"
+echo "- 範囲: ${scope}（$files ファイル、$lines 行）"
 echo "- 所要時間: $((SECONDS - started)) 秒、トークン: $usage_line${cost:+、$cost}"
 echo "- 保存先: $run_dir/review.md"
 echo "- 続きを Opus と話す: (cd $workdir && claude --resume $session)"

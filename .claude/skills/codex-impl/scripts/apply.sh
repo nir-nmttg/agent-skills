@@ -65,7 +65,7 @@ for run_dir in "$@"; do
     blob "$wt" "$base" "$path" "$b" || true
     if [[ $st == D ]]; then
       if [[ ! -e $ours && ! -L $ours ]]; then skipped+=("$path")
-      elif same "$ours" "$b"; then rm -f "$ours"; taken+=("$path（削除）")
+      elif same "$ours" "$b"; then rm -f "$ours"; taken+=("${path}（削除）")
       else conflicts+=("$path: Codex は削除したが、作業フォルダでも変更されている（作業フォルダの内容を残した）")
       fi
       continue
@@ -98,7 +98,7 @@ for run_dir in "$@"; do
   ((${#merged[@]})) && printf -- '- マージ: %s\n' "${merged[@]}"
   if ((${#conflicts[@]})); then
     printf -- '- 競合: %s\n' "${conflicts[@]}"
-    echo "- worktree は残しています: $wt（解消したら apply.sh --discard $run_dir で片づける）"
+    echo "- worktree は残しています: ${wt}（解消したら apply.sh --discard $run_dir で片づける）"
     overall=2
   else
     git -C "$repo" worktree remove --force "$wt"

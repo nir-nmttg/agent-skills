@@ -114,7 +114,7 @@ else
 fi
 
 if [[ ! -s $run_dir/diff.patch ]]; then
-  echo "エラー: レビューする変更がありません（範囲: $scope）。--base / --commit / --uncommitted で範囲を指定してください" >&2
+  echo "エラー: レビューする変更がありません（範囲: ${scope}）。--base / --commit / --uncommitted で範囲を指定してください" >&2
   exit 1
 fi
 files=$(grep -c '^diff --git ' "$run_dir/diff.patch" || true)
@@ -177,7 +177,7 @@ run_review() {
 check_result() {
   local sfx=$1 status=$2 label=${3:+観点 $3、}
   if ((status != 0)) || [[ ! -s $run_dir/review$sfx.md ]]; then
-    echo "エラー: Codex の実行に失敗しました（${label}終了コード $status）" >&2
+    echo "エラー: Codex の実行に失敗しました（${label}終了コード ${status}）" >&2
     jq -r 'select(.type == "error" or .item.type == "error") | .message // .item.message' "$run_dir/events$sfx.jsonl" 2>/dev/null | tail -5 >&2 || true
     tail -20 "$run_dir/codex$sfx.log" >&2
     return 1
@@ -196,7 +196,7 @@ tokens_of() {
 started=$SECONDS
 
 if ((${#focuses[@]} == 0)); then
-  echo "Codex でレビュー中: model=$model effort=$effort fast=$fast_label 範囲=$scope（$files ファイル、$lines 行）" >&2
+  echo "Codex でレビュー中: model=$model effort=$effort fast=$fast_label 範囲=${scope}（$files ファイル、$lines 行）" >&2
   status=0
   run_review "" || status=$?
   check_result "" "$status" || exit 1
@@ -204,7 +204,7 @@ if ((${#focuses[@]} == 0)); then
   echo "## $title"
   echo
   echo "- 設定: $model / effort=$effort / fast=$fast_label"
-  echo "- 範囲: $scope（$files ファイル、$lines 行）"
+  echo "- 範囲: ${scope}（$files ファイル、$lines 行）"
   echo "- 所要時間: $((SECONDS - started)) 秒、トークン: $(tokens_of "")"
   echo "- 保存先: $run_dir/review.md"
   echo "- 続きを Codex と話す: codex resume $(thread_of "")"
@@ -214,7 +214,7 @@ if ((${#focuses[@]} == 0)); then
   exit 0
 fi
 
-echo "Codex で観点ごとに並列レビュー中: ${focuses[*]} model=$model effort=$effort fast=$fast_label 範囲=$scope（$files ファイル、$lines 行）" >&2
+echo "Codex で観点ごとに並列レビュー中: ${focuses[*]} model=$model effort=$effort fast=$fast_label 範囲=${scope}（$files ファイル、$lines 行）" >&2
 pids=()
 for f in "${focuses[@]}"; do
   run_review "$f" &
@@ -227,10 +227,10 @@ for pid in "${pids[@]}"; do
   statuses+=("$s")
 done
 
-echo "## $title（観点ごとに並列）"
+echo "## ${title}（観点ごとに並列）"
 echo
 echo "- 設定: $model / effort=$effort / fast=$fast_label"
-echo "- 範囲: $scope（$files ファイル、$lines 行）"
+echo "- 範囲: ${scope}（$files ファイル、$lines 行）"
 echo "- 観点: $(IFS=,; echo "${focuses[*]}")"
 echo "- 所要時間: $((SECONDS - started)) 秒（すべての観点が終わるまで）"
 echo

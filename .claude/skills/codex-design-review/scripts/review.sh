@@ -95,7 +95,7 @@ run_review() {
 check_result() {
   local sfx=$1 status=$2 label=${3:+観点 $3、}
   if ((status != 0)) || [[ ! -s $run_dir/review$sfx.md ]]; then
-    echo "エラー: Codex の実行に失敗しました（${label}終了コード $status）" >&2
+    echo "エラー: Codex の実行に失敗しました（${label}終了コード ${status}）" >&2
     jq -r 'select(.type == "error" or .item.type == "error") | .message // .item.message' "$run_dir/events$sfx.jsonl" 2>/dev/null | tail -5 >&2 || true
     tail -20 "$run_dir/codex$sfx.log" >&2
     return 1
@@ -144,7 +144,7 @@ for pid in "${pids[@]}"; do
   statuses+=("$s")
 done
 
-echo "## $title（観点ごとに並列）"
+echo "## ${title}（観点ごとに並列）"
 echo
 echo "- 設定: $model / effort=$effort / fast=$fast_label"
 echo "- 観点: $(IFS=,; echo "${focuses[*]}")"

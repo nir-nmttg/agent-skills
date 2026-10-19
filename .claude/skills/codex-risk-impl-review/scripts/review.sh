@@ -11,7 +11,7 @@ set -euo pipefail
 # ~/.claude/skills のシンボリックリンク経由で呼ばれても、リンク先のリポジトリのスクリプトを使う
 here=$(cd -P "$(dirname "$0")" && pwd)
 base=$here/../../codex-impl-review/scripts/review.sh
-[[ -f $base ]] || { echo "エラー: codex-impl-review スキルが見つかりません（$base）" >&2; exit 1; }
+[[ -f $base ]] || { echo "エラー: codex-impl-review スキルが見つかりません（${base}）" >&2; exit 1; }
 
 CODEX_IMPL_REVIEW_MODEL=${CODEX_RISK_IMPL_REVIEW_MODEL:-gpt-6-astra} \
 CODEX_IMPL_REVIEW_PROMPT=$here/../assets/review-prompt.md \

@@ -61,7 +61,7 @@ while IFS=$'\t' read -r src url alt; do
   i=$((i + 1))
   name=$(printf '%02d' "$i")
   if ! type=$(curl -sSL --fail --max-time 30 --max-filesize 10485760 -o "$tmp" -w '%{content_type}' "$url" 2>/dev/null); then
-    echo "- ⚠️ $name: 取得できませんでした（$src）"
+    echo "- ⚠️ $name: 取得できませんでした（${src}）"
     continue
   fi
   case ${type%%;*} in
@@ -71,10 +71,10 @@ while IFS=$'\t' read -r src url alt; do
     image/webp) ext=webp ;;
     image/svg+xml) ext=svg ;;
     *)
-      echo "- ⚠️ $name: 画像ではありません（${type:-種類不明}、$src）"
+      echo "- ⚠️ $name: 画像ではありません（${type:-種類不明}、${src}）"
       continue
       ;;
   esac
   mv "$tmp" "$dir/$name.$ext"
-  echo "- $dir/$name.$ext ← $src${alt:+「$alt」}"
+  echo "- $dir/$name.$ext ← $src${alt:+「${alt}」}"
 done <<<"$images"

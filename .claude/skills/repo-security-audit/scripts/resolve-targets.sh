@@ -50,10 +50,10 @@ candidates=$(
 die_with_candidates() {
   echo "$1" >&2
   if [[ -n $candidates ]]; then
-    echo "今のフォルダ（$workspace）の下にあるリポジトリ:" >&2
+    echo "今のフォルダ（${workspace}）の下にあるリポジトリ:" >&2
     sed "s|^|  |" <<<"$candidates" >&2
   else
-    echo "今のフォルダ（$workspace）の下に Git リポジトリがありません。" >&2
+    echo "今のフォルダ（${workspace}）の下に Git リポジトリがありません。" >&2
   fi
   exit 1
 }
@@ -79,7 +79,7 @@ else
     hits=$(awk -F/ -v n="$n" '$NF == n' <<<"$candidates")
     [[ -n $hits ]] || die_with_candidates "リポジトリが見つかりません: $n"
     if [[ $(wc -l <<<"$hits") -gt 1 ]]; then
-      echo "「$n」という名前のリポジトリが複数あります。パスで指定してください:" >&2
+      echo "「${n}」という名前のリポジトリが複数あります。パスで指定してください:" >&2
       sed "s|^|  |" <<<"$hits" >&2
       exit 1
     fi
@@ -135,9 +135,9 @@ while IFS= read -r t; do
   echo "- パス: $t"
   echo "- Git ルート: $top$(if [[ $top != "$t" ]]; then echo "（⚠️ パスと一致しません）"; fi)"
   [[ -z $remote ]] || echo "- リモート: $remote"
-  echo "- コミット: $head${branch:+（$branch）}"
+  echo "- コミット: $head${branch:+（${branch}）}"
   echo "- 未コミットの変更: $(if [[ $dirty == 0 ]]; then echo "なし"; else echo "あり（$dirty ファイル）"; fi)"
-  echo "- 規模: 追跡ファイル $files 件${exts:+（$exts）}"
+  echo "- 規模: 追跡ファイル $files 件${exts:+（${exts}）}"
   echo "- 保存先: $run_dir$(if [[ $root != "$out_base" ]]; then echo "（artifacts が対象の中にあるため切り替え）"; fi)"
   if [[ -n $prior ]]; then
     echo "- 以前の実行:"

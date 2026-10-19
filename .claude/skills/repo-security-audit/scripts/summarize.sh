@@ -39,7 +39,7 @@ for run in "$@"; do
   findings=$(json_or_empty "$run/findings.json")
   ledger=$(json_or_empty "$run/coverage-ledger.json")
   repo=$(jq -r '.repo // empty' <<<"$meta"); repo=${repo:-$(basename "$(dirname "$run")")}
-  label="$repo（${run##*/}）"
+  label="${repo}（${run##*/}）"
   status=$(jq -r '.run_status // "不明"' <<<"$meta")
 
   counts=$(jq -r '
@@ -94,7 +94,7 @@ for run in "$@"; do
     echo
     echo "- フォルダ: $run"
     for f in REPORT.md FINDINGS-DETAIL.md NEEDS-VALIDATION.md findings.json coverage-ledger.json; do
-      if [[ -f $run/$f ]]; then echo "- $f"; else echo "- $f（なし）"; fi
+      if [[ -f $run/$f ]]; then echo "- $f"; else echo "- ${f}（なし）"; fi
     done
   )$'\n'
 done

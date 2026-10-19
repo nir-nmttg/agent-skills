@@ -129,7 +129,7 @@ shortstat=$(git -C "$workdir" diff --shortstat "$tree_before" "$tree_after" | se
 stat=$(git -C "$workdir" diff --stat "$tree_before" "$tree_after")
 
 if ((status != 0)) || [[ ! -s $run_dir/result-$n.md ]]; then
-  echo "エラー: Codex の実行に失敗しました（終了コード $status）" >&2
+  echo "エラー: Codex の実行に失敗しました（終了コード ${status}）" >&2
   jq -r 'select(.type == "error" or .item.type == "error") | .message // .item.message' "$run_dir/events-$n.jsonl" 2>/dev/null | tail -5 >&2 || true
   tail -20 "$run_dir/codex-$n.log" >&2
   [[ -s $run_dir/diff-$n.patch ]] && echo "途中までの変更が $workdir に残っています: ${shortstat}（差分: $run_dir/diff-$n.patch）" >&2
@@ -146,14 +146,14 @@ echo "## Codex の実装結果（$n 回目）"
 echo
 echo "- 設定: $model / effort=max / fast=on"
 if [[ $workdir == "$wt" ]]; then
-  echo "- 作業場所: $wt（$repo の worktree。反映は apply.sh $run_dir）"
+  echo "- 作業場所: ${wt}（$repo の worktree。反映は apply.sh ${run_dir}）"
 else
   echo "- 作業フォルダ: $workdir"
 fi
 echo "- 変更: ${shortstat:-なし}"
 echo "- 所要時間: $((SECONDS - started)) 秒、トークン: ${tokens:-不明}"
 echo "- 差分: $run_dir/diff-$n.patch"
-echo "- スレッド: $thread（修正の依頼は --resume $thread）"
+echo "- スレッド: ${thread}（修正の依頼は --resume ${thread}）"
 [[ -n $dirty && $n == 1 ]] && echo "- 注意: 実行前から未コミットの変更がありました。上の差分は Codex が変えた分だけです"
 [[ $head_after == "$head_before" ]] || echo "- 注意: Codex が HEAD を動かしました（$(git -C "$workdir" rev-parse --short "$head_before") → $(git -C "$workdir" rev-parse --short "$head_after")）"
 echo

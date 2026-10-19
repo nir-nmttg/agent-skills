@@ -12,7 +12,7 @@ usage() { sed -n '4,4p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 1; }
 dir=$(cd "$1" && pwd)
 id=$2
 brief="$dir/briefs/$id.md"
-[[ -f $brief ]] || { echo "指示書がありません: $brief（先に plan-check.sh を実行する）" >&2; exit 1; }
+[[ -f $brief ]] || { echo "指示書がありません: ${brief}（先に plan-check.sh を実行する）" >&2; exit 1; }
 
 # ~/.claude/skills のシンボリックリンク経由で呼ばれても、リンク先のリポジトリの codex-impl を使う
 skills_dir=$(cd -P "$(dirname "$0")/../.." && pwd)

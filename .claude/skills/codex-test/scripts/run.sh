@@ -122,7 +122,7 @@ if [[ -n $is_git ]]; then
 fi
 
 if ((status != 0)) || [[ ! -s $run_dir/result-$n.md ]]; then
-  echo "エラー: Codex の実行に失敗しました（終了コード $status）" >&2
+  echo "エラー: Codex の実行に失敗しました（終了コード ${status}）" >&2
   jq -r 'select(.type == "error" or .item.type == "error") | .message // .item.message' "$run_dir/events-$n.jsonl" 2>/dev/null | tail -5 >&2 || true
   tail -20 "$run_dir/codex-$n.log" >&2
   [[ -n $changed ]] && echo "注意: Codex がファイルを変更しました: ${changed}（差分: $run_dir/diff-$n.patch）" >&2
