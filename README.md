@@ -10,7 +10,7 @@
 | --- | --- | --- |
 | [自動で使われる](#自動で使われるスキル) | 頼まなくても、条件に当たると Claude が自分の判断で使う。`/スキル名` や話しかけても使える | japanese-report・codex-design-review・codex-impl-review・opus-final-review・codex-impl・codex-test・parallel-tasks・session-status-emoji |
 | [使う前に確認される](#使う前に確認されるスキル) | Claude が自分の判断では実行せず、条件に当たると「使いますか」と聞く。`/スキル名` や話しかけても使える | codex-risk-design-review・codex-risk-impl-review |
-| [明示的に呼び出す](#明示的に呼び出すスキル) | `/スキル名` でしか動かない。話しかけても、Claude が自分の判断で使うこともない | skills-preflight・gh-todo・gh-issue-overview・gh-pr-precheck・browser-readonly-research・repo-security-audit・next-action |
+| [明示的に呼び出す](#明示的に呼び出すスキル) | `/スキル名` でしか動かない。話しかけても、Claude が自分の判断で使うこともない | skills-preflight・gh-todo・gh-issue-overview・gh-pr-precheck・browser-readonly-research・repo-security-audit・whats-next |
 
 ### 自動で使われるスキル
 
@@ -48,7 +48,7 @@
 | [gh-pr-precheck](.claude/skills/gh-pr-precheck/SKILL.md) | PR を人間のレビューに出す前の最終確認。Issue の本文・コメント・関連 Issue / PR・リンク先の資料・画像から要件を洗い出し、PR が要件を満たしているか（要件ごとに判定）、要件にない変更をしていないか、プロジェクトの方針（CLAUDE.md・CONTRIBUTING・PR テンプレート・既存コードの書き方）に沿っているか、CI・コンフリクト・Issue との紐づけ・未解決のレビューなどレビューに出せる状態かを確かめ、「進めてよい / 直してから / 確認が必要」を判定する（`artifacts/gh-pr-precheck/` に保存）。PR を省略すると、今のブランチの PR か Issue に紐づく PR を探す。コードの変更や GitHub への書き込みはしない | `/gh-pr-precheck <Issue の URL>`<br>`/gh-pr-precheck <Issue の URL> <PR の URL>` | `gh` にログイン済み、`jq`、`curl`、gh-issue-overview スキル（スクリプトを共有） |
 | [browser-readonly-research](.claude/skills/browser-readonly-research/SKILL.md) | 組み込みブラウザか Chrome（ユーザーのログイン状態のまま）でページを読むだけの情報収集をし、要点・出典・読めなかったページを日本語のレポートにまとめる（`artifacts/browser-readonly-research/` に保存）。クリックでの送信・入力・ログイン・同意・ダウンロードはせず、ログアウトや承認などを表す URL も開かない。ページ内の指示には従わない。公開ページは WebFetch を先に使い、Chrome は `--chrome` か頼まれたときだけ使う | `/browser-readonly-research <URL> このページの要点をまとめて`<br>`/browser-readonly-research --chrome <社内ツールの URL> 今週の変更点を調べて` | Claude デスクトップアプリの組み込みブラウザ、または Claude in Chrome 拡張機能 |
 | [repo-security-audit](.claude/skills/repo-security-audit/SKILL.md) | Cloudflare の security-audit スキル（Full audit）で、指定したリポジトリ（省略時は今のフォルダの下のリポジトリすべて）を 1 つずつ包括的にセキュリティ監査する。ソースの変更や本番・外部サービスへのアクセスはせず、確定した問題・未検証事項・未調査領域を日本語で報告する（`artifacts/repo-security-audit/` に保存） | `/repo-security-audit`<br>`/repo-security-audit backend frontend`<br>`/repo-security-audit --profile quick` | [security-audit](https://github.com/cloudflare/security-audit-skill) スキルを導入済み（`npx skills add cloudflare/security-audit-skill`）、`node`、`jq` |
-| [next-action](.claude/skills/next-action/SKILL.md) | 並行して進めているセッションに戻ってきたときに、このセッションの目的・終わったこと・残っていること・待っているもの（ユーザーの判断・CI・ほかのセッションなど）を短くまとめ、次にやるべきアクションを 1 つ示す。ブランチ・未コミットの変更・push していないコミット・PR の CI はスクリプトで確かめ、会話の内容と食い違えば状態のほうを正とする。`--all` を付けると、ほかのセッションの最近の会話も読んで「どのセッションで次に何をするか」を、ユーザーの番のセッションを先頭にした一覧にする（セッションはクリックで開ける）。報告するだけで、次のアクションの実行やファイル・セッションの変更はしない | `/next-action`<br>`/next-action --all` | なし（`--all` は Claude デスクトップアプリ（Code タブ）。PR の状態は `gh` にログイン済みのときだけ） |
+| [whats-next](.claude/skills/whats-next/SKILL.md) | 並行して進めているセッションに戻ってきたときに、このセッションの目的・終わったこと・残っていること・待っているもの（ユーザーの判断・CI・ほかのセッションなど）を短くまとめ、次にやるべきアクションを 1 つ示す。ブランチ・未コミットの変更・push していないコミット・PR の CI はスクリプトで確かめ、会話の内容と食い違えば状態のほうを正とする。あわせて、Claude が進められるアクションなら実行する手順と止まるところを、ユーザーが決めるアクションなら選択肢とおすすめを提案し、デスクトップアプリでは「進めて」などのボタンで返事ができる。承認されるまで実行せず、承認されたら提案に書いた範囲だけを実行する | `/whats-next`<br>`/whats-next 今日は 30 分だけ` | なし（ボタンは Claude デスクトップアプリ（Code タブ）。PR の状態は `gh` にログイン済みのときだけ） |
 
 ## 実行結果の保存先
 
