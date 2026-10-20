@@ -4,7 +4,8 @@
 #
 # 使い方: scripts/link-skills.sh
 #   - 未リンクのスキルはリンクを作る（このリポジトリを指すリンクは張り直す）
-#   - 同名の別ディレクトリや別の場所へのリンクがあれば、触らずに警告する
+#   - 同名で切れたリンクは、別の場所を指していても張り直す（リポジトリを移したとき）
+#   - 同名の別ディレクトリや、別の場所への切れていないリンクがあれば、触らずに警告する
 #   - 削除したスキルを指したまま切れているリンクは取り除く
 set -euo pipefail
 
@@ -24,6 +25,11 @@ for skill in "$src_dir"/*/; do
     current=$(readlink "$dest")
     if [[ "$current" == "$skill" ]]; then
       echo "linked  $name"
+      continue
+    fi
+    if [[ ! -e "$dest" ]]; then
+      ln -sfn "$skill" "$dest"
+      echo "relinked $name（リンク切れ: ${current}）"
       continue
     fi
     if [[ "$current" != "$src_dir"/* ]]; then
