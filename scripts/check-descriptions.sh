@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # スキルの description の文字数を数え、上限を超えたものがないかを確かめる。
-# disable-model-invocation のないスキルの description は毎回コンテキストに入るので、その合計も出す。
+# Claude / Codex 別に、自動選択される description の文字数も出す。
 #
 # 使い方: scripts/check-descriptions.sh
 #   - 1 行に「種類（auto / manual） 文字数/上限 スキル名」を出力する
@@ -22,16 +22,31 @@ done
 repo_root=$(cd -P "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 
 over=0
-in_context=0
-for f in "$repo_root"/.claude/skills/*/SKILL.md; do
+claude_context=0
+codex_context=0
+for f in "$repo_root"/.claude/skills/*/SKILL.md "$repo_root"/.agents/skills/*/SKILL.md; do
+  [[ -f "$f" ]] || continue
   name=$(basename "$(dirname "$f")")
+  if [[ "$f" == "$repo_root"/.agents/* ]]; then
+    name="codex/$name"
+  else
+    name="claude/$name"
+  fi
   frontmatter=$(awk '/^---$/ { n++; next } n == 1' "$f")
   desc=$(sed -n 's/^description:[[:space:]]*//p' <<<"$frontmatter")
-  if grep -q '^disable-model-invocation:[[:space:]]*true' <<<"$frontmatter"; then
+  ui_config="$(dirname "$f")/agents/openai.yaml"
+  if grep -q '^disable-model-invocation:[[:space:]]*true' <<<"$frontmatter" || {
+    [[ "$name" == codex/* && -f "$ui_config" ]] &&
+      grep -Eq '^[[:space:]]*allow_implicit_invocation:[[:space:]]*false([[:space:]]*(#.*)?)$' "$ui_config"
+  }; then
     kind=manual limit=$manual_limit
   else
     kind=auto limit=$auto_limit
-    in_context=$((in_context + ${#desc}))
+    if [[ "$name" == codex/* ]]; then
+      codex_context=$((codex_context + ${#desc}))
+    else
+      claude_context=$((claude_context + ${#desc}))
+    fi
   fi
   mark=""
   if (( ${#desc} > limit )); then
@@ -40,6 +55,6 @@ for f in "$repo_root"/.claude/skills/*/SKILL.md; do
   fi
   printf '%-6s %3d/%d  %s%s\n' "$kind" "${#desc}" "$limit" "$name" "$mark"
 done
-echo "毎回コンテキストに入る description の合計: ${in_context} 文字"
+echo "自動選択用 description の合計: Claude ${claude_context} 文字 / Codex ${codex_context} 文字"
 
 exit "$over"

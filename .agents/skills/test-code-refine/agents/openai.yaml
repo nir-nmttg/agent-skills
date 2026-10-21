@@ -1,0 +1,7 @@
+interface:
+  display_name: "本質的なテストを残す"
+  short_description: "不具合を検出する力を保ち、重複や実装追従のテストを削減・改善する"
+  default_prompt: "$test-code-refine を使って、対象のテストを見直し、無駄なテストを減らして本質的な振る舞いを守る形に整理してください。"
+
+policy:
+  allow_implicit_invocation: false

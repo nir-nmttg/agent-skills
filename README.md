@@ -1,8 +1,18 @@
 # agent-skills
 
-普段の仕事で使う汎用的な Claude Code スキル集。このフォルダを Claude Code で開くと使える。
+普段の仕事で使う汎用的な Claude Code・Codex スキル集。Claude Code 用は `.claude/skills/`、Codex 用は `.agents/skills/` で管理する。
 
-## スキル一覧
+スキルの作成・変更ルールは [AGENTS.md](AGENTS.md) にまとめている。
+
+## Codex 用スキル
+
+`test-code-refine` は `$test-code-refine` などでスキルを明示的に指定したときだけ使う。通常の依頼から Codex が自動で選ぶことはない。
+
+| スキル | できること | 使い方の例 | 前提 |
+| --- | --- | --- | --- |
+| [test-code-refine](.agents/skills/test-code-refine/SKILL.md) | テストが検出する不具合と守る振る舞いを確かめ、無駄なテストを削除・統合し、実装に依存するテストを本質的な振る舞いの確認へ書き換える。境界値・異常系・過去の不具合・重要な副作用の検出力を保ち、変更後に影響範囲を実行して確かめる | `$test-code-refine src/billing のテストを整理して`<br>`$test-code-refine この差分のテストを本質的なものにして` | 対象リポジトリのテスト実行環境 |
+
+## Claude Code 用スキル一覧
 
 スキルは呼び出し方で 3 種類に分かれる。初めて使うときは `/skills-preflight` で、必要なコマンドやログインがそろっているかを確認する。
 
@@ -55,12 +65,18 @@
 
 ## 他のフォルダでも使う
 
-リポジトリ直下で次を実行すると、すべてのスキルが `~/.claude/skills/` にシンボリックリンクされ、どのフォルダで Claude Code を開いても使える。
+リポジトリ直下で次を実行すると、Claude Code 用は `~/.claude/skills/`（`CLAUDE_CONFIG_DIR` 指定時はその配下の `skills/`）、Codex 用は `~/.agents/skills/` にシンボリックリンクされ、他のフォルダでも使える。
 
 ```bash
 scripts/link-skills.sh
+
+# 片方だけリンクする場合
+scripts/link-skills.sh --claude
+scripts/link-skills.sh --codex
 ```
 
+- 引数なし、または `--all` で両方をリンクする。Claude と Codex のスキルは、それぞれ対応する場所にだけリンクする
+- Codex の配置先とシンボリックリンク対応は [公式スキルドキュメント](https://learn.chatgpt.com/docs/build-skills#where-codex-loads-local-skills) に従う。追加が反映されなければ Codex を再起動する
 - スキルを追加・削除したら、もう一度実行する（新しいスキルはリンクされ、削除したスキルの切れたリンクは消える）
 - リポジトリを移したら、新しい場所でもう一度実行する（古い場所を指して切れたリンクは張り直される）
 - 同名のスキルが別の場所にあるときは上書きせず、警告だけ出す
