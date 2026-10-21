@@ -53,7 +53,6 @@ check_cmd claude "opus-final-review" "\`brew install --cask claude-code\` のあ
 check_cmd gh "gh-todo, gh-issue-overview, gh-pr-precheck, codex-verify-prompt（PR を渡すとき）" "\`brew install gh\` のあと \`gh auth login\`" gh --version
 check_cmd python3 "gh-issue-overview" "\`xcode-select --install\`（または \`brew install python\`）" python3 --version
 check_cmd curl "gh-issue-overview, gh-pr-precheck" "\`brew install curl\`"
-check_cmd node "repo-security-audit" "\`brew install node\`" node --version
 
 # インストール方法は Homebrew 前提なので、足りないコマンドがあって Homebrew も無ければ先に入れてもらう
 need_brew=false
@@ -89,23 +88,6 @@ if has gh; then
   fi
 fi
 
-# --- 外部スキル ---------------------------------------------------------------
-
-# repo-security-audit/scripts/lib.sh の find_audit_skill と同じ場所を探す
-audit_dir=""
-for d in ${SECURITY_AUDIT_SKILL_DIR:-} ~/.claude/skills/security-audit ~/.agents/skills/security-audit ~/.codex/skills/security-audit; do
-  if [[ -f $d/SKILL.md && -f $d/validate-findings.cjs ]]; then
-    audit_dir=$d
-    break
-  fi
-done
-if [[ -n $audit_dir ]]; then
-  add security-audit ok "Cloudflare security-audit スキル" "${audit_dir/#$HOME/~}" "repo-security-audit"
-else
-  add security-audit ng "Cloudflare security-audit スキル" "見つかりません" "repo-security-audit" \
-    "\`npx skills add cloudflare/security-audit-skill\`"
-fi
-
 # --- 他のフォルダから使うためのリンク（任意） --------------------------------
 
 unlinked=()
@@ -132,7 +114,6 @@ skill_needs() {
     gh-todo) echo "jq gh gh-login" ;;
     gh-issue-overview) echo "jq gh gh-login python3 curl" ;;
     gh-pr-precheck) echo "jq gh gh-login curl" ;;
-    repo-security-audit) echo "git jq node security-audit" ;;
     *) echo "" ;;
   esac
 }
