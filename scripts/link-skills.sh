@@ -7,9 +7,19 @@
 #   - 同名で切れたリンクは、別の場所を指していても張り直す（リポジトリを移したとき）
 #   - 同名の別ディレクトリや、別の場所への切れていないリンクがあれば、触らずに警告する
 #   - 削除したスキルを指したまま切れているリンクは取り除く
+#   - git worktree の中で実行したときは、何もせずにメインの checkout で実行し直すよう案内する
 set -euo pipefail
 
 repo_root=$(cd -P "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+
+# worktree の中を指すリンクは、worktree を片付けると切れるので張らない
+if git_dir=$(git -C "$repo_root" rev-parse --path-format=absolute --git-dir 2>/dev/null) &&
+  common_dir=$(git -C "$repo_root" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) &&
+  [[ "$git_dir" != "$common_dir" ]]; then
+  echo "git worktree の中なのでリンクしません。メインの checkout で実行し直してください:" >&2
+  echo "  $(dirname "$common_dir")/scripts/link-skills.sh" >&2
+  exit 1
+fi
 src_dir="$repo_root/.claude/skills"
 dest_dir="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills"
 
