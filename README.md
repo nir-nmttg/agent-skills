@@ -11,6 +11,7 @@ Codex 用スキルは、`$スキル名` などでスキルを明示的に指定�
 | スキル | できること | 使い方の例 | 前提 |
 | --- | --- | --- | --- |
 | [docs-sync](.agents/skills/docs-sync/SKILL.md) | README.md などを現状の実装を正として更新する。有用な説明と重要な制約を残し、古い説明・重複・不足を整理して、現在の使い方を見つけやすくする | `$docs-sync README.md を現状の実装に合わせて更新して`<br>`$docs-sync docs/usage.md を必要な情報に絞って整理して` | 対象のドキュメントと実装を参照できること |
+| [project-design-refactor](.agents/skills/project-design-refactor/SKILL.md) | プロジェクトを探索し、設計文書と既存コードを根拠に、設計思想・責務分担・依存関係から逸脱した実装を見つけてリファクタリングする。意図的な例外を尊重し、既存の振る舞いを保って変更・検証する | `$project-design-refactor`<br>`$project-design-refactor src/billing をプロジェクトの設計に合わせてリファクタリングして` | 対象の設計・実装を参照でき、関連する検証を実行できること |
 | [test-code-refine](.agents/skills/test-code-refine/SKILL.md) | テストが検出する不具合と守る振る舞いを確かめ、無駄なテストを削除・統合し、実装に依存するテストを本質的な振る舞いの確認へ書き換える。境界値・異常系・過去の不具合・重要な副作用の検出力を保ち、変更後に影響範囲を実行して確かめる | `$test-code-refine src/billing のテストを整理して`<br>`$test-code-refine この差分のテストを本質的なものにして` | 対象リポジトリのテスト実行環境 |
 
 ## Claude Code 用スキル一覧
