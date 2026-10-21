@@ -1,5 +1,5 @@
 ---
-name: project-design-refactor
+name: design-alignment-refactor
 description: プロジェクトの設計思想を文書とコードから読み取り、設計に沿っていない実装を探索する。根拠のある箇所を、既存の振る舞いを保ちながらプロジェクトの設計に合わせてリファクタリングする。
 ---
 
