@@ -1,5 +1,5 @@
 ---
-name: test-code-refine
+name: test-suite-refactor
 description: 既存のテストコードを不具合の検出力で見直し、重複や実装の細部に依存するテストを削除・統合・書き換える。境界値・異常系・過去の不具合を守りながら、保守負担を減らす。
 ---
 
