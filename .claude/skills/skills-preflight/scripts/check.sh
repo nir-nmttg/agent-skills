@@ -50,7 +50,7 @@ check_cmd git "ほぼすべて" "\`xcode-select --install\`（または \`brew i
 check_cmd jq "ほぼすべて" "\`brew install jq\`" jq --version
 check_cmd codex "codex-*" "\`brew install --cask codex\` のあと \`codex login\`" codex --version
 check_cmd claude "opus-final-review" "\`brew install --cask claude-code\` のあと \`claude auth login\`" claude --version
-check_cmd gh "gh-todo, gh-issue-overview, gh-pr-precheck" "\`brew install gh\` のあと \`gh auth login\`" gh --version
+check_cmd gh "gh-todo, gh-issue-overview, gh-pr-precheck, codex-verify-prompt（PR を渡すとき）" "\`brew install gh\` のあと \`gh auth login\`" gh --version
 check_cmd python3 "gh-issue-overview" "\`xcode-select --install\`（または \`brew install python\`）" python3 --version
 check_cmd curl "gh-issue-overview, gh-pr-precheck" "\`brew install curl\`"
 check_cmd node "repo-security-audit" "\`brew install node\`" node --version
@@ -83,9 +83,9 @@ fi
 if has gh; then
   if gh auth status >/dev/null 2>&1; then
     user=$(gh api user --jq .login 2>/dev/null || true)
-    add gh-login ok "GitHub（gh）のログイン" "${user:+@$user}" "gh-todo, gh-issue-overview, gh-pr-precheck"
+    add gh-login ok "GitHub（gh）のログイン" "${user:+@$user}" "gh-todo, gh-issue-overview, gh-pr-precheck, codex-verify-prompt（PR を渡すとき）"
   else
-    add gh-login ng "GitHub（gh）のログイン" "未ログイン" "gh-todo, gh-issue-overview, gh-pr-precheck" "\`gh auth login\`"
+    add gh-login ng "GitHub（gh）のログイン" "未ログイン" "gh-todo, gh-issue-overview, gh-pr-precheck, codex-verify-prompt（PR を渡すとき）" "\`gh auth login\`"
   fi
 fi
 
@@ -126,6 +126,7 @@ fi
 
 skill_needs() {
   case $1 in
+    codex-verify-prompt) echo "git jq" ;;
     codex-*) echo "git jq codex codex-login" ;;
     opus-final-review) echo "git jq claude claude-login" ;;
     parallel-tasks) echo "git jq" ;;
