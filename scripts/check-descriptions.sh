@@ -5,7 +5,8 @@
 # 使い方: scripts/check-descriptions.sh
 #   - 1 行に「種類（auto / manual） 文字数/上限 スキル名」を出力する
 #   - 上限: 自動で使う・確認されるスキルは 200 文字、明示的に呼び出すスキルは 120 文字
-#   - 上限を超えたスキルがあれば終了コード 1
+#   - Codex の agents/openai.yaml に short_description・default_prompt がないか、display_name があれば指摘する
+#   - 上限超えか openai.yaml の指摘があれば終了コード 1
 set -euo pipefail
 
 auto_limit=200
@@ -52,6 +53,19 @@ for f in "$repo_root"/.claude/skills/*/SKILL.md "$repo_root"/.agents/skills/*/SK
   if (( ${#desc} > limit )); then
     mark="  ← 上限超え"
     over=1
+  fi
+  # Codex の openai.yaml は short_description・default_prompt を必須とし、display_name を禁止する
+  if [[ "$name" == codex/* ]]; then
+    for key in short_description default_prompt; do
+      if [[ ! -f "$ui_config" ]] || ! grep -Eq "^[[:space:]]+${key}:[[:space:]]*[^[:space:]]" "$ui_config"; then
+        mark+="  ← openai.yaml に ${key} がない"
+        over=1
+      fi
+    done
+    if [[ -f "$ui_config" ]] && grep -Eq '^[[:space:]]+display_name:' "$ui_config"; then
+      mark+="  ← openai.yaml に display_name がある"
+      over=1
+    fi
   fi
   printf '%-6s %3d/%d  %s%s\n' "$kind" "${#desc}" "$limit" "$name" "$mark"
 done
