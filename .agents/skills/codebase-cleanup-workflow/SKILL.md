@@ -1,5 +1,5 @@
 ---
-name: project-cleanup-workflow
+name: codebase-cleanup-workflow
 description: プロジェクト全体を探索し、設計整合・責務分割と共通化・テスト整理・宣言順整理・文書同期のスキルを順に組み合わせ、振る舞いを保って整備する。
 ---
 
