@@ -1,6 +1,0 @@
-interface:
-  short_description: "ランタイム・依存のメジャー更新を一件ずつ移行し、供給網・テスト・画面まで確認する"
-  default_prompt: "$upgrade-major を使って、このプロジェクトのランタイムと依存ライブラリのメジャー更新を一件ずつ進め、各移行で供給網の確認、テスト、組み込みブラウザでの実操作まで完了してから次へ進んでください。"
-
-policy:
-  allow_implicit_invocation: false

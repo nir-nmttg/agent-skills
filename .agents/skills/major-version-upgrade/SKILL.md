@@ -1,5 +1,5 @@
 ---
-name: upgrade-major
+name: major-version-upgrade
 description: ランタイムと依存ライブラリのメジャー更新を一件ずつ進め、移行修正、供給網の確認、隔離環境でのテスト、組み込みブラウザの実操作まで行う。
 ---
 

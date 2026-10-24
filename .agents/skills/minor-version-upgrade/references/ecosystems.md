@@ -5,7 +5,7 @@
 ## Node・Ruby などのランタイム
 
 - `.node-version`、`.nvmrc`、`.ruby-version`、`.tool-versions`、`mise.toml`、manifest の engines/ruby、CI・コンテナから、実際に使う指定を特定する。全部が存在する前提で追加しない。Docker image は tag の意味・署名と digest の変化も確認する。
-- Node は同一 major のサポート中の安定版を候補にする。Ruby のブランチ変更は minor 番号でも API 非互換を許すため、通常は同一 `X.Y` の patch をまとめる。別ブランチへの移行は `$upgrade-major` に回す。
+- Node は同一 major のサポート中の安定版を候補にする。Ruby のブランチ変更は minor 番号でも API 非互換を許すため、通常は同一 `X.Y` の patch をまとめる。別ブランチへの移行は `$major-version-upgrade` に回す。
 - 既存の信頼済み管理ツールを使って、プロジェクトで選べる形で導入する。管理ツールの plugin・project hook・ダウンロードスクリプトも先に読む。ホスト全体の既定版切替や `sudo` での上書きをしない。
 - Node の公式アーカイブは、公式 release key と署名済み `SHASUMS256.txt.asc`、配布物の hash を検証する。Ruby は公式 release/download の checksum と照合する。管理ツールに任せる場合も、取得元・検証方法・未確認点を記録する。
 - 同梱 npm、Bundler、native ABI、OpenSSL、ビルド環境、CI matrix の互換性を見る。管理ツール自体や同梱ツールの major 移行が必要なら、一括候補から分離して個別の移行計画を立てる。

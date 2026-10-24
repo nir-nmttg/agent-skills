@@ -1,6 +1,0 @@
-interface:
-  short_description: "ランタイム・依存のマイナー更新をまとめ、供給網・テスト・画面操作まで確認する"
-  default_prompt: "$upgrade-minor を使って、このプロジェクトのランタイムと依存ライブラリのマイナー・パッチ更新をまとめて行い、供給網の確認、テスト、組み込みブラウザでの実操作まで検証してください。"
-
-policy:
-  allow_implicit_invocation: false
