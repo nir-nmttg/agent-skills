@@ -1,6 +1,6 @@
 interface:
   short_description: "不具合を検出する力を保ち、重複や実装追従のテストを削減・改善する"
-  default_prompt: "$test-suite-refactor を使って、対象のテストを見直し、無駄なテストを減らして本質的な振る舞いを守る形に整理してください。"
+  default_prompt: "$test-suite-refactor を使って、プロジェクト全体のテストを見直し、不具合の検出力を保ちながら重複や実装の細部への依存を整理してください。"
 
 policy:
   allow_implicit_invocation: false

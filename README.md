@@ -16,14 +16,14 @@ Claude Code のスキルは機能を作って届けるまでの開発を、Codex
 | | Claude Code | Codex |
 | --- | --- | --- |
 | 役割 | 開発する | 整備する |
-| 扱う作業 | Issue の把握・設計・実装・テスト・レビュー・PR の確認・次の作業の判断 | 設計方針への整合、責務分割・共通化、テストの整理、ドキュメントと実装の同期 |
+| 扱う作業 | Issue の把握・設計・実装・テスト・レビュー・PR の確認・次の作業の判断 | 設計方針への整合、責務分割・共通化、宣言順の整理、テストの整理、ドキュメントと実装の同期 |
 | 変更の性質 | 機能や振る舞いを追加・変更する | 既存の振る舞いを保ったまま、保守性・可読性・検出力を上げる |
 | 使い方 | 条件に当たると Claude が自分の判断で使うスキルが中心 | `$スキル名` で明示的に指定したときだけ使う |
 
 典型的な流れは次のとおり。
 
 1. **Claude Code で開発する**: 設計・実装・検証を進め、PR まで仕上げる。実装・テスト・レビューの一部は Claude のスキルが Codex CLI（GPT-6 Luna / GPT-6.1 Sol / GPT-6 Astra）に任せるが、指示・採否の判断・反映は Claude が行う。
-2. **Codex で整備する**: 機能の区切りなど節目に、設計とのずれ・責務の混在や重複・冗長なテスト・古いドキュメントを Codex のスキルで整える。
+2. **Codex で整備する**: 時間やトークンに余裕があるとき、プロジェクト全体の設計とのずれ・責務の混在や重複・冗長なテスト・宣言順・古いドキュメントを繰り返し整える。`$project-cleanup-workflow` でまとめて実行するか、目的ごとのスキルを指定する。
 3. **整ったコードベースで、また Claude Code で次の開発に進む。**
 
 ## はじめに
@@ -64,7 +64,7 @@ Claude Code のリンク先は、`CLAUDE_CONFIG_DIR` 指定時はその配下の
 
 ### 3. 目的に合うスキルを選ぶ
 
-開発には Claude Code 用、整備には Codex 用の一覧から選ぶ。名前のリンクから詳細な手順・オプションを確認できる。Claude Code のスキルは呼び出し方で分類し、各分類の中を準備・設計・実装・検証・仕上げの作業順に並べている。Codex のスキルは、準備のあと設計・コード・テスト・ドキュメントの順に並べている。
+開発には Claude Code 用、整備には Codex 用の一覧から選ぶ。名前のリンクから詳細な手順・オプションを確認できる。Claude Code のスキルは呼び出し方で分類し、各分類の中を準備・設計・実装・検証・仕上げの作業順に並べている。Codex のスキルは準備・一括整備のあと、設計・構造・テスト・宣言順・文書の順に並べている。
 
 ## Claude Code 用スキル一覧
 
@@ -117,15 +117,19 @@ Sol / Astra のレビューと Opus の最終レビューは、推論レベル�
 
 ## Codex 用スキル一覧
 
-開発したコードベースを、既存の振る舞いを保ったまま整えるためのスキル。現在の Codex 用スキルは、`$スキル名` などで明示的に指定したときだけ使う。
+開発したコードベースを、既存の振る舞いを保ったまま整えるためのスキル。すべて `$スキル名` で明示的に指定したときだけ使う。
+
+`skills-preflight` は準備確認用。それ以外は、気が向いたときや時間・トークンに余裕があるときに、プロジェクト全体を繰り返し整えるために使う。対象を省略すると全体を探索し、指定した場合はその範囲を扱う。有益な変更がなければそのまま終え、未探索・保留・未検証の範囲を報告する。
 
 | スキル | できること | 使い方の例 | 前提 |
 | --- | --- | --- | --- |
 | [skills-preflight](.agents/skills/skills-preflight/SKILL.md) | スキルの定義・呼び出し設定・リンクと、必要なコマンドやプロジェクトの検証環境を確認する。利用可否と対処をまとめ、環境は変更しない | `$skills-preflight`<br>`$skills-preflight このプロジェクトで使う準備を確認して` | `bash`。各スキルの実行環境は確認対象 |
+| [project-cleanup-workflow](.agents/skills/project-cleanup-workflow/SKILL.md) | 全体探索と検証結果を共有し、設計整合 → 責務分割・共通化 → テスト整理 → 宣言順整理 → 文書同期を一巡する。各スキルの判断基準で必要な改善を実施する | `$project-cleanup-workflow`<br>`$project-cleanup-workflow 今回は src/billing のみ整備して` | 下記5つの整備スキルを参照でき、対象の実装・文書と検証環境を利用できること |
 | [design-alignment-refactor](.agents/skills/design-alignment-refactor/SKILL.md) | 文書とコードからプロジェクトの設計方針を読み取り、責務分担や依存関係の逸脱を修正する。意図的な例外を尊重し、既存の振る舞いを保って検証する | `$design-alignment-refactor`<br>`$design-alignment-refactor src/billing をプロジェクトの設計に合わせてリファクタリングして` | 対象の設計・実装を参照でき、関連する検証を実行できること |
 | [code-structure-refactor](.agents/skills/code-structure-refactor/SKILL.md) | 責務の混在や重複を探索し、責務分割・共通化で保守性・可読性・拡張性を改善する。既存の振る舞いを保ち、効果のない抽象化を避ける | `$code-structure-refactor`<br>`$code-structure-refactor src/billing の責務分割と共通化を進めて` | 対象の実装を参照でき、関連する検証を実行できること |
-| [test-suite-refactor](.agents/skills/test-suite-refactor/SKILL.md) | 不具合の検出力を保ちながら、重複や実装の細部に依存するテストを削除・統合・書き換える。境界値・異常系・過去の不具合・重要な副作用を守り、影響範囲を実行して確かめる | `$test-suite-refactor src/billing のテストを整理して`<br>`$test-suite-refactor この差分のテストを本質的なものにして` | 対象リポジトリのテスト実行環境 |
-| [docs-align-with-code](.agents/skills/docs-align-with-code/SKILL.md) | 実装を正として README.md などを更新する。有用な説明と重要な制約を残し、古い記述・重複・不足を整理して、現在の使い方を見つけやすくする | `$docs-align-with-code README.md を現状の実装に合わせて更新して`<br>`$docs-align-with-code docs/usage.md を必要な情報に絞って整理して` | 対象のドキュメントと実装を参照できること |
+| [test-suite-refactor](.agents/skills/test-suite-refactor/SKILL.md) | 不具合の検出力を保ちながら、重複や実装の細部に依存するテストを削除・統合・書き換える。境界値・異常系・過去の不具合・重要な副作用を守り、影響範囲を実行して確かめる | `$test-suite-refactor`<br>`$test-suite-refactor src/billing のテストを整理して` | 対象リポジトリのテスト実行環境 |
+| [code-order-refactor](.agents/skills/code-order-refactor/SKILL.md) | プロジェクトを探索し、メソッド・関数などを読みやすい順へ移す。初期化・登録などの順序依存を守り、再実行でも配置を安定させる | `$code-order-refactor`<br>`$code-order-refactor src/billing のメソッドの順番を整理して` | 対象の実装を参照でき、関連する検証を実行できること |
+| [docs-align-with-code](.agents/skills/docs-align-with-code/SKILL.md) | 実装を正としてプロジェクト全体の利用・開発・運用文書を更新する。有用な説明と重要な制約を残し、古い記述・重複・不足を整理する | `$docs-align-with-code`<br>`$docs-align-with-code README.md を現状の実装に合わせて更新して` | 対象のドキュメントと実装を参照できること |
 
 ## 実行結果の保存先
 

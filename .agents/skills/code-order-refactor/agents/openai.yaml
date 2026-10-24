@@ -1,0 +1,6 @@
+interface:
+  short_description: "プロジェクトを探索し、振る舞いを保ってメソッドや関数の記述順を整える"
+  default_prompt: "$code-order-refactor を使って、プロジェクト全体を探索し、振る舞いを保ちながらファイル内のメソッド・関数などを読みやすい順番に整理してください。"
+
+policy:
+  allow_implicit_invocation: false

@@ -1,6 +1,6 @@
 interface:
   short_description: "現状の実装を正として、必要な情報を選びながらドキュメントを更新する"
-  default_prompt: "$docs-align-with-code を使って、README.md などを現状の実装に合わせ、必要な情報を見つけやすい形に更新してください。"
+  default_prompt: "$docs-align-with-code を使って、プロジェクト全体の利用・開発・運用文書を実装と照合し、必要な情報を見つけやすい形に更新してください。"
 
 policy:
   allow_implicit_invocation: false
