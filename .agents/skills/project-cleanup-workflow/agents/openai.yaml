@@ -1,6 +1,0 @@
-interface:
-  short_description: "整備スキルを順に組み合わせ、プロジェクト全体のコード・テスト・文書を整える"
-  default_prompt: "$project-cleanup-workflow を使って、プロジェクト全体を探索し、設計・構造・テスト・宣言順・文書を順に見直して、振る舞いを保ちながら整備してください。"
-
-policy:
-  allow_implicit_invocation: false

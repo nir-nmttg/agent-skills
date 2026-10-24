@@ -23,7 +23,7 @@ Claude Code のスキルは機能を作って届けるまでの開発を、Codex
 典型的な流れは次のとおり。
 
 1. **Claude Code で開発する**: 設計・実装・検証を進め、PR まで仕上げる。実装・テスト・レビューの一部は Claude のスキルが Codex CLI（GPT-6 Luna / GPT-6.1 Sol / GPT-6 Astra）に任せるが、指示・採否の判断・反映は Claude が行う。
-2. **Codex で整備する**: 時間やトークンに余裕があるとき、プロジェクト全体の設計とのずれ・責務の混在や重複・冗長なテスト・宣言順・古いドキュメントを繰り返し整える。`$project-cleanup-workflow` でまとめて実行するか、目的ごとのスキルを指定する。
+2. **Codex で整備する**: 時間やトークンに余裕があるとき、プロジェクト全体の設計とのずれ・責務の混在や重複・冗長なテスト・宣言順・古いドキュメントを繰り返し整える。`$codebase-cleanup-workflow` でまとめて実行するか、目的ごとのスキルを指定する。
 3. **整ったコードベースで、また Claude Code で次の開発に進む。**
 
 ## はじめに
@@ -124,7 +124,7 @@ Sol / Astra のレビューと Opus の最終レビューは、推論レベル�
 | スキル | できること | 使い方の例 | 前提 |
 | --- | --- | --- | --- |
 | [skills-preflight](.agents/skills/skills-preflight/SKILL.md) | スキルの定義・呼び出し設定・リンクと、必要なコマンドやプロジェクトの検証環境を確認する。利用可否と対処をまとめ、環境は変更しない | `$skills-preflight`<br>`$skills-preflight このプロジェクトで使う準備を確認して` | `bash`。各スキルの実行環境は確認対象 |
-| [project-cleanup-workflow](.agents/skills/project-cleanup-workflow/SKILL.md) | 全体探索と検証結果を共有し、設計整合 → 責務分割・共通化 → テスト整理 → 宣言順整理 → 文書同期を一巡する。各スキルの判断基準で必要な改善を実施する | `$project-cleanup-workflow`<br>`$project-cleanup-workflow 今回は src/billing のみ整備して` | 下記5つの整備スキルを参照でき、対象の実装・文書と検証環境を利用できること |
+| [codebase-cleanup-workflow](.agents/skills/codebase-cleanup-workflow/SKILL.md) | 全体探索と検証結果を共有し、設計整合 → 責務分割・共通化 → テスト整理 → 宣言順整理 → 文書同期を一巡する。各スキルの判断基準で必要な改善を実施する | `$codebase-cleanup-workflow`<br>`$codebase-cleanup-workflow 今回は src/billing のみ整備して` | 下記5つの整備スキルを参照でき、対象の実装・文書と検証環境を利用できること |
 | [design-alignment-refactor](.agents/skills/design-alignment-refactor/SKILL.md) | 文書とコードからプロジェクトの設計方針を読み取り、責務分担や依存関係の逸脱を修正する。意図的な例外を尊重し、既存の振る舞いを保って検証する | `$design-alignment-refactor`<br>`$design-alignment-refactor src/billing をプロジェクトの設計に合わせてリファクタリングして` | 対象の設計・実装を参照でき、関連する検証を実行できること |
 | [code-structure-refactor](.agents/skills/code-structure-refactor/SKILL.md) | 責務の混在や重複を探索し、責務分割・共通化で保守性・可読性・拡張性を改善する。既存の振る舞いを保ち、効果のない抽象化を避ける | `$code-structure-refactor`<br>`$code-structure-refactor src/billing の責務分割と共通化を進めて` | 対象の実装を参照でき、関連する検証を実行できること |
 | [test-suite-refactor](.agents/skills/test-suite-refactor/SKILL.md) | 不具合の検出力を保ちながら、重複や実装の細部に依存するテストを削除・統合・書き換える。境界値・異常系・過去の不具合・重要な副作用を守り、影響範囲を実行して確かめる | `$test-suite-refactor`<br>`$test-suite-refactor src/billing のテストを整理して` | 対象リポジトリのテスト実行環境 |
