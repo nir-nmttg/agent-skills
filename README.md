@@ -16,7 +16,7 @@ Claude Code のスキルは機能を作って届けるまでの開発を、Codex
 | | Claude Code | Codex |
 | --- | --- | --- |
 | 役割 | 開発する | 整備する |
-| 扱う作業 | Issue の把握・設計・実装・テスト・レビュー・PR の確認・次の作業の判断 | 設計方針への整合、責務分割・共通化、宣言順の整理、テストの整理、文書同期、ランタイム・依存の更新 |
+| 扱う作業 | Issue の把握・設計・実装・テスト・レビュー・PR の確認・次の作業の判断 | 設計方針への整合、責務分割・共通化、宣言順の整理、テストの整理、文書同期、実行・開発環境と依存の更新 |
 | 変更の性質 | 機能や振る舞いを追加・変更する | 整備では既存の振る舞いを保ち、更新では互換性と供給網を確認して必要な移行を行う |
 | 使い方 | 条件に当たると Claude が自分の判断で使うスキルが中心 | `$スキル名` で明示的に指定したときだけ使う |
 
@@ -117,17 +117,19 @@ Sol / Astra のレビューと Opus の最終レビューは、推論レベル�
 
 ## Codex 用スキル一覧
 
-開発したコードベースの整備と、ランタイム・依存の更新に使うスキル。すべて `$スキル名` で明示的に指定したときだけ使う。
+開発したコードベースの整備と、各言語の実行・開発環境や依存の更新に使うスキル。すべて `$スキル名` で明示的に指定したときだけ使う。
 
-`skills-preflight` は準備確認用。`minor-version-upgrade` / `major-version-upgrade` は依頼されたプロジェクトの更新用で、`codebase-cleanup-workflow` には含めない。供給網の調査と隔離した実行を経て、テスト・組み込みブラウザで影響範囲を検証する。CLI など画面がない対象は適用外の理由と代替の検証を記録し、必要なブラウザ検証ができなければ未検証として残す。調査で攻撃がないことを完全には保証できないため、確認結果と残る不確実性も報告する。
+`skills-preflight` は準備確認用。`minor-version-upgrade` / `major-version-upgrade` は、言語を限定せず、依頼されたプロジェクトのランタイム・コンパイラ・SDK・依存ライブラリを更新する。`codebase-cleanup-workflow` には含めない。採用中の管理方法と複数言語の構成を静的に確認し、各対象の公式の版番号・互換性方針で一括更新と個別移行を分ける。Node・Ruby・Python・Java/Kotlin・Go・Rust・.NET・PHP の手引きを用意し、ほかの言語も公式仕様を確認して同じ安全基準で扱う。グローバル環境の更新は依頼範囲に含まれる場合だけ行う。
+
+供給網の調査と隔離した実行を経て、テスト・組み込みブラウザで影響範囲を検証する。CLI・ライブラリ・ネイティブアプリなどブラウザが適用されない対象は、その理由と対象に合った実行検証を記録し、必要なブラウザ検証ができなければ未検証として残す。調査で攻撃がないことを完全には保証できないため、確認結果と残る不確実性も報告する。
 
 整備スキルは、気が向いたときや時間・トークンに余裕があるときに、既存の振る舞いを保ってプロジェクト全体を繰り返し整えるために使う。対象を省略すると全体を探索し、指定した場合はその範囲を扱う。有益な変更がなければそのまま終え、未探索・保留・未検証の範囲を報告する。
 
 | スキル | できること | 使い方の例 | 前提 |
 | --- | --- | --- | --- |
 | [skills-preflight](.agents/skills/skills-preflight/SKILL.md) | スキルの定義・呼び出し設定・リンクと、必要なコマンドやプロジェクトの検証環境を確認する。利用可否と対処をまとめ、環境は変更しない | `$skills-preflight`<br>`$skills-preflight このプロジェクトで使う準備を確認して` | `bash`。各スキルの実行環境は確認対象 |
-| [minor-version-upgrade](.agents/skills/minor-version-upgrade/SKILL.md) | Node・Ruby などのランタイムと依存の minor / patch を、互換性と供給網の確認後にまとめて更新する。隔離環境・テスト・組み込みブラウザで検証し、結果を保存する。互換性を壊す版変更は major 側へ回す | `$minor-version-upgrade`<br>`$minor-version-upgrade このプロジェクトのランタイムと依存を同一 major 内で更新して` | 採用中のランタイム・パッケージ管理、公式情報へのネットワーク、隔離環境、既存のテスト環境、画面がある対象は組み込みブラウザ |
-| [major-version-upgrade](.agents/skills/major-version-upgrade/SKILL.md) | ランタイム・依存の major 更新や互換性を壊す版変更を1対象ずつ移行する。対象ごとに供給網の確認・隔離実行・テスト・組み込みブラウザでの検証まで完了して次へ進む | `$major-version-upgrade`<br>`$major-version-upgrade Ruby と Rails の更新を1対象ずつ検証して進めて` | 採用中のランタイム・パッケージ管理、公式の移行・供給網情報へのネットワーク、隔離環境、既存のテスト環境、画面がある対象は組み込みブラウザ |
+| [minor-version-upgrade](.agents/skills/minor-version-upgrade/SKILL.md) | 各言語のランタイム・コンパイラ・SDK・依存の互換性を保つ minor / patch を、供給網の確認後にまとめて更新する。隔離環境・テスト・対象に合った実操作で検証し、結果を保存する。公式方針上の個別移行は major 側へ回す | `$minor-version-upgrade`<br>`$minor-version-upgrade このプロジェクトの各言語の実行環境と依存を互換性を保つ範囲で更新して` | 採用中の実行・ビルド・依存管理、公式情報へのネットワーク、隔離環境、既存のテスト環境、Web 画面には組み込みブラウザ |
+| [major-version-upgrade](.agents/skills/major-version-upgrade/SKILL.md) | 各言語のランタイム・コンパイラ・SDK・依存の major 更新や個別移行が必要な版変更を1対象ずつ進める。対象ごとに供給網の確認・隔離実行・テスト・対象に合った実操作まで完了して次へ進む | `$major-version-upgrade`<br>`$major-version-upgrade Python と .NET SDK の更新を1対象ずつ検証して進めて` | 採用中の実行・ビルド・依存管理、公式の移行・供給網情報へのネットワーク、隔離環境、既存のテスト環境、Web 画面には組み込みブラウザ |
 | [codebase-cleanup-workflow](.agents/skills/codebase-cleanup-workflow/SKILL.md) | 全体探索と検証結果を共有し、設計整合 → 責務分割・共通化 → テスト整理 → 宣言順整理 → 文書同期を一巡する。各スキルの判断基準で必要な改善を実施する | `$codebase-cleanup-workflow`<br>`$codebase-cleanup-workflow 今回は src/billing のみ整備して` | 下記5つの整備スキルを参照でき、対象の実装・文書と検証環境を利用できること |
 | [design-alignment-refactor](.agents/skills/design-alignment-refactor/SKILL.md) | 文書とコードからプロジェクトの設計方針を読み取り、責務分担や依存関係の逸脱を修正する。意図的な例外を尊重し、既存の振る舞いを保って検証する | `$design-alignment-refactor`<br>`$design-alignment-refactor src/billing をプロジェクトの設計に合わせてリファクタリングして` | 対象の設計・実装を参照でき、関連する検証を実行できること |
 | [code-structure-refactor](.agents/skills/code-structure-refactor/SKILL.md) | 責務の混在や重複を探索し、責務分割・共通化で保守性・可読性・拡張性を改善する。既存の振る舞いを保ち、効果のない抽象化を避ける | `$code-structure-refactor`<br>`$code-structure-refactor src/billing の責務分割と共通化を進めて` | 対象の実装を参照でき、関連する検証を実行できること |

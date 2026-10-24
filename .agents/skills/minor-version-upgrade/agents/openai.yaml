@@ -1,6 +1,6 @@
 interface:
-  short_description: "ランタイム・依存のマイナー更新をまとめ、供給網・テスト・画面操作まで確認する"
-  default_prompt: "$minor-version-upgrade を使って、このプロジェクトのランタイムと依存ライブラリのマイナー・パッチ更新をまとめて行い、供給網の確認、テスト、組み込みブラウザでの実操作まで検証してください。"
+  short_description: "各言語の実行・開発環境と依存をまとめて更新し、供給網・テスト・実操作まで確認する"
+  default_prompt: "$minor-version-upgrade を使って、このプロジェクトの各言語のランタイム・コンパイラ・SDKと依存を互換性を保つ範囲でまとめて更新し、供給網確認、テスト、Webは組み込みブラウザ、それ以外は対象に合う実操作まで検証してください。"
 
 policy:
   allow_implicit_invocation: false
