@@ -1,12 +1,30 @@
 # agent-skills
 
-普段の仕事で使う汎用的な Claude Code・Codex スキル集。
+Claude Code で開発し、Codex で整備するための汎用スキル集。特定のプロジェクトに依存せず、普段の仕事で使う。
 
+- [Claude で開発し、Codex で整備する](#claude-で開発しcodex-で整備する)
 - [はじめに](#はじめに)
-- [Codex 用スキル一覧](#codex-用スキル一覧)
 - [Claude Code 用スキル一覧](#claude-code-用スキル一覧)
+- [Codex 用スキル一覧](#codex-用スキル一覧)
 - [実行結果の保存先](#実行結果の保存先)
 - [スキルの追加・変更](#スキルの追加変更)
+
+## Claude で開発し、Codex で整備する
+
+Claude Code のスキルは機能を作って届けるまでの開発を、Codex のスキルは開発で積み上がったコードベースを整える保守を受け持つ。
+
+| | Claude Code | Codex |
+| --- | --- | --- |
+| 役割 | 開発する | 整備する |
+| 扱う作業 | Issue の把握・設計・実装・テスト・レビュー・PR の確認・次の作業の判断 | 設計方針への整合、責務分割・共通化、テストの整理、ドキュメントと実装の同期 |
+| 変更の性質 | 機能や振る舞いを追加・変更する | 既存の振る舞いを保ったまま、保守性・可読性・検出力を上げる |
+| 使い方 | 条件に当たると Claude が自分の判断で使うスキルが中心 | `$スキル名` で明示的に指定したときだけ使う |
+
+典型的な流れは次のとおり。
+
+1. **Claude Code で開発する**: 設計・実装・検証を進め、PR まで仕上げる。実装・テスト・レビューの一部は Claude のスキルが Codex CLI（GPT-6 Luna / GPT-6.1 Sol / GPT-6 Astra）に任せるが、指示・採否の判断・反映は Claude が行う。
+2. **Codex で整備する**: 機能の区切りなど節目に、設計とのずれ・責務の混在や重複・冗長なテスト・古いドキュメントを Codex のスキルで整える。
+3. **整ったコードベースで、また Claude Code で次の開発に進む。**
 
 ## はじめに
 
@@ -19,14 +37,14 @@
 scripts/link-skills.sh
 
 # 片方だけ使う場合
-scripts/link-skills.sh --codex
 scripts/link-skills.sh --claude
+scripts/link-skills.sh --codex
 ```
 
 | エージェント | このリポジトリの配置 | ユーザー用リンク先 | 呼び出し方 |
 | --- | --- | --- | --- |
-| Codex | `.agents/skills/` | `~/.agents/skills/` | `$スキル名` |
 | Claude Code | `.claude/skills/` | `~/.claude/skills/` | `/スキル名` |
+| Codex | `.agents/skills/` | `~/.agents/skills/` | `$スキル名` |
 
 Claude Code のリンク先は、`CLAUDE_CONFIG_DIR` 指定時はその配下の `skills/` になる。Codex の配置先は [公式スキルドキュメント](https://learn.chatgpt.com/docs/build-skills#where-codex-loads-local-skills) を参照。追加が反映されなければ Codex を再起動する。
 
@@ -41,28 +59,16 @@ Claude Code のリンク先は、`CLAUDE_CONFIG_DIR` 指定時はその配下の
 
 | エージェント | 呼び出し | 確認すること |
 | --- | --- | --- |
-| Codex | `$skills-preflight` | Codex スキルの定義・呼び出し設定・リンク、必要なコマンド、対象プロジェクトの検証環境 |
 | Claude Code | `/skills-preflight` | Claude Code スキルに必要なコマンド・ログイン・ユーザー用リンクと、不足への対処 |
+| Codex | `$skills-preflight` | Codex スキルの定義・呼び出し設定・リンク、必要なコマンド、対象プロジェクトの検証環境 |
 
 ### 3. 目的に合うスキルを選ぶ
 
-以下の一覧は、準備・設計・実装・検証・仕上げの流れで並べている。名前のリンクから詳細な手順・オプションを確認できる。Claude Code のスキルは呼び出し方で分類し、各分類の中を作業順に並べている。
-
-## Codex 用スキル一覧
-
-現在の Codex 用スキルは、`$スキル名` などで明示的に指定したときだけ使う。
-
-| スキル | できること | 使い方の例 | 前提 |
-| --- | --- | --- | --- |
-| [skills-preflight](.agents/skills/skills-preflight/SKILL.md) | スキルの定義・呼び出し設定・リンクと、必要なコマンドやプロジェクトの検証環境を確認する。利用可否と対処をまとめ、環境は変更しない | `$skills-preflight`<br>`$skills-preflight このプロジェクトで使う準備を確認して` | `bash`。各スキルの実行環境は確認対象 |
-| [design-alignment-refactor](.agents/skills/design-alignment-refactor/SKILL.md) | 文書とコードからプロジェクトの設計方針を読み取り、責務分担や依存関係の逸脱を修正する。意図的な例外を尊重し、既存の振る舞いを保って検証する | `$design-alignment-refactor`<br>`$design-alignment-refactor src/billing をプロジェクトの設計に合わせてリファクタリングして` | 対象の設計・実装を参照でき、関連する検証を実行できること |
-| [code-structure-refactor](.agents/skills/code-structure-refactor/SKILL.md) | 責務の混在や重複を探索し、責務分割・共通化で保守性・可読性・拡張性を改善する。既存の振る舞いを保ち、効果のない抽象化を避ける | `$code-structure-refactor`<br>`$code-structure-refactor src/billing の責務分割と共通化を進めて` | 対象の実装を参照でき、関連する検証を実行できること |
-| [test-suite-refactor](.agents/skills/test-suite-refactor/SKILL.md) | 不具合の検出力を保ちながら、重複や実装の細部に依存するテストを削除・統合・書き換える。境界値・異常系・過去の不具合・重要な副作用を守り、影響範囲を実行して確かめる | `$test-suite-refactor src/billing のテストを整理して`<br>`$test-suite-refactor この差分のテストを本質的なものにして` | 対象リポジトリのテスト実行環境 |
-| [docs-align-with-code](.agents/skills/docs-align-with-code/SKILL.md) | 実装を正として README.md などを更新する。有用な説明と重要な制約を残し、古い記述・重複・不足を整理して、現在の使い方を見つけやすくする | `$docs-align-with-code README.md を現状の実装に合わせて更新して`<br>`$docs-align-with-code docs/usage.md を必要な情報に絞って整理して` | 対象のドキュメントと実装を参照できること |
+開発には Claude Code 用、整備には Codex 用の一覧から選ぶ。名前のリンクから詳細な手順・オプションを確認できる。Claude Code のスキルは呼び出し方で分類し、各分類の中を準備・設計・実装・検証・仕上げの作業順に並べている。Codex のスキルは、準備のあと設計・コード・テスト・ドキュメントの順に並べている。
 
 ## Claude Code 用スキル一覧
 
-呼び出し方は次の3種類。自動で使う条件・確認される条件は、各一覧で機能と分けて示す。
+開発を進めるためのスキル。呼び出し方は次の3種類。自動で使う条件・確認される条件は、各一覧で機能と分けて示す。
 
 | 種類 | 呼び出し方 | スキル |
 | --- | --- | --- |
@@ -108,6 +114,18 @@ Sol / Astra のレビューと Opus の最終レビューは、推論レベル�
 | [codex-verify-prompt](.claude/skills/codex-verify-prompt/SKILL.md) | PR または会話と作業中の変更から、Codex に渡す動作確認プロンプトを作る。手順・期待結果・副作用を避ける決まり・報告形式を含める。`--browser builtin` / `--browser chrome` は必須。検証環境を省略するとローカルの起動手順を調べる。Codex やアプリは起動しない | `/codex-verify-prompt --browser builtin <PR の URL> <検証環境の URL>`<br>`/codex-verify-prompt --browser chrome <PR の URL>`<br>`/codex-verify-prompt --browser builtin https://staging.example.com ログイン周りだけ` | `git`、`jq`（PR を渡すときは `gh` にログイン済み） |
 | [gh-pr-precheck](.claude/skills/gh-pr-precheck/SKILL.md) | Issue の要件とプロジェクトの方針に PR を照合し、CI・コンフリクト・未解決レビューも含め、人間のレビューに進めるか判定する。PR 省略時は関連する PR を探す。コード変更や GitHub への書き込みは行わない | `/gh-pr-precheck <Issue の URL>`<br>`/gh-pr-precheck <Issue の URL> <PR の URL>` | `gh` にログイン済み、`jq`、`curl`、gh-issue-overview スキル（スクリプトを共有） |
 | [whats-next](.claude/skills/whats-next/SKILL.md) | 会話と実際のブランチ・差分・PR の状態から、進捗と次のアクションを1つ示す。実行手順または選択肢を提案し、承認後にその範囲だけ進める。デスクトップでは返事のボタンも表示する | `/whats-next`<br>`/whats-next 今日は 30 分だけ` | なし（ボタンは Claude デスクトップアプリ（Code タブ）。PR の状態は `gh` にログイン済みのときだけ） |
+
+## Codex 用スキル一覧
+
+開発したコードベースを、既存の振る舞いを保ったまま整えるためのスキル。現在の Codex 用スキルは、`$スキル名` などで明示的に指定したときだけ使う。
+
+| スキル | できること | 使い方の例 | 前提 |
+| --- | --- | --- | --- |
+| [skills-preflight](.agents/skills/skills-preflight/SKILL.md) | スキルの定義・呼び出し設定・リンクと、必要なコマンドやプロジェクトの検証環境を確認する。利用可否と対処をまとめ、環境は変更しない | `$skills-preflight`<br>`$skills-preflight このプロジェクトで使う準備を確認して` | `bash`。各スキルの実行環境は確認対象 |
+| [design-alignment-refactor](.agents/skills/design-alignment-refactor/SKILL.md) | 文書とコードからプロジェクトの設計方針を読み取り、責務分担や依存関係の逸脱を修正する。意図的な例外を尊重し、既存の振る舞いを保って検証する | `$design-alignment-refactor`<br>`$design-alignment-refactor src/billing をプロジェクトの設計に合わせてリファクタリングして` | 対象の設計・実装を参照でき、関連する検証を実行できること |
+| [code-structure-refactor](.agents/skills/code-structure-refactor/SKILL.md) | 責務の混在や重複を探索し、責務分割・共通化で保守性・可読性・拡張性を改善する。既存の振る舞いを保ち、効果のない抽象化を避ける | `$code-structure-refactor`<br>`$code-structure-refactor src/billing の責務分割と共通化を進めて` | 対象の実装を参照でき、関連する検証を実行できること |
+| [test-suite-refactor](.agents/skills/test-suite-refactor/SKILL.md) | 不具合の検出力を保ちながら、重複や実装の細部に依存するテストを削除・統合・書き換える。境界値・異常系・過去の不具合・重要な副作用を守り、影響範囲を実行して確かめる | `$test-suite-refactor src/billing のテストを整理して`<br>`$test-suite-refactor この差分のテストを本質的なものにして` | 対象リポジトリのテスト実行環境 |
+| [docs-align-with-code](.agents/skills/docs-align-with-code/SKILL.md) | 実装を正として README.md などを更新する。有用な説明と重要な制約を残し、古い記述・重複・不足を整理して、現在の使い方を見つけやすくする | `$docs-align-with-code README.md を現状の実装に合わせて更新して`<br>`$docs-align-with-code docs/usage.md を必要な情報に絞って整理して` | 対象のドキュメントと実装を参照できること |
 
 ## 実行結果の保存先
 
