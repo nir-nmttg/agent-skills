@@ -1,6 +1,6 @@
 interface:
   short_description: "責務の混在や重複を見つけ、振る舞いを保ちながら責務分割・共通化する"
-  default_prompt: "$code-structure-refactor を使って、対象の責務の混在や重複を探し、振る舞いを保ちながら責務分割・共通化を進めてください。"
+  default_prompt: "$code-structure-refactor を使って、プロジェクト全体の責務の混在や重複を探し、振る舞いを保ちながら責務分割・共通化を進めてください。"
 
 policy:
   allow_implicit_invocation: false

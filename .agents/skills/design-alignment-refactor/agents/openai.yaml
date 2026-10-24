@@ -1,6 +1,6 @@
 interface:
   short_description: "プロジェクトの設計方針を読み取り、設計から逸脱した実装を振る舞いを保って直す"
-  default_prompt: "$design-alignment-refactor を使って、対象の実装をプロジェクトの設計方針に照らして見直し、逸脱している箇所をリファクタリングしてください。"
+  default_prompt: "$design-alignment-refactor を使って、プロジェクト全体の実装を設計方針に照らして見直し、振る舞いを保ちながら根拠のある逸脱を修正してください。"
 
 policy:
   allow_implicit_invocation: false
