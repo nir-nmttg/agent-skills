@@ -117,9 +117,11 @@ Sol / Astra のレビューと Opus の最終レビューは、推論レベル�
 
 ## Codex 用スキル一覧
 
-開発したコードベースの整備と、各言語の実行・開発環境や依存の更新に使うスキル。すべて `$スキル名` で明示的に指定したときだけ使う。
+開発したコードベースの整備と、Ruby・Node（JavaScript / TypeScript）・Python のランタイムや依存の更新に使うスキル。すべて `$スキル名` で明示的に指定したときだけ使う。
 
-`skills-preflight` は準備確認用。`minor-version-upgrade` / `major-version-upgrade` は、言語を限定せず、依頼されたプロジェクトのランタイム・コンパイラ・SDK・依存ライブラリを更新する。`codebase-cleanup-workflow` には含めない。採用中の管理方法と複数言語の構成を静的に確認し、各対象の公式の版番号・互換性方針で一括更新と個別移行を分ける。Node・Ruby・Python・Java/Kotlin・Go・Rust・.NET・PHP の手引きを用意し、ほかの言語も公式仕様を確認して同じ安全基準で扱う。グローバル環境の更新は依頼範囲に含まれる場合だけ行う。
+`skills-preflight` は準備確認用。`minor-version-upgrade` / `major-version-upgrade` は、Ruby・Node・Python のランタイムと依存ライブラリの更新に最適化し、`codebase-cleanup-workflow` には含めない。Ruby / Bundler、Node / npm・pnpm・Yarn、Python / uv・pip・Poetry など、採用中の管理方法を設定と lockfile から静的に確認し、管理ツールを勝手に変更しない。必要なのは対象で採用されたツールだけで、すべての導入は要求しない。Rails・Node のフロントエンド・Python worker など3言語が混在する構成も一覧化し、言語間の連携まで検証する。その他の言語は影響・依存境界を記録し、更新対象を広げない。グローバル環境の更新は依頼範囲に含まれる場合だけ行う。
+
+Ruby・Python の `X.Y` ブランチ変更や機能リリース、Node の major 更新は個別移行として扱う。Node の同一 major 内の minor / patch、Ruby・Python の同一 `X.Y` 内の patch、各ライブラリの互換性を保つ更新は、公式方針と実際の変更を確認したうえでまとめる。ライブラリも番号だけで判断せず、`0.x` の minor 増加や非互換変更を含む版は個別に扱う。
 
 供給網の調査と隔離した実行を経て、テスト・組み込みブラウザで影響範囲を検証する。CLI・ライブラリ・ネイティブアプリなどブラウザが適用されない対象は、その理由と対象に合った実行検証を記録し、必要なブラウザ検証ができなければ未検証として残す。調査で攻撃がないことを完全には保証できないため、確認結果と残る不確実性も報告する。
 
@@ -128,8 +130,8 @@ Sol / Astra のレビューと Opus の最終レビューは、推論レベル�
 | スキル | できること | 使い方の例 | 前提 |
 | --- | --- | --- | --- |
 | [skills-preflight](.agents/skills/skills-preflight/SKILL.md) | スキルの定義・呼び出し設定・リンクと、必要なコマンドやプロジェクトの検証環境を確認する。利用可否と対処をまとめ、環境は変更しない | `$skills-preflight`<br>`$skills-preflight このプロジェクトで使う準備を確認して` | `bash`。各スキルの実行環境は確認対象 |
-| [minor-version-upgrade](.agents/skills/minor-version-upgrade/SKILL.md) | 各言語のランタイム・コンパイラ・SDK・依存の互換性を保つ minor / patch を、供給網の確認後にまとめて更新する。隔離環境・テスト・対象に合った実操作で検証し、結果を保存する。公式方針上の個別移行は major 側へ回す | `$minor-version-upgrade`<br>`$minor-version-upgrade このプロジェクトの各言語の実行環境と依存を互換性を保つ範囲で更新して` | 採用中の実行・ビルド・依存管理、公式情報へのネットワーク、隔離環境、既存のテスト環境、Web 画面には組み込みブラウザ |
-| [major-version-upgrade](.agents/skills/major-version-upgrade/SKILL.md) | 各言語のランタイム・コンパイラ・SDK・依存の major 更新や個別移行が必要な版変更を1対象ずつ進める。対象ごとに供給網の確認・隔離実行・テスト・対象に合った実操作まで完了して次へ進む | `$major-version-upgrade`<br>`$major-version-upgrade Python と .NET SDK の更新を1対象ずつ検証して進めて` | 採用中の実行・ビルド・依存管理、公式の移行・供給網情報へのネットワーク、隔離環境、既存のテスト環境、Web 画面には組み込みブラウザ |
+| [minor-version-upgrade](.agents/skills/minor-version-upgrade/SKILL.md) | Ruby・Node・Python のランタイムと依存の互換性を保つ更新を、供給網の確認後にまとめて反映する。隔離環境・テスト・対象に合った実操作で検証し、結果を保存する。個別移行が必要な版は major 側へ回す | `$minor-version-upgrade`<br>`$minor-version-upgrade Ruby・Node・Python と依存を互換性を保つ範囲でまとめて更新して` | 対象で採用中のランタイム・依存管理、公式情報へのネットワーク、隔離環境、既存のテスト環境、Web 画面には組み込みブラウザ |
+| [major-version-upgrade](.agents/skills/major-version-upgrade/SKILL.md) | Ruby・Python の X.Y ブランチ変更、Node や依存の major 更新など個別移行が必要な版を1対象ずつ更新する。対象ごとに供給網の確認・隔離実行・テスト・対象に合った実操作まで完了して次へ進む | `$major-version-upgrade`<br>`$major-version-upgrade Ruby・Node・Python のランタイムと依存を1対象ずつ検証して移行して` | 対象で採用中のランタイム・依存管理、公式の移行・供給網情報へのネットワーク、隔離環境、既存のテスト環境、Web 画面には組み込みブラウザ |
 | [codebase-cleanup-workflow](.agents/skills/codebase-cleanup-workflow/SKILL.md) | 全体探索と検証結果を共有し、設計整合 → 責務分割・共通化 → テスト整理 → 宣言順整理 → 文書同期を一巡する。各スキルの判断基準で必要な改善を実施する | `$codebase-cleanup-workflow`<br>`$codebase-cleanup-workflow 今回は src/billing のみ整備して` | 下記5つの整備スキルを参照でき、対象の実装・文書と検証環境を利用できること |
 | [design-alignment-refactor](.agents/skills/design-alignment-refactor/SKILL.md) | 文書とコードからプロジェクトの設計方針を読み取り、責務分担や依存関係の逸脱を修正する。意図的な例外を尊重し、既存の振る舞いを保って検証する | `$design-alignment-refactor`<br>`$design-alignment-refactor src/billing をプロジェクトの設計に合わせてリファクタリングして` | 対象の設計・実装を参照でき、関連する検証を実行できること |
 | [code-structure-refactor](.agents/skills/code-structure-refactor/SKILL.md) | 責務の混在や重複を探索し、責務分割・共通化で保守性・可読性・拡張性を改善する。既存の振る舞いを保ち、効果のない抽象化を避ける | `$code-structure-refactor`<br>`$code-structure-refactor src/billing の責務分割と共通化を進めて` | 対象の実装を参照でき、関連する検証を実行できること |
