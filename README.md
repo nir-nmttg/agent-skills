@@ -11,12 +11,12 @@ Claude Code で開発し、Codex で整備するための汎用スキル集。�
 
 ## Claude で開発し、Codex で整備する
 
-Claude Code のスキルは機能を作って届けるまでの開発を、Codex のスキルは開発で積み上がったコードベースを整える保守を受け持つ。
+Claude Code のスキルは機能を作って届けるまでの開発を、Codex のスキルは開発で積み上がったコードベースを整える保守や、書類など日常のファイル整理を受け持つ。
 
 | | Claude Code | Codex |
 | --- | --- | --- |
 | 役割 | 開発する | 整備する |
-| 扱う作業 | Issue の把握・設計・実装・テスト・レビュー・PR の確認・次の作業の判断 | 設計方針への整合、責務分割・共通化、宣言順の整理、テストの整理、文書同期、実行・開発環境と依存の更新 |
+| 扱う作業 | Issue の把握・設計・実装・テスト・レビュー・PR の確認・次の作業の判断 | 設計方針への整合、責務分割・共通化、宣言順の整理、テストの整理、文書同期、実行・開発環境と依存の更新、内容に基づくファイル名の整理 |
 | 変更の性質 | 機能や振る舞いを追加・変更する | 整備では既存の振る舞いを保ち、更新では互換性と供給網を確認して必要な移行を行う |
 | 使い方 | 条件に当たると Claude が自分の判断で使うスキルが中心 | `$スキル名` で明示的に指定したときだけ使う |
 
@@ -64,7 +64,7 @@ Claude Code のリンク先は、`CLAUDE_CONFIG_DIR` 指定時はその配下の
 
 ### 3. 目的に合うスキルを選ぶ
 
-開発には Claude Code 用、整備・更新には Codex 用の一覧から選ぶ。名前のリンクから詳細な手順・オプションを確認できる。Claude Code のスキルは呼び出し方で分類し、各分類の中を準備・設計・実装・検証・仕上げの作業順に並べている。Codex のスキルは準備・更新・一括整備のあと、設計・構造・テスト・宣言順・文書の順に並べている。
+開発には Claude Code 用、整備・更新・ファイル整理には Codex 用の一覧から選ぶ。名前のリンクから詳細な手順・オプションを確認できる。Claude Code のスキルは呼び出し方で分類し、各分類の中を準備・設計・実装・検証・仕上げの作業順に並べている。Codex のスキルは準備・更新・一括整備のあと、設計・構造・テスト・宣言順・文書・ファイル整理の順に並べている。
 
 ## Claude Code 用スキル一覧
 
@@ -117,7 +117,7 @@ Sol / Astra のレビューと Opus の最終レビューは、推論レベル�
 
 ## Codex 用スキル一覧
 
-開発したコードベースの整備と、Ruby・Node（JavaScript / TypeScript）・Python のランタイムや依存の更新に使うスキル。すべて `$スキル名` で明示的に指定したときだけ使う。
+開発したコードベースの整備、Ruby・Node（JavaScript / TypeScript）・Python のランタイムや依存の更新、書類などのファイル整理に使うスキル。すべて `$スキル名` で明示的に指定したときだけ使う。
 
 `skills-preflight` は準備確認用。`minor-version-upgrade` / `major-version-upgrade` は、Ruby・Node・Python のランタイムと依存ライブラリの更新に最適化し、`codebase-cleanup-workflow` には含めない。Ruby / Bundler、Node / npm・pnpm・Yarn、Python / uv・pip・Poetry など、採用中の管理方法を設定と lockfile から静的に確認し、管理ツールを勝手に変更しない。対象の管理ツールは採用されたものだけを使い、すべての導入は要求しない。共通の実行ゲートには `bash` と Python 3.9 以降の標準ライブラリが必要。Rails・Node のフロントエンド・Python worker など3言語が混在する構成も一覧化し、言語間の連携まで検証する。その他の言語は影響・依存境界を記録し、更新対象を広げない。グローバル環境の更新は依頼範囲に含まれる場合だけ行う。
 
@@ -142,6 +142,7 @@ Ruby・Python の `X.Y` ブランチ変更や機能リリース、Node の major
 | [test-suite-refactor](.agents/skills/test-suite-refactor/SKILL.md) | 不具合の検出力を保ちながら、重複や実装の細部に依存するテストを削除・統合・書き換える。境界値・異常系・過去の不具合・重要な副作用を守り、影響範囲を実行して確かめる | `$test-suite-refactor`<br>`$test-suite-refactor src/billing のテストを整理して` | 対象リポジトリのテスト実行環境 |
 | [code-order-refactor](.agents/skills/code-order-refactor/SKILL.md) | プロジェクトを探索し、メソッド・関数などを読みやすい順へ移す。初期化・登録などの順序依存を守り、再実行でも配置を安定させる | `$code-order-refactor`<br>`$code-order-refactor src/billing のメソッドの順番を整理して` | 対象の実装を参照でき、関連する検証を実行できること |
 | [docs-align-with-code](.agents/skills/docs-align-with-code/SKILL.md) | 実装を正としてプロジェクト全体の利用・開発・運用文書を更新する。有用な説明と重要な制約を残し、古い記述・重複・不足を整理する | `$docs-align-with-code`<br>`$docs-align-with-code README.md を現状の実装に合わせて更新して` | 対象のドキュメントと実装を参照できること |
+| [rename-files-by-content](.agents/skills/rename-files-by-content/SKILL.md) | 指定フォルダ直下の通常ファイルを内容から `YYYY-MM-DD_名前.拡張子` に改名する。隠しファイルと、隠しフォルダを含むサブフォルダ内は対象外。請求書・領収書・契約書などに応じて日付と名称を選び、同名は連番、不明なものは元名を保って記録する | `$rename-files-by-content /絶対パス/対象フォルダ`<br>`$rename-files-by-content /絶対パス/対象フォルダ 候補だけ見せて` | `bash`、Python 3.9 以降、対象の読み書き・ハードリンク作成、形式に合う読取・必要に応じた表示や OCR の手段 |
 
 ## 実行結果の保存先
 
