@@ -7,6 +7,7 @@ tar の拡張ヘッダーも逐次処理する。検査対象のコードや YAM
 
 import binascii
 import gzip
+import hashlib
 import io
 import json
 import lzma
@@ -284,7 +285,7 @@ def _pax(data):
     return result
 
 
-def _tar(data, budget, prefix="", gem=False):
+def _tar(data, budget, prefix="", gem=False, allow_extensions=True):
     if len(data) > MAX_TAR_BYTES or len(data) % 512:
         raise InspectionError("tar のサイズが検査上限を超えているか、ブロックが破損しています")
     cursor = 0
@@ -308,6 +309,10 @@ def _tar(data, budget, prefix="", gem=False):
         if info.size < 0 or info.size > MAX_FILE_BYTES:
             raise InspectionError("tar の単一ファイルが 16 MiB の上限を超えています")
         extension = info.type in (tarfile.XHDTYPE, tarfile.XGLTYPE, tarfile.GNUTYPE_LONGNAME)
+        # RubyGems TarReader は拡張を適用せず、生ヘッダーの名前・サイズを使う。
+        # gem の外側と data.tar.gz 内側では、その解釈と異なる配布物を採用しない。
+        if extension and (gem or not allow_extensions):
+            raise InspectionError("gem の PAX・GNU 拡張ヘッダーは検査対象外です")
         if not extension and info.type not in (tarfile.REGTYPE, tarfile.AREGTYPE, tarfile.DIRTYPE):
             raise InspectionError("tar にリンク・device・FIFO・sparse・未対応形式があります")
         pax = dict(global_pax)
@@ -335,6 +340,8 @@ def _tar(data, budget, prefix="", gem=False):
             else:
                 fields = _pax(payload)
                 if info.type == tarfile.XGLTYPE:
+                    if set(fields).intersection(("size", "path", "linkpath")):
+                        raise InspectionError("global PAX のファイル固有のサイズ・パスは検査対象外です")
                     global_pax.update(fields)
                 else:
                     if set(fields).intersection(pending_pax):
@@ -342,6 +349,9 @@ def _tar(data, budget, prefix="", gem=False):
                     pending_pax.update(fields)
             pending_extension = True
             continue
+        # GNU longname と PAX path の優先順位は reader ごと・並び順で異なる。
+        if longname is not None and "path" in pax:
+            raise InspectionError("GNU longname と PAX path が競合しています")
         name = pax.get("path", longname if longname is not None else info.name)
         if "linkpath" in pax or info.linkname:
             raise InspectionError("tar にリンク先を指定するヘッダーがあります")
@@ -363,7 +373,7 @@ def _tar(data, budget, prefix="", gem=False):
         if "data.tar.gz" not in gem_parts or "metadata.gz" not in gem_parts:
             raise InspectionError("gem に必須の data.tar.gz・metadata.gz がありません")
         _tar(_decompress(gem_parts["data.tar.gz"], "gzip", MAX_TAR_BYTES),
-             budget, prefix="data.tar.gz!/")
+             budget, prefix="data.tar.gz!/", allow_extensions=False)
         metadata = _decompress(gem_parts["metadata.gz"], "gzip", MAX_FILE_BYTES)
         # YAML オブジェクトの構築・Ruby タグの評価は一切行わない。
         metadata.decode("utf-8")
@@ -521,6 +531,7 @@ def inspect_artifact(path: Path) -> dict:
 
     対応形式は gem、whl/zip、tar、tar.gz/tgz、tar.xz。暗号化 ZIP、ZIP64、
     sparse、リンク、連結 xz、曖昧なパス等は未対応として停止する。
+    gem の外側・data.tar.gz 内側では PAX・GNU 拡張も未対応とする。
     members/unpacked_bytes は gem の外側・内側・展開した metadata を合算する。
     """
     try:
@@ -539,6 +550,7 @@ def inspect_artifact(path: Path) -> dict:
         else:
             raise InspectionError("配布物の形式は未対応です（gem/whl/zip/tar/tar.gz/tgz/tar.xz）")
         data = _read_artifact(path)
+        sha256 = hashlib.sha256(data).hexdigest()
         budget = _Budget()
         if kind in ("wheel", "zip"):
             _zip(data, budget)
@@ -548,7 +560,7 @@ def inspect_artifact(path: Path) -> dict:
             elif kind == "tar.xz":
                 data = _decompress(data, "xz", MAX_TAR_BYTES)
             _tar(data, budget, gem=(kind == "gem"))
-        return {"format": kind, "members": budget.members,
+        return {"format": kind, "sha256": sha256, "members": budget.members,
                 "unpacked_bytes": budget.unpacked_bytes, "signals": budget.signals}
     except InspectionError:
         raise

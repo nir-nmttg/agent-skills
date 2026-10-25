@@ -10,7 +10,7 @@
 2. 既存のコンテナ・VM・OS sandbox と executor の実体・設定を静的にレビューする。[隔離条件](verification.md#4-隔離を確認してから導入テスト起動する) を強制できるものを選び、秘密を除いた最小の候補用コピー、専用 cache、ダミー設定を用意する。スクリプトが OS の隔離環境を自動構築・証明することはない。
 3. 候補を解決し、配布物を取得する。Gemfile/gemspec・backend・plugin などを評価する解決やメタデータ取得には、この段階からレビュー済みの隔離を適用する。`init` 前ならコードを自由に実行できるという意味ではない。取得と導入を分け、未確認の依存をホストへ導入しない。
 4. 更新前後の全依存 inventory、全変更版の公開日時、正確な版・取得元・digest、取得物、機械判定用の監査 JSON を揃える。直接・間接・dev・build・optional・platform 別の範囲を説明し、未探索や監査の非対応を隠さない。Ruby・Node・Python 本体の公式セキュリティ告知も証拠に含める。
-5. 計画に候補・manifest・lockfile 相当・実行設定・配布物・inventory・監査結果と、レビュー済みの既存隔離 executor の argv 配列を固定する。executor とその設定・入力も hash で結びつける。shell のコマンド文字列や、未確認の wrapper を実行先にしない。導入時の未確認な再取得・再解決を許さない。
+5. 計画に候補・manifest・lockfile 相当・実行設定・配布物・inventory・監査結果と、レビュー済みの既存隔離 executor の argv 配列を固定する。設定の include・補助 script 等、候補外のファイル入力も `execution.inputs` に列挙して hash で結びつける。設定は自己完結・相対 include とするか、snapshot の入力先を executor の引数から受け取る構成にする。rootfs・image 等のファイルでない入力は immutable digest へ固定し、可変 tag を使わないことを `isolation` で確認する。shell のコマンド文字列や、未確認の wrapper を実行先にしない。導入時の未確認な再取得・再解決を許さない。
 
 `RUN`・`PROJECT`・`CANDIDATE` は実際の絶対パスを設定する。`UPGRADE_PYTHON` はプロジェクト外の信頼済みPython 3.9以降の実体の絶対パス、`UPGRADE_GATE` はこのスキル実体の `scripts/supply-chain.py` の絶対パスとする。対象のvenv・shim・PATH上の未確認Pythonを使わず、常に `-I -S` で環境由来のimportとsite処理を無効化する。フラグなしの誤用は本体も拒否するが、フラグなしで起動した時点のsite処理まで後から防げるわけではない。
 
@@ -29,7 +29,7 @@
 | `artifacts` | 実際の旧新版配布物の差分、実行 hook・生成コード・通信・秘密へのアクセスを読み、archive 検査の signal と整合する |
 | `advisories` | 対応する全依存の監査、DB の鮮度、公式の脆弱性・悪性告知、ランタイムの告知を照合し、対象・期限・未確認点を説明する |
 | `authenticity` | 公認の digest、提供された署名・provenance を信頼した公開主体に照合する。未提供の場合は独立した代替根拠と限界を示す |
-| `isolation` | executor の実体と argv・設定・入力をレビューし、秘密・ホスト書込み・外部通信・資源の制限と `RUN` の分離を確認する |
+| `isolation` | executor の実体と argv・設定・全入力をレビューし、snapshot を読み取り専用で受け取り隔離内の scratch へコピーすること、秘密・ホスト書込み・外部通信・資源の制限と `RUN` の分離を確認する。ファイルでない rootfs・image 等は immutable digest に固定する |
 | `compatibility` | 正確な更新版と公式の互換性方針、minor / major の境界、ABI・peer・ビルド依存・3言語の連携、検証計画を説明する |
 
 実際の根拠を `RUN` 内の非空ファイルへ保存してから、一件ずつ記録する。`pass` には `--evidence` と説明が必須で、証拠の SHA256・時刻・計画 fingerprint を状態に結びつける。URL だけ、未確認の文章、空ファイルを証拠にしない。秘密や実データも保存しない。
@@ -44,7 +44,7 @@
 "$UPGRADE_PYTHON" -I -S "$UPGRADE_GATE" review --run "$RUN" --check authenticity --status unknown --note "公開主体を独立した根拠で確認できないため保留"
 ```
 
-必須項目の `fail`・`unknown` を除外する設定はない。機械検査不能な項目を推測で `pass` にしない。
+必須項目の `fail`・`unknown` を除外する設定はない。機械検査不能な項目を推測で `pass` にしない。既存の証拠の変更・期限切れ、既存 `pass` の別証拠への置換、`fail` からの復活は、正規の `review` でも同じ `RUN` の再承認に使えない。新しい実行記録を作り、全項目を再調査・レビューする。
 
 ## 3. 検査を通った計画だけを一度実行する
 
@@ -55,11 +55,13 @@
 
 `check`・`run` は、固定の7項目がすべて有効な `pass` でなければ非ゼロで停止する。証拠と監査の有効期間は24時間で、期限切れは再調査する。全変更版の公開から7日未満、公開日時の不明・未来も自動で停止する。組織の方針がより厳しければ追加で守る。緊急修正を理由にこの下限を短縮しない。
 
-自動検査は、全 candidate inventory の差分 coverage、取得物の SHA256、archive の path・link・type・件数とサイズの上限、`.gem` の内層・wheel を含む実行 hook の signal、公開後の日数と minor のランタイム境界を調べる。Ruby・Python 本体の同一 `X.Y`、Node 本体の同一 major でも互換性を自動保証するものではない。
+自動検査は、全 candidate inventory の差分 coverage、取得物の SHA256、archive の path・link・type・件数とサイズの上限、`.gem` の内層・wheel を含む実行 hook の signal、公開後の日数と minor のランタイム境界を調べる。解析に用いた配布物・監査JSON・inventory・plan の bytes から求めた SHA256 も承認内容と照合し、hash 確認と解析の別読取りの間の差替えを拒否する。Ruby・Python 本体の同一 `X.Y`、Node 本体の同一 major でも互換性を自動保証するものではない。
 
 監査 JSON の対応形式は npm audit v2・pip-audit・bundler-audit。エラー・skip・未対応形式・finding が1件でもある結果・期限切れ・coverage 不足は停止する。severity や既存問題を理由に検出結果を無視せず、空の結果を作らない。採用方式のままで対応する監査結果を用意できなければ保留する。署名の信頼・出所・配布物の意味のある差分・DB 鮮度・OS の隔離境界は、証拠付きの手動レビューが必要である。
 
-`run` は実行直前に再検査し、元の対象・候補・manifest・設定・取得物・証拠・executor・hash・argv の差替えを拒否する。レビュー済みの argv 配列を `shell=False` で実行し、計画の実行許可を一度だけ使う。失敗時に同じ状態を流用したり、任意コマンドへ切り替えたりしない。承認はRUNとスキル名にも結びつけ、別のRUNへコピーしても流用できない。候補・入力・計画の変更、再取得・再解決、証拠の差替えや期限切れがあれば、新しい実行記録で準備とレビューをやり直す。
+`run` は元の対象・候補・manifest・設定・取得物・証拠・executor・hash・argv を再検査し、承認した候補・設定・`inputs`・取得物を `RUN/execution-inputs` へ安全にコピーして hash を照合する。承認 hash と異なる内容をコピーしようとすれば停止し、コピー後は承認した snapshot だけを実行に使う。snapshot のファイルは `0400` と元の実行 bit、ディレクトリは `0500` とし、元の書込み可能な候補を実行しない。snapshot 作成後も、実行直前の現在時刻で証拠・監査の鮮度と整合を再検査する。
+
+executor の cwd と入力引数はこの読み取り専用 snapshot を参照する。executor は受け取った入力を隔離内の scratch へコピーして導入・テストし、結果は別の `RUN/execution-output` へ出す。入力 snapshot と出力先だけを渡し、`RUN` 全体を公開しない。token を解決した argv 配列を `shell=False` で一度だけ起動する。失敗時に同じ状態を流用したり、任意コマンドへ切り替えたりしない。承認はRUNとスキル名にも結びつけ、別のRUNへコピーしても流用できない。承認する候補・入力・計画を変える場合や、再取得・再解決、証拠の差替えや期限切れがあれば、新しい実行記録で準備と全レビューをやり直す。
 
 実行後は実際の版・依存・digest を計画と照合し、同じ隔離条件でテスト・必要な実操作を行う。追加の導入や更新が必要なら、別のレビュー済み計画の `run` を経由する。`check`・`run` の結果と残る不確実性も `report.md` に残す。
 
@@ -69,13 +71,13 @@
 
 ## 計画JSONとinventoryの形式
 
-JSONは重複キー・未対応キー・不正な型を拒否する。`plan.json`、inventory、監査結果、取得物、隔離設定、証拠はすべて `RUN` 内の通常ファイルとし、symlink・hardlink・特殊ファイルや `..` による参照を使わない。取得元URLから認証情報を除き、認証は取得用プロセスだけに渡す。
+計画と状態は `schema_version: 2` を使い、旧形式の記録は流用しない。JSONは重複キー・未対応キー・不正な型を拒否する。`plan.json`、inventory、監査結果、取得物、隔離設定、追加のファイル入力、証拠はすべて `RUN` 内の通常ファイルとし、symlink・hardlink・特殊ファイルや `..` による参照を使わない。取得元URLから認証情報を除き、認証は取得用プロセスだけに渡す。
 
 次はNodeの1候補を表す構造例。公開日時の `null`、古い監査日時、ゼロのhash、架空のexecutorを含むため実行できない。公式の根拠・実測値・実際の隔離設定で埋め、全候補に展開してから初期化する。初期化後の変更は承認を無効にする。
 
 ```json
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "unit": "web-widget-update",
   "files": ["package.json", "package-lock.json", ".npmrc"],
   "inventory": "inventory.json",
@@ -108,10 +110,18 @@ JSONは重複キー・未対応キー・不正な型を拒否する。`plan.json
     "argv": [
       "/absolute/path/to/reviewed-sandbox-executor",
       "--config",
-      "/absolute/RUN/evidence/isolation.json",
-      "/absolute/CANDIDATE"
+      "{config}",
+      "--candidate",
+      "{candidate}",
+      "--worker",
+      "{input:executor/install-worker.sh}",
+      "--package",
+      "{artifact:packages/widget-1.1.0.tgz}",
+      "--output",
+      "{output}"
     ],
-    "config": "evidence/isolation.json"
+    "config": "evidence/isolation.json",
+    "inputs": ["executor/install-worker.sh"]
   }
 }
 ```
@@ -122,7 +132,8 @@ JSONは重複キー・未対応キー・不正な型を拒否する。`plan.json
 - `artifacts` はその候補の導入で使う全配布物。公認情報で確認したSHA256と実物を照合する。旧配布物との差分や署名の信頼は、別の必須レビューに根拠を残す。
 - `audits` は変更したライブラリ・ビルド依存の各 `ecosystem/component` に対応する実際の監査結果。形式は `node:npm-v2`、`python:pip-audit`、`ruby:bundler-audit`。`checked_at` と `exit_code` は隔離内で実際に実行した日時・終了結果を記録する。これらの申告内容とDB鮮度は `advisories` の証拠でも確認する。bundler-auditはJSON内の生成日時も24時間・未来日時の検査へ含める。
 - 本体ランタイムだけの更新は、対応するpackage監査JSONがなくても公式告知を必須の `advisories` で調べる。ライブラリがあるのに報告を省略することはできない。pip-auditは変更したpackageの正規化名・版が結果に含まれるか照合する。npm/bundlerのJSONだけでは全正常依存の解決版を証明できないため、監査範囲は `coverage` でも照合する。
-- `execution.argv` は既存隔離executorとその引数。ホストのシェルや依存管理コマンドを直接指定せず、適用される隔離設定と入力・mount・通信制御をレビューする。`mechanism` は `container/vm/os-sandbox`。`config` はその根拠となる実際の設定ファイルで、この宣言だけで隔離が成立するわけではない。cwdは候補コピー、外側executorへ渡す環境は固定のPATH/LANGだけである。
+- `execution.argv[0]` は信頼済みの既存隔離 executor の実体の絶対パス。ホストのシェルや依存管理コマンドを直接指定せず、適用される隔離設定と入力・mount・通信制御をレビューする。以降の引数で入力先に使える token は `{candidate}`・`{config}`・`{input:RUN内の相対パス}`・`{artifact:RUN内の相対パス}`、出力先は `{output}`。`input` は `inputs`、`artifact` は候補の `artifacts` に列挙したものだけを使う。生の `PROJECT`・`CANDIDATE`・`RUN` やその他の絶対ホストパス、未知の token を引数へ入れない。token は実行用 snapshot と専用出力先へ解決され、cwd も snapshot の候補コピーとなる。
+- `execution.inputs` は必須の配列で、config 以外の候補外ファイル入力を `RUN` 内の相対パスですべて列挙する。追加の入力がなければ空配列にする。config の include や補助 script を未固定のホストパスから読む構成は使わない。`config` は実際に適用する隔離設定、`mechanism` は `container/vm/os-sandbox`。設定の意味と適用、ファイルでない入力の immutable digest、snapshot の読み取り専用 mount と scratch・出力の分離は `isolation` で確認し、この宣言だけで隔離が成立したとは扱わない。外側 executor へ渡す環境は固定の PATH/LANG だけである。
 
 `inventory.json` は全直接・間接・ビルド依存の更新前後の解決結果を記録する。次も構造例であり、実際のmanifest・lockfile・採用ツールの結果を `coverage` で照合する必要がある。
 
@@ -158,7 +169,8 @@ JSONは重複キー・未対応キー・不正な型を拒否する。`plan.json
 ## 検査上限と非対応
 
 - 候補は200件まで、配布物の圧縮済み合計は512MiBまで。候補コピーは `.git` と秘密の `.env*` を除いた最小コピーとし、合計64MiB・ファイルとディレクトリ合計5000件までとする。読めないディレクトリも省略せず停止する。
+- `execution.inputs` の追加ファイル入力は、各ファイル・合計とも128MiBまで。
 - 1配布物は128MiBまで、1メンバーは16MiBまで、合計展開量128MiB・10000メンバーまで。検査対応は `.gem`、`.whl/.zip`、`.tar/.tar.gz/.tgz/.tar.xz`。通常ファイルへ展開して検査することはない。
-- tarの危険なパス・リンク・特殊形式、zipのCRCや構造異常、暗号化・ZIP64等の未対応形式、上限超過は停止する。gemの既知の内層は検査するが、任意の入れ子archiveはsignalとして示し、追加レビューを必要とする。signalがゼロでも安全判定にはしない。
+- tarの危険なパス・リンク・特殊形式、global PAX の `size/path/linkpath`、同じメンバーの GNU longname と PAX path の競合を拒否する。`.gem` は外側・内層とも PAX/GNU 拡張を拒否し、consumer 間の解釈差を避ける。通常の tgz・sdist の local PAX 等は対応範囲で検査する。zipのCRCや構造異常、暗号化・ZIP64等の未対応形式、上限超過も停止する。gemの既知の内層は検査するが、任意の入れ子archiveはsignalとして示し、追加レビューを必要とする。signalがゼロでも安全判定にはしない。
 - 大きな本体バイナリ・wheel等が上限を超える場合も検査を飛ばさない。対象を安全に分割できるか調べ、できなければ未対応として保留する。上限や必須項目を外すフラグはない。
 - 監査JSON・証拠は8MiBまで。bundler-auditは確認済みの0.8.x/0.9.xの形式を扱い、未確認の新形式は停止する。実行は30分で待機を打ち切るが、隔離内のプロセス・資源の停止はexecutor側でも強制する。

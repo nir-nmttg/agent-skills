@@ -123,7 +123,9 @@ Sol / Astra のレビューと Opus の最終レビューは、推論レベル�
 
 Ruby・Python の `X.Y` ブランチ変更や機能リリース、Node の major 更新は個別移行として扱う。Node の同一 major 内の minor / patch、Ruby・Python の同一 `X.Y` 内の patch、各ライブラリの互換性を保つ更新は、公式方針と実際の変更を確認したうえでまとめる。ライブラリも番号だけで判断せず、`0.x` の minor 増加や非互換変更を含む版は個別に扱う。
 
-供給網の調査は [minor の実行ゲート](.agents/skills/minor-version-upgrade/references/gate.md) / [major の実行ゲート](.agents/skills/major-version-upgrade/references/gate.md) に根拠付きで記録する。固定7項目は `unknown` から始まり、全項目の有効な `pass` と、全依存 coverage・取得物 SHA256 / archive・公開から7日以上・監査 JSON などの機械検査が揃うまで導入を停止する。証拠・監査は24時間で期限切れとなり、監査の finding・skip・非対応や範囲不足も停止する。導入・更新は `supply-chain.py run` が再検査した計画の既存隔離 executor を一度だけ起動する。`check` 後の任意コマンドや skip・force・待機短縮は使わない。
+供給網の調査は [minor の実行ゲート](.agents/skills/minor-version-upgrade/references/gate.md) / [major の実行ゲート](.agents/skills/major-version-upgrade/references/gate.md) に根拠付きで記録する。固定7項目は `unknown` から始まり、全項目の有効な `pass` と、全依存 coverage・取得物 SHA256 / archive・公開から7日以上・監査 JSON などの機械検査が揃うまで導入を停止する。証拠・監査は24時間で期限切れとなり、監査の finding・skip・非対応や範囲不足も停止する。証拠変更・期限切れ・既存 `pass` の別証拠への置換や `fail` からの復活は同じ `RUN` で再承認せず、新しい実行記録で全レビューをやり直す。
+
+計画は `schema_version: 2` とし、executor・設定・候補外ファイル入力・取得物を固定する。導入・更新は `supply-chain.py run` が読み取り専用 snapshot を作り、直前に再検査した既存隔離 executor を一度だけ起動する。executor は token で受け取った snapshot を隔離内の scratch へコピーして導入・テストし、結果を別の専用出力先へ出す。元の候補や未固定のホスト入力を実行に使わず、`RUN` 全体を渡さない。`check` 後の任意コマンドや skip・force・待機短縮は使わない。
 
 その後、同じ隔離条件でテスト・組み込みブラウザによる影響範囲の実操作を検証する。CLI・ライブラリ・ネイティブアプリなどブラウザが適用されない対象は、その理由と対象に合った実行検証を記録し、必要なブラウザ検証ができなければ未検証として残す。ゲートは隔離環境を自動構築・証明せず、同じ UID の意図的な偽造や直接コマンドの迂回まで防ぐものではない。成功しても攻撃の不存在を保証できないため、確認結果と残る不確実性も報告する。
 
@@ -132,8 +134,8 @@ Ruby・Python の `X.Y` ブランチ変更や機能リリース、Node の major
 | スキル | できること | 使い方の例 | 前提 |
 | --- | --- | --- | --- |
 | [skills-preflight](.agents/skills/skills-preflight/SKILL.md) | スキルの定義・呼び出し設定・リンクと、必要なコマンドやプロジェクトの検証環境を確認する。利用可否と対処をまとめ、環境は変更しない | `$skills-preflight`<br>`$skills-preflight このプロジェクトで使う準備を確認して` | `bash`。各スキルの実行環境は確認対象 |
-| [minor-version-upgrade](.agents/skills/minor-version-upgrade/SKILL.md) | Ruby・Node・Python の互換性を保つ更新を、証拠付きの供給網ゲートを通した一つの計画でまとめて反映する。隔離環境・テスト・実操作で検証し、結果を保存する。個別移行が必要な版は major 側へ回す | `$minor-version-upgrade`<br>`$minor-version-upgrade Ruby・Node・Python と依存を互換性を保つ範囲でまとめて更新して` | `bash`、Python 3.9 以降、対象で採用中のランタイム・依存管理、公式情報へのネットワーク、レビュー済みの既存隔離 executor、監査・テスト環境、Web 画面には組み込みブラウザ |
-| [major-version-upgrade](.agents/skills/major-version-upgrade/SKILL.md) | Ruby・Python の X.Y ブランチ変更、Node や依存の major 更新などを1対象ずつ更新する。一件ごとに証拠付きの供給網ゲート・隔離実行・テスト・実操作まで完了して次へ進む | `$major-version-upgrade`<br>`$major-version-upgrade Ruby・Node・Python のランタイムと依存を1対象ずつ検証して移行して` | `bash`、Python 3.9 以降、対象で採用中のランタイム・依存管理、公式の移行・供給網情報へのネットワーク、レビュー済みの既存隔離 executor、監査・テスト環境、Web 画面には組み込みブラウザ |
+| [minor-version-upgrade](.agents/skills/minor-version-upgrade/SKILL.md) | Ruby・Node・Python の互換性を保つ更新を、証拠付きの供給網ゲートと読み取り専用 snapshot を使う一つの計画でまとめて反映する。隔離環境・テスト・実操作で検証し、結果を保存する。個別移行が必要な版は major 側へ回す | `$minor-version-upgrade`<br>`$minor-version-upgrade Ruby・Node・Python と依存を互換性を保つ範囲でまとめて更新して` | `bash`、Python 3.9 以降、対象で採用中のランタイム・依存管理、公式情報へのネットワーク、snapshot と出力を分離できるレビュー済みの既存隔離 executor、監査・テスト環境、Web 画面には組み込みブラウザ |
+| [major-version-upgrade](.agents/skills/major-version-upgrade/SKILL.md) | Ruby・Python の X.Y ブランチ変更、Node や依存の major 更新などを1対象ずつ更新する。一件ごとに証拠付きの供給網ゲート・読み取り専用 snapshot による隔離実行・テスト・実操作まで完了して次へ進む | `$major-version-upgrade`<br>`$major-version-upgrade Ruby・Node・Python のランタイムと依存を1対象ずつ検証して移行して` | `bash`、Python 3.9 以降、対象で採用中のランタイム・依存管理、公式の移行・供給網情報へのネットワーク、snapshot と出力を分離できるレビュー済みの既存隔離 executor、監査・テスト環境、Web 画面には組み込みブラウザ |
 | [codebase-cleanup-workflow](.agents/skills/codebase-cleanup-workflow/SKILL.md) | 全体探索と検証結果を共有し、設計整合 → 責務分割・共通化 → テスト整理 → 宣言順整理 → 文書同期を一巡する。各スキルの判断基準で必要な改善を実施する | `$codebase-cleanup-workflow`<br>`$codebase-cleanup-workflow 今回は src/billing のみ整備して` | 下記5つの整備スキルを参照でき、対象の実装・文書と検証環境を利用できること |
 | [design-alignment-refactor](.agents/skills/design-alignment-refactor/SKILL.md) | 文書とコードからプロジェクトの設計方針を読み取り、責務分担や依存関係の逸脱を修正する。意図的な例外を尊重し、既存の振る舞いを保って検証する | `$design-alignment-refactor`<br>`$design-alignment-refactor src/billing をプロジェクトの設計に合わせてリファクタリングして` | 対象の設計・実装を参照でき、関連する検証を実行できること |
 | [code-structure-refactor](.agents/skills/code-structure-refactor/SKILL.md) | 責務の混在や重複を探索し、責務分割・共通化で保守性・可読性・拡張性を改善する。既存の振る舞いを保ち、効果のない抽象化を避ける | `$code-structure-refactor`<br>`$code-structure-refactor src/billing の責務分割と共通化を進めて` | 対象の実装を参照でき、関連する検証を実行できること |

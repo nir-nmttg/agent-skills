@@ -66,6 +66,59 @@ def gem_bytes(entries):
     ])
 
 
+def extended_tar_fixtures():
+    """consumerと検査側の名前・size解釈差を作る。内容は実行・展開しない。"""
+    end = b"\0" * 1024
+
+    def member(name, payload=b"", kind=tarfile.REGTYPE, size=None):
+        info = tarfile.TarInfo(name)
+        info.mode = 0o644
+        info.type = kind
+        info.size = len(payload) if size is None else size
+        return info.tobuf(format=tarfile.USTAR_FORMAT) + payload + b"\0" * (-len(payload) % 512)
+
+    def pax(key, value, global_header=False):
+        suffix = (" " + key + "=" + value + "\n").encode("utf-8")
+        length = len(suffix) + 1
+        while True:
+            record = str(length).encode("ascii") + suffix
+            if len(record) == length:
+                break
+            length = len(record)
+        return member("PaxHeader", record, tarfile.XGLTYPE if global_header else tarfile.XHDTYPE)
+
+    def gem(inner):
+        return metadata + member("data.tar.gz", gzip.compress(inner)) + end
+
+    metadata = member("metadata.gz", gzip.compress(b"---\nname: demo\nversion: 1.1.0\n"))
+    gnu = member("././@LongLink", b"pkg/setup.py\0", tarfile.GNUTYPE_LONGNAME)
+    local = pax("path", "pkg/readme.txt")
+    harmless = member("README", b"safe\n") + end
+    dangerous = member("../escape", b"dummy\n") + end
+    return {
+        "global-size.tar": pax("size", "1024", True)
+            + member("safe.txt", member("../escape") + b"\0" * 512, size=0) + end,
+        "global-path.tar": pax("path", "pkg/safe.txt", True) + member("raw.txt", b"OK\n") + end,
+        "global-linkpath.tar": pax("linkpath", "target", True) + member("safe.txt", b"OK\n") + end,
+        "gnu-pax.tar": member("pkg/setup.py", b"old\n") + gnu + local + member("raw.txt", b"new\n") + end,
+        "pax-gnu.tar": local + gnu + member("raw.txt", b"new\n") + end,
+        "gem-outer-pax.gem": metadata + pax("path", "ignored.bin")
+            + member("data.tar.gz", gzip.compress(dangerous)) + pax("path", "data.tar.gz")
+            + member("benign.bin", gzip.compress(harmless)) + end,
+        "gem-outer-gnu.gem": metadata
+            + member("././@LongLink", b"data.tar.gz\0", tarfile.GNUTYPE_LONGNAME)
+            + member("benign.bin", gzip.compress(harmless)) + end,
+        "gem-inner-pax.gem": gem(pax("path", "README") + member("extconf.rb", b"puts 1\n") + end),
+        "gem-inner-gnu.gem": gem(member("././@LongLink", b"README\0", tarfile.GNUTYPE_LONGNAME)
+            + member("extconf.rb", b"puts 1\n") + end),
+        "local-path.tar": pax("path", "pkg/safe.txt") + member("raw.txt", b"OK\n") + end,
+        "local-size.tar": pax("size", "3") + member("safe.txt", b"OK\n", size=0) + end,
+        "global-mtime.tar": pax("mtime", "0", True) + member("safe.txt", b"OK\n") + end,
+        "ordinary-gnu.tar": gnu + member("raw.txt", b"OK\n") + end,
+        "ordinary.gem": gem(harmless),
+    }
+
+
 def npm_report(finding=False):
     vulnerabilities = {}
     counts = dict.fromkeys(("info", "low", "moderate", "high", "critical", "total"), 0)
@@ -114,7 +167,7 @@ class Fixture:
         self.run_temporary = tempfile.TemporaryDirectory(prefix="gate-test-", dir=str(artifact_root))
         self.run_dir = Path(self.run_temporary.name)
         self.run_dir.chmod(0o700)
-        self.marker = self.root / "invocations.jsonl"
+        self.marker = self.run_dir / "execution-output" / "invocations.jsonl"
         self.launcher = self.root / "trusted-test-executor"
         # あくまで信頼済みの launcher。実プロジェクトのコードやshellは実行しない。
         self.launcher.write_text(
@@ -134,15 +187,15 @@ class Fixture:
                                                       ("package/index.js", b"module.exports = 1;\n")]))
         self.audit = npm_report()
         self.plan = {
-            "schema_version": 1, "unit": "demo", "files": ["app/package.json", "app/package-lock.json"],
+            "schema_version": 2, "unit": "demo", "files": ["app/package.json", "app/package-lock.json"],
             "inventory": "inventory.json",
             "candidates": [{"id": "node:demo", "published_at": timestamp(-timedelta(days=10)),
                             "stability": "stable", "compatibility": "compatible",
                             "artifacts": [{"path": self.artifact, "sha256": sha256(self.artifact_bytes)}]}],
             "audits": [{"ecosystem": "node", "component": "app", "format": "npm-v2", "path": "audit.json",
                         "exit_code": 0, "checked_at": timestamp()}],
-            "execution": {"argv": [str(self.launcher), str(self.marker), "approved-argument", "0"],
-                          "config": "isolation.json", "mechanism": "os-sandbox"},
+            "execution": {"argv": [str(self.launcher), "{output}/invocations.jsonl", "approved-argument", "0"],
+                          "config": "isolation.json", "inputs": [], "mechanism": "os-sandbox"},
         }
         self.flush()
 
@@ -240,7 +293,7 @@ class GateTests(unittest.TestCase):
                 calls = f.invocations()
                 self.assertEqual(len(calls), 1)
                 self.assertEqual(calls[0]["argv"], ["approved-argument", "0"])
-                self.assertEqual(calls[0]["cwd"], str(f.candidate))
+                self.assertEqual(calls[0]["cwd"], str(f.run_dir / "execution-inputs" / "candidate"))
                 self.assertNotIn("HOME", calls[0]["environment"])
                 self.assertNotIn("SSH_AUTH_SOCK", calls[0]["environment"])
                 self.assertEqual(f.state()["execution_status"], "succeeded")
@@ -330,7 +383,7 @@ class GateTests(unittest.TestCase):
         for status in ("fail", "unknown", "skip", "removed"):
             with self.subTest(status=status), self.fixture() as f:
                 f.ready()
-                if status in ("fail", "unknown"):
+                if status == "fail":
                     f.require_ok(f.command("review", "--check", "sources", "--status", status, "--note", "保留"))
                 else:
                     state = f.state()
@@ -665,6 +718,277 @@ class GateTests(unittest.TestCase):
                 self.assertNotEqual(f.init().returncode, 0)
                 self.assertFalse(f.marker.exists())
 
+    def test_legacy_schema_and_missing_execution_inputs_are_rejected(self):
+        for mutation in ("schema", "inputs"):
+            with self.subTest(mutation=mutation), self.fixture() as f:
+                if mutation == "schema":
+                    f.plan["schema_version"] = 1
+                else:
+                    del f.plan["execution"]["inputs"]
+                f.flush()
+                self.assertNotEqual(f.init().returncode, 0)
+
+    def test_execution_inputs_must_be_declared_safe_unique_regular_files(self):
+        for mutation in ("missing", "duplicate", "config", "artifact", "reserved", "traversal", "symlink", "hardlink"):
+            with self.subTest(mutation=mutation), self.fixture() as f:
+                name = "executor/include.txt"
+                path = f.run_dir / name
+                path.parent.mkdir()
+                path.write_text("approved input\n", encoding="utf-8")
+                f.plan["execution"]["inputs"] = [name]
+                if mutation == "missing":
+                    path.unlink()
+                elif mutation == "duplicate":
+                    f.plan["execution"]["inputs"].append(name)
+                elif mutation in ("config", "artifact", "reserved", "traversal"):
+                    f.plan["execution"]["inputs"] = [{"config": "isolation.json", "artifact": f.artifact,
+                        "reserved": "execution-output/data", "traversal": "../include.txt"}[mutation]]
+                else:
+                    target = f.root / "include.txt"
+                    target.write_bytes(path.read_bytes())
+                    path.unlink()
+                    if mutation == "symlink":
+                        path.symlink_to(target)
+                    else:
+                        os.link(str(target), str(path))
+                f.flush()
+                self.assertNotEqual(f.init().returncode, 0)
+                self.assertFalse(f.marker.exists())
+
+    def test_undeclared_host_paths_and_unknown_tokens_are_rejected(self):
+        for argument in ("/unbound/include.json", "--config=/unbound/include.json", "-C/unbound", "--config@/unbound",
+                         "{candidate}/../outside", "{input:unlisted.txt}", "{artifact:packages/unlisted.tgz}",
+                         "{unknown}", "{candidate", "--mount={candidate},-C/unbound"):
+            with self.subTest(argument=argument), self.fixture() as f:
+                f.plan["execution"]["argv"].append(argument)
+                f.flush()
+                self.assertNotEqual(f.init().returncode, 0)
+                self.assertFalse(f.marker.exists())
+        with self.fixture() as f:
+            f.flush()
+            f.json(f.run_dir / "isolation.json", {"unreviewed_source": str(f.candidate)})
+            self.assertNotEqual(f.init().returncode, 0)
+
+    def test_added_executor_input_is_bound_to_approval(self):
+        with self.fixture() as f:
+            path = f.run_dir / "include.txt"
+            path.write_text("approved", encoding="utf-8")
+            f.plan["execution"]["inputs"] = ["include.txt"]
+            f.plan["execution"]["argv"].append("{input:include.txt}")
+            f.ready()
+            path.write_text("unreviewed replacement", encoding="utf-8")
+            f.blocked()
+
+    def test_inspection_result_is_bound_to_the_bytes_actually_parsed(self):
+        for kind in ("archive", "audit"):
+            with self.subTest(kind=kind), self.fixture() as f:
+                if kind == "archive":
+                    f.artifact_bytes = gzip.compress(tar_bytes([("../escape", b"dummy")]))
+                    f.plan["candidates"][0]["artifacts"][0]["sha256"] = sha256(f.artifact_bytes)
+                else:
+                    f.audit = npm_report(finding=True)
+                f.ready()
+                gate = load_gate(f.cli)
+                if kind == "archive":
+                    target = f.run_dir / f.artifact
+                    original = gate.inspect_artifact
+                    harmless = gzip.compress(tar_bytes([("package/README", b"safe")]))
+                else:
+                    target = f.run_dir / "audit.json"
+                    original = gate.inspect_audit
+                    harmless = json.dumps(npm_report()).encode("utf-8")
+                approved = target.read_bytes()
+                def inspect_replacement(*args):
+                    target.write_bytes(harmless)
+                    try:
+                        return original(*args)
+                    finally:
+                        target.write_bytes(approved)
+                if kind == "archive":
+                    gate.inspect_artifact = inspect_replacement
+                else:
+                    gate.inspect_audit = inspect_replacement
+                with self.assertRaises(gate.GateError):
+                    invoke_gate(gate, f)
+                self.assertFalse(f.marker.exists())
+
+    def test_inventory_classification_and_binding_use_the_same_bytes(self):
+        with self.fixture() as f:
+            f.inventory["after"][0]["version"] = "2.0.0"
+            f.ready()
+            gate = load_gate(f.cli)
+            path = f.run_dir / "inventory.json"
+            approved = path.read_bytes()
+            compatible = json.loads(approved)
+            compatible["after"][0]["version"] = "1.1.0"
+            saved = gate.safe_read
+            swapped = False
+            def classify_replacement(source, *args, **kwargs):
+                nonlocal swapped
+                if Path(source) == path and not swapped:
+                    swapped = True
+                    path.write_text(json.dumps(compatible), encoding="utf-8")
+                    try:
+                        return saved(source, *args, **kwargs)
+                    finally:
+                        path.write_bytes(approved)
+                return saved(source, *args, **kwargs)
+            gate.safe_read = classify_replacement
+            with self.assertRaises(gate.GateError):
+                invoke_gate(gate, f)
+            self.assertFalse(f.marker.exists())
+
+    def test_review_api_cannot_replace_or_refresh_one_old_proof(self):
+        for mutation in ("changed", "alternate", "other-proof", "stale", "future", "fail", "unknown"):
+            with self.subTest(mutation=mutation), self.fixture() as f:
+                f.ready()
+                evidence = "evidence/sources.txt"
+                if mutation == "changed":
+                    (f.run_dir / evidence).write_text("replacement evidence", encoding="utf-8")
+                elif mutation == "alternate":
+                    evidence = "evidence/replacement.txt"
+                    (f.run_dir / evidence).write_text("new evidence", encoding="utf-8")
+                elif mutation == "other-proof":
+                    (f.run_dir / "evidence/coverage.txt").write_text("changed coverage", encoding="utf-8")
+                elif mutation in ("stale", "future"):
+                    state = f.state()
+                    state["reviews"]["sources"]["checked_at"] = timestamp(timedelta(hours=-25 if mutation == "stale" else 1))
+                    f.write_state(state)
+                elif mutation == "fail":
+                    f.require_ok(f.command("review", "--check", "sources", "--status", "fail", "--note", "不一致"))
+                status = "unknown" if mutation == "unknown" else "pass"
+                result = f.command("review", "--check", "sources", "--status", status, "--evidence", evidence,
+                                   "--note", "一項目だけ再承認を試行")
+                self.assertNotEqual(result.returncode, 0)
+                self.assertFalse(f.marker.exists())
+                if mutation in ("changed", "other-proof", "stale", "future", "fail"):
+                    f.blocked()
+                else:
+                    # 置換要求を拒否しても、元の有効な承認を壊さない。
+                    self.assertEqual(f.state()["reviews"]["sources"]["evidence"], "evidence/sources.txt")
+
+    def test_unchanged_fresh_proof_can_be_reconfirmed(self):
+        with self.fixture() as f:
+            f.ready()
+            f.require_ok(f.command("review", "--check", "sources", "--status", "pass", "--evidence", "evidence/sources.txt",
+                                   "--note", "同じ根拠を再確認"))
+            f.require_ok(f.command("run"))
+            self.assertEqual(len(f.invocations()), 1)
+
+    def test_executor_consumes_approved_snapshot_after_original_input_changes(self):
+        with self.fixture() as f:
+            include = f.run_dir / "include.txt"
+            include.write_text("approved include", encoding="utf-8")
+            f.plan["execution"]["inputs"] = ["include.txt"]
+            f.plan["execution"]["argv"] += ["{config}", "{input:include.txt}", "{artifact:" + f.artifact + "}", "{candidate}/app"]
+            f.launcher.write_text(
+                "#!" + sys.executable + "\nimport json, pathlib, sys\n"
+                "record = {'source': pathlib.Path('app/index.js').read_text(), 'config': pathlib.Path(sys.argv[4]).read_text(),\n"
+                "          'include': pathlib.Path(sys.argv[5]).read_text(), 'artifact': pathlib.Path(sys.argv[6]).read_bytes().hex(),\n"
+                "          'candidate_arg': sys.argv[7]}\n"
+                "pathlib.Path(sys.argv[1]).write_text(json.dumps(record)+'\\n')\n", encoding="utf-8")
+            f.ready()
+            config = (f.run_dir / "isolation.json").read_text(encoding="utf-8")
+            gate = load_gate(f.cli)
+            saved = gate.subprocess.run
+            def mutate_then_launch(*args, **kwargs):
+                (f.candidate / "app/index.js").write_text("unreviewed source", encoding="utf-8")
+                (f.run_dir / "isolation.json").write_text("unreviewed config", encoding="utf-8")
+                include.write_text("unreviewed include", encoding="utf-8")
+                (f.run_dir / f.artifact).write_bytes(b"unreviewed artifact")
+                return saved(*args, **kwargs)
+            gate.subprocess.run = mutate_then_launch
+            try:
+                self.assertEqual(invoke_gate(gate, f), 0)
+            finally:
+                gate.subprocess.run = saved
+            record = f.invocations()[0]
+            self.assertEqual(record["source"], "module.exports = 1;\n")
+            self.assertEqual(record["config"], config)
+            self.assertEqual(record["include"], "approved include")
+            self.assertEqual(record["artifact"], f.artifact_bytes.hex())
+            snapshot = f.run_dir / "execution-inputs"
+            self.assertEqual(record["candidate_arg"], str(snapshot / "candidate/app"))
+            for path in snapshot.rglob("*"):
+                self.assertFalse(path.stat().st_mode & 0o222)
+
+    def test_copy_time_change_and_preexisting_snapshot_consume_failed_run(self):
+        for mutation in ("copy", "snapshot", "output"):
+            with self.subTest(mutation=mutation), self.fixture() as f:
+                f.ready()
+                gate = load_gate(f.cli)
+                saved = gate.prepare_execution
+                def change_before_copy(run, state, plan, bound):
+                    if mutation == "copy":
+                        (f.candidate / "app/index.js").write_text("unreviewed source", encoding="utf-8")
+                    else:
+                        (run / ("execution-inputs" if mutation == "snapshot" else "execution-output")).mkdir()
+                    return saved(run, state, plan, bound)
+                gate.prepare_execution = change_before_copy
+                with self.assertRaises((gate.GateError, OSError)):
+                    invoke_gate(gate, f)
+                self.assertEqual(f.state()["execution_status"], "failed")
+                f.blocked()
+
+    def test_proof_changed_after_snapshot_is_rechecked_before_launch(self):
+        with self.fixture() as f:
+            f.ready()
+            gate = load_gate(f.cli)
+            saved = gate.prepare_execution
+            def change_after_copy(*args):
+                execution = saved(*args)
+                (f.run_dir / "evidence/sources.txt").write_text("replacement proof", encoding="utf-8")
+                return execution
+            gate.prepare_execution = change_after_copy
+            with self.assertRaises(gate.GateError):
+                invoke_gate(gate, f)
+            self.assertEqual(f.state()["execution_status"], "failed")
+            f.blocked()
+
+    def test_freshness_is_checked_again_after_snapshot(self):
+        for kind in ("reviews", "audit", "bundler-created-at"):
+            with self.subTest(kind=kind), self.fixture() as f:
+                if kind == "bundler-created-at":
+                    f.inventory = {"before": [f.package("1.0.0", "ruby")], "after": [f.package("1.1.0", "ruby")]}
+                    f.plan["candidates"][0]["id"] = "ruby:demo"
+                    f.plan["audits"][0].update(ecosystem="ruby", format="bundler-audit")
+                    f.audit = bundler_report()
+                    f.audit["created_at"] = (datetime.now(timezone.utc) - timedelta(hours=23)).strftime("%Y-%m-%d %H:%M:%S %z")
+                elif kind == "audit":
+                    f.plan["audits"][0]["checked_at"] = timestamp(-timedelta(hours=23))
+                f.ready()
+                gate = load_gate(f.cli)
+                saved = gate.prepare_execution
+                class LaterDateTime(datetime):
+                    @classmethod
+                    def now(cls, tz=None):
+                        return datetime.now(tz) + timedelta(hours=25 if kind == "reviews" else 2)
+                def advance_after_copy(*args):
+                    execution = saved(*args)
+                    gate.datetime = LaterDateTime
+                    return execution
+                gate.prepare_execution = advance_after_copy
+                with self.assertRaises(gate.GateError):
+                    invoke_gate(gate, f)
+                self.assertEqual(f.state()["execution_status"], "failed")
+                f.blocked()
+
+
+def load_gate(path):
+    spec = importlib.util.spec_from_file_location("gate_under_test", str(path))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def invoke_gate(gate, fixture):
+    previous = sys.argv
+    try:
+        sys.argv = [str(fixture.cli), "run", "--run", str(fixture.run_dir)]
+        return gate.main()
+    finally:
+        sys.argv = previous
+
 
 def load_helper(name):
     path = SKILLS / MINOR / "scripts" / (name + ".py")
@@ -700,6 +1024,7 @@ class HelperTests(unittest.TestCase):
         for name, data, expected in cases:
             with self.subTest(name=name), self.temporary(name, data) as path:
                 report = self.archive.inspect_artifact(path)
+                self.assertEqual(report["sha256"], sha256(data))
                 self.assertGreater(report["members"], 0)
                 self.assertGreater(report["unpacked_bytes"], 0)
                 self.assertTrue(expected <= {signal["kind"] for signal in report["signals"]})
@@ -736,10 +1061,28 @@ class HelperTests(unittest.TestCase):
                 with self.assertRaises(self.archive.InspectionError):
                     self.archive.inspect_artifact(path)
 
+    def test_archive_consumer_ambiguities_fail_closed_with_valid_formats_preserved(self):
+        safe = {"local-path.tar", "local-size.tar", "global-mtime.tar", "ordinary-gnu.tar", "ordinary.gem"}
+        for name, data in extended_tar_fixtures().items():
+            with self.subTest(name=name), self.temporary(name, data) as path:
+                if name in safe:
+                    self.assertGreater(self.archive.inspect_artifact(path)["members"], 0)
+                else:
+                    with self.assertRaises(self.archive.InspectionError):
+                        self.archive.inspect_artifact(path)
+
+    def test_parser_discrepancy_fixtures_represent_actual_consumer_difference(self):
+        fixtures = extended_tar_fixtures()
+        for name, expected in (("global-size.tar", ["safe.txt", "../escape"]),
+                               ("gnu-pax.tar", ["pkg/setup.py", "pkg/setup.py"])):
+            with self.subTest(name=name), tarfile.open(fileobj=io.BytesIO(fixtures[name])) as archive:
+                self.assertEqual(archive.getnames(), expected)
+
     def test_three_audit_formats_accept_only_known_complete_structure(self):
         for format_name, report in (("npm-v2", npm_report()), ("pip-audit", pip_report()), ("bundler-audit", bundler_report())):
             with self.subTest(format=format_name), self.temporary("audit.json", json.dumps(report).encode("utf-8")) as path:
                 result = self.audit.inspect_audit(path, format_name)
+                self.assertEqual(result["sha256"], sha256(path.read_bytes()))
                 self.assertEqual(result["findings"], 0)
                 self.assertEqual(result["format"], format_name)
 

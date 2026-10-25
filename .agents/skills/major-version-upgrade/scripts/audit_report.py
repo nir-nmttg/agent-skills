@@ -1,6 +1,7 @@
 """監査JSONを厳格に読み、検出数と照合可能な対象だけを返す。標準ライブラリのみ。"""
 
 import datetime
+import hashlib
 import json
 import math
 import os
@@ -295,4 +296,8 @@ def inspect_audit(path: Path, format_name: str) -> dict:
         raise
     except (ValueError, RecursionError, OverflowError, TypeError):
         raise AuditError("監査JSONが破損しているか形式が不正です。") from None
-    return {"format": format_name, "packages": packages, "findings": findings}
+    result = {"format": format_name, "sha256": hashlib.sha256(raw).hexdigest(),
+              "packages": packages, "findings": findings}
+    if format_name == "bundler-audit":
+        result["created_at"] = report["created_at"]
+    return result

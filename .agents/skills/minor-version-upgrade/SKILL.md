@@ -28,16 +28,16 @@ Python 3.9 以降の標準ライブラリで動く [実行ゲート](references/
 
 1. [供給網と実行・動作検証](references/verification.md) と [実行ゲート](references/gate.md) を読み、公開元、配布物、脆弱性、コード実行箇所、隔離条件を確認する。使う管理系統について [更新方法の注意点](references/ecosystems.md) も読む。下記の一括処理にも、この確認を省略しない。
 2. 静的に読める manifest・ビルド定義・lockfile と公式メタデータから仮候補を作る。レビュー済みの既存隔離を用意してから、秘密を除いた最小の候補用コピー・専用 cache で再解決・取得・必要な展開を行う。依存解決やメタデータ取得でもビルド定義・backend・hook・plugin を実行し得るため、コード評価がある操作には `init` 前から隔離を適用する。ゲートはこの隔離を自動構築・証明しない。
-3. 更新前後の全依存 inventory と候補グラフを固定し、版・取得元・integrity/checksum・git ref・追加削除・install/build script の変更を全件一覧化する。全変更版の取得物・公開日時、対応する監査 JSON を揃え、実際の配布物差分を読む。導入に必要な manifest・設定・移行用の静的な変更も候補コピーで準備する。レビュー済みの既存隔離 executor の実体・設定・argv 配列と、全入力の hash を `RUN/plan.json` に固定する。
+3. 更新前後の全依存 inventory と候補グラフを固定し、版・取得元・integrity/checksum・git ref・追加削除・install/build script の変更を全件一覧化する。全変更版の取得物・公開日時、対応する監査 JSON を揃え、実際の配布物差分を読む。導入に必要な manifest・設定・移行用の静的な変更も候補コピーで準備する。`schema_version: 2` の `RUN/plan.json` に、レビュー済みの既存隔離 executor の実体・設定・argv 配列を固定し、include・補助 script 等の候補外ファイル入力を `execution.inputs` に列挙する。入力先はゲートの token で指定し、全入力の hash と、ファイルでない image 等の immutable digest を確認する。
 4. 脆弱性と悪性パッケージの告知、配布元の連続性、署名・provenance、疑わしいコード、監査 DB の鮮度と隔離境界を複数の根拠で確認する。監査ゼロ件、署名、provenance、利用者数のいずれも単独の採用根拠にしない。署名が未提供なら独立した代替根拠と限界を記録する。証拠不足・不審・互換性不明の候補は保留し、機械検査不能を自動で `pass` にしない。
 5. 保留対象を除外するときは、依存関係を再解決して計画・inventory・監査・差分を作り直す。保留版が間接依存に残るならその導入元も保留する。既存の危険な版に戻すだけでは解消扱いにしない。独立した範囲だけを進める場合も、その全件を新しい計画で確認し直す。
-6. `init` でゲートを初期化する。起動は [実行ゲート](references/gate.md) の信頼済みPython実体・絶対パスのゲート・`-I -S` を必須とする。`coverage`・`sources`・`artifacts`・`advisories`・`authenticity`・`isolation`・`compatibility` の7項目はすべて `unknown` から始め、非空の実際の証拠と説明を付けて `review` する。証拠の SHA256・時刻・計画 fingerprint を結びつける。`check` は全項目の有効な `pass` と機械検査が揃うまで停止する。証拠・監査は24時間で期限切れとなり、監査のエラー・skip・非対応・finding・coverage 不足も停止の根拠になる。
+6. `init` でゲートを初期化する。起動は [実行ゲート](references/gate.md) の信頼済みPython実体・絶対パスのゲート・`-I -S` を必須とする。`coverage`・`sources`・`artifacts`・`advisories`・`authenticity`・`isolation`・`compatibility` の7項目はすべて `unknown` から始め、非空の実際の証拠と説明を付けて `review` する。証拠の SHA256・時刻・計画 fingerprint を結びつける。`check` は全項目の有効な `pass` と機械検査が揃うまで停止する。証拠・監査は24時間で期限切れとなり、監査のエラー・skip・非対応・finding・coverage 不足も停止の根拠になる。既存の証拠変更・期限切れ・既存 `pass` の別証拠への置換や `fail` からの復活を同じ `RUN` の再承認に使わず、新しい実行記録で全レビューをやり直す。
 
 ## 採用した候補をまとめて反映する
 
-- `"$UPGRADE_PYTHON" -I -S "$UPGRADE_GATE" run --run "$RUN"` で、事前確認を終えた一つの計画だけを反映する。実行直前に入力・証拠・executor・hash・argv を再検査し、レビュー済みの argv 配列を `shell=False` で一度だけ起動する。executor 内の処理は管理系統と依存順に分かれてよいが、各 minor ごとに承認や全テストを挟まない。Ruby・Node・Pythonの連携、native extension／addonのABI、生成コードの互換条件を保ち、採用表にない更新を加えない。
+- `"$UPGRADE_PYTHON" -I -S "$UPGRADE_GATE" run --run "$RUN"` で、事前確認を終えた一つの計画だけを反映する。ゲートは承認済み入力を読み取り専用 snapshot にコピー・照合し、直前の時刻で証拠・監査も再検査する。executor は token を解決した snapshot を受け取り、隔離内の scratch へコピーして導入・テストする。元の候補を実行せず、出力先は別の `RUN/execution-output` だけとする。レビュー済みの argv 配列を `shell=False` で一度だけ起動し、`RUN` 全体を渡さない。executor 内の処理は管理系統と依存順に分かれてよいが、各 minor ごとに承認や全テストを挟まない。Ruby・Node・Pythonの連携、native extension／addonのABI、生成コードの互換条件を保ち、採用表にない更新を加えない。
 - 確認した配布物と固定した全依存グラフで再現可能に導入し、実行時の未確認な再取得・再解決を許さない。管理ツールの版を固定し、既存 lockfile を削除して作り直さない。lockfile がない系統は、既存方式で正確な全解決版・取得元・digest・必要なビルド依存を記録して再照合する。再現できる固定方法がなければ保留する。native build や必要な script は、内容と取得バイナリまでレビューして計画した隔離内で許可する。
-- 候補で準備した環境指定、manifest・ビルド定義・lockfile 相当、必要な CI・コンテナ設定を同期する。ホストの既定環境切替、権限昇格、グローバル更新を代替策にしない。隔離用コピーからは、許可した設定・ソース差分だけを対象に反映し、キャッシュ・依存ディレクトリ・秘密ファイルを持ち込まない。
+- 候補で準備した環境指定、manifest・ビルド定義・lockfile 相当、必要な CI・コンテナ設定を同期する。ホストの既定環境切替、権限昇格、グローバル更新を代替策にしない。隔離内で生成した差分は専用出力先から読み、許可した設定・ソース差分だけを対象に反映し、キャッシュ・依存ディレクトリ・秘密ファイルを持ち込まない。
 - 導入後の実バージョン・依存グラフ・checksum を候補表と照合する。新たな依存・別版や入力の変更があれば停止し、新しい実行記録で計画と全レビューをやり直す。同じ計画の再実行やゲート外の導入で修正しない。適用に付随するコード修正は互換性の維持に必要な最小範囲とし、新機能や設計変更を混ぜない。
 
 ## テストと対象別の実操作で確かめる
