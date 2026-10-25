@@ -1,6 +1,6 @@
 interface:
   short_description: "隠しファイル・隠しフォルダを除き、指定フォルダ直下のファイルを内容から改名する"
-  default_prompt: "$rename-files-by-content を使って、/絶対パス/対象フォルダ 直下の通常ファイルを確認し、内容に応じた YYYY-MM-DD_名前.拡張子 に改名してください。隠しファイルと、隠しフォルダを含むサブフォルダ内は対象外です。"
+  default_prompt: "$rename-files-by-content を使って、/絶対パス/対象フォルダ 直下の通常ファイルを確認し、内容に応じた YYYY-MM-DD_名前.拡張子 に改名してください。名称の空白は - に置き換えてください。隠しファイルと、隠しフォルダを含むサブフォルダ内は対象外です。"
 
 policy:
   allow_implicit_invocation: false
