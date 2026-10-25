@@ -142,7 +142,7 @@ Ruby・Python の `X.Y` ブランチ変更や機能リリース、Node の major
 | [test-suite-refactor](.agents/skills/test-suite-refactor/SKILL.md) | 不具合の検出力を保ちながら、重複や実装の細部に依存するテストを削除・統合・書き換える。境界値・異常系・過去の不具合・重要な副作用を守り、影響範囲を実行して確かめる | `$test-suite-refactor`<br>`$test-suite-refactor src/billing のテストを整理して` | 対象リポジトリのテスト実行環境 |
 | [code-order-refactor](.agents/skills/code-order-refactor/SKILL.md) | プロジェクトを探索し、メソッド・関数などを読みやすい順へ移す。初期化・登録などの順序依存を守り、再実行でも配置を安定させる | `$code-order-refactor`<br>`$code-order-refactor src/billing のメソッドの順番を整理して` | 対象の実装を参照でき、関連する検証を実行できること |
 | [docs-align-with-code](.agents/skills/docs-align-with-code/SKILL.md) | 実装を正としてプロジェクト全体の利用・開発・運用文書を更新する。有用な説明と重要な制約を残し、古い記述・重複・不足を整理する | `$docs-align-with-code`<br>`$docs-align-with-code README.md を現状の実装に合わせて更新して` | 対象のドキュメントと実装を参照できること |
-| [rename-files-by-content](.agents/skills/rename-files-by-content/SKILL.md) | 指定フォルダ直下の通常ファイルを内容から `YYYY-MM-DD_名前.拡張子` に改名する。隠しファイルと、隠しフォルダを含むサブフォルダ内は対象外。請求書・領収書・契約書などに応じて日付と名称を選び、同名は連番、不明なものは元名を保って記録する | `$rename-files-by-content /絶対パス/対象フォルダ`<br>`$rename-files-by-content /絶対パス/対象フォルダ 候補だけ見せて` | `bash`、Python 3.9 以降、対象の読み書き・ハードリンク作成、形式に合う読取・必要に応じた表示や OCR の手段 |
+| [rename-files-by-content](.agents/skills/rename-files-by-content/SKILL.md) | 指定フォルダ直下の通常ファイルを内容から `YYYY-MM-DD_名前.拡張子` に改名する。隠しファイルと、隠しフォルダを含むサブフォルダ内は対象外。請求書・領収書・契約書などに応じて日付と名称を選び、名称の空白は `-` に置き換える。同名は連番、不明なものは元名を保って記録する | `$rename-files-by-content /絶対パス/対象フォルダ`<br>`$rename-files-by-content /絶対パス/対象フォルダ 候補だけ見せて` | `bash`、Python 3.9 以降、対象の読み書き・ハードリンク作成、形式に合う読取・必要に応じた表示や OCR の手段 |
 
 ## 実行結果の保存先
 

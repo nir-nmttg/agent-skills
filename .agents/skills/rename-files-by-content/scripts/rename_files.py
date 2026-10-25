@@ -123,8 +123,10 @@ def validate_target(value, source):
         raise PlanError("target はファイル名または null にしてください: {!r}".format(source))
     if any(char in '/\\<>:"|?*' or unicodedata.category(char) in ("Cc", "Cs") for char in value):
         raise PlanError("target に区切り文字、制御文字、使用できない記号があります: {!r}".format(source))
-    if value.startswith(".") or value.endswith(".") or value[-1].isspace():
-        raise PlanError("target の先頭の .、末尾の空白や . は使えません: {!r}".format(source))
+    if any(char.isspace() for char in value):
+        raise PlanError("target に空白は使えません。名称の連続する空白を - に置き換えてください: {!r}".format(source))
+    if value.startswith(".") or value.endswith("."):
+        raise PlanError("target の先頭・末尾の . は使えません: {!r}".format(source))
     if len(value.encode("utf-8")) > MAX_NAME_BYTES:
         raise PlanError("target は UTF-8 で 240 byte 以下にしてください: {!r}".format(source))
     suffix = extension(source)
