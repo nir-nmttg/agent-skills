@@ -1,0 +1,6 @@
+interface:
+  short_description: "Ruby・Node・Pythonと依存を一件ずつ移行し、供給網・テスト・実操作まで確認する"
+  default_prompt: "$major-version-upgrade を使って、このプロジェクトのRuby・Node・Pythonと依存ライブラリの個別移行を進め、各対象で供給網確認、テスト、Webは組み込みブラウザ、それ以外は対象に合う実操作まで完了してから次へ進んでください。"
+
+policy:
+  allow_implicit_invocation: false
