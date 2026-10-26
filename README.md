@@ -64,19 +64,23 @@ Claude Code のリンク先は、`CLAUDE_CONFIG_DIR` 指定時はその配下の
 
 ### 3. 目的に合うスキルを選ぶ
 
-開発には Claude Code 用、整備・更新・ファイル整理には Codex 用の一覧から選ぶ。名前のリンクから詳細な手順・オプションを確認できる。Claude Code のスキルは呼び出し方で分類し、各分類の中を準備・設計・実装・検証・仕上げの作業順に並べている。Codex のスキルは準備・更新・一括整備のあと、設計・構造・テスト・宣言順・文書・ファイル整理の順に並べている。
+開発には Claude Code 用、整備・更新・ファイル整理には Codex 用の一覧から選ぶ。名前のリンクから詳細な手順・オプションを確認できる。各一覧は、コードベースの開発・整備に使う**開発用スキル**と、準備確認・報告・情報収集・ファイル整理などに使う**雑務用スキル**に分けている。Claude Code のスキルはさらに呼び出し方で分類し、開発用は各分類の中を設計・実装・検証・仕上げの作業順に並べている。Codex の開発用スキルは更新・一括整備のあと、設計・構造・テスト・宣言順・文書の順に並べている。
 
 ## Claude Code 用スキル一覧
 
-開発を進めるためのスキル。呼び出し方は次の3種類。自動で使う条件・確認される条件は、各一覧で機能と分けて示す。
+開発を進めるための[開発用スキル](#claude-code-の開発用スキル)と、準備確認・報告・情報収集などの[雑務用スキル](#claude-code-の雑務用スキル)がある。呼び出し方は次の3種類。自動で使う条件・確認される条件は、各一覧で機能と分けて示す。
 
-| 種類 | 呼び出し方 | スキル |
-| --- | --- | --- |
-| [自動で使われる](#自動で使われるスキル) | 条件に当たると Claude が使う。`/スキル名` や話しかけても使える | codex-design-review・codex-impl・codex-test・codex-impl-review・opus-final-review・japanese-report・session-status-emoji |
-| [使う前に確認される](#使う前に確認されるスキル) | 条件に当たると使うか確認する。`/スキル名` や話しかけても使える | codex-risk-design-review・codex-risk-impl-review |
-| [明示的に呼び出す](#明示的に呼び出すスキル) | `/スキル名` で指定して使う。通常の依頼から自動で選ぶことはない | skills-preflight・gh-todo・browser-readonly-research・gh-issue-overview・codex-verify-prompt・gh-pr-precheck・whats-next |
+| 種類 | 呼び出し方 | 開発用 | 雑務用 |
+| --- | --- | --- | --- |
+| 自動で使われる | 条件に当たると Claude が使う。`/スキル名` や話しかけても使える | [codex-design-review・codex-impl・codex-test・codex-impl-review・opus-final-review](#自動で使われる開発用スキル) | [japanese-report・session-status-emoji](#自動で使われる雑務用スキル) |
+| 使う前に確認される | 条件に当たると使うか確認する。`/スキル名` や話しかけても使える | [codex-risk-design-review・codex-risk-impl-review](#使う前に確認される開発用スキル) | なし |
+| 明示的に呼び出す | `/スキル名` で指定して使う。通常の依頼から自動で選ぶことはない | [gh-issue-overview・codex-verify-prompt・gh-pr-precheck・whats-next](#明示的に呼び出す開発用スキル) | [skills-preflight・gh-todo・browser-readonly-research](#明示的に呼び出す雑務用スキル) |
 
-### 自動で使われるスキル
+### Claude Code の開発用スキル
+
+設計・実装・テスト・レビュー・PR の確認・次の作業の判断など、機能を作って届けるまでの開発に使う。
+
+#### 自動で使われる開発用スキル
 
 条件に当たると Claude が自分の判断で使う。`/スキル名` や自然な言葉で明示的に依頼することもできる。
 
@@ -87,12 +91,10 @@ Claude Code のリンク先は、`CLAUDE_CONFIG_DIR` 指定時はその配下の
 | [codex-test](.claude/skills/codex-test/SKILL.md) | テスト・型チェック・lint・ビルドを GPT-6 Luna（推論レベル max・通常速度）に実行させ、失敗の要点と原因を報告させる。ファイルは変更しない。`--resume` で再実行、`--network` でネットワークを許可できる | Claude がテスト・型チェック・リンター・ビルドを実行するときは原則すべて。実装の確認、完了報告・コミット・PR の前、失敗の切り分けでは必ず任せる（迷ったら任せる。数行で済む 1〜数件のテストを編集のたびに細かく繰り返している最中だけは Claude が直接実行する） | `/codex-test`<br>`/codex-test npm test と型チェックを実行`<br>「テストして」 | `codex` にログイン済み、`jq` |
 | [codex-impl-review](.claude/skills/codex-impl-review/SKILL.md) | git の差分を GPT-6.1 Sol に読み取り専用でレビューさせ、Claude が指摘の採否を判断し、自分の実装なら修正する。既定は未コミットを含む既定ブランチとの差分。`--base` / `--commit` / `--uncommitted` と `--focus` で範囲・観点を選べる | 2 ファイル以上か 30 行以上のロジック変更や、DB・公開 API・認証・課金などに触れる変更を終えたら、完了報告やコミットの前（迷ったら使う。数行の変更やドキュメントだけの変更は除く）。基本は Sol 1 本で、15 ファイル以上か 500 行以上の変更、DB・認証・課金などの高リスク領域に 2 つ以上触れる変更のときだけ、観点ごとに 2〜3 本並列にする（この 2 つでは仕上げに opus-final-review も使う） | `/codex-impl-review`<br>`/codex-impl-review --fast --uncommitted`<br>「観点ごとに分けて Codex で並列に実装レビューして」 | `codex` にログイン済み、`jq`、対象が git リポジトリ |
 | [opus-final-review](.claude/skills/opus-final-review/SKILL.md) | 会話を共有しない別の Claude（Opus 5.5）に、要件と git の差分だけで最終レビューさせる。別セッションは設定・MCP・スキルを読み込まず、読み取り専用で確認する。Claude が指摘の採否を判断し、自分の実装なら修正する | 15 ファイル以上か 500 行以上の変更、または DB・認証・課金などの高リスク領域に 2 つ以上触れる変更で、codex-impl-review などの指摘を直し終えたあとの最後の確認（Claude の使用量になるので、迷ったら使わない） | `/opus-final-review`<br>`/opus-final-review --uncommitted`<br>「仕上げにコンテキストなしの Opus で最終レビューして」 | `claude` にログイン済み、`jq`、対象が git リポジトリ |
-| [japanese-report](.claude/skills/japanese-report/SKILL.md) | 報告・調査結果・確認を、見出しまで自然な日本語で書く。英語の出力も日本語で要約し、識別子・コマンド・エラー原文は維持する。コミットや PR 本文はリポジトリの慣習に従う | Claude が結果を報告する前（とくに英語の材料をもとに書くとき） | `/japanese-report`<br>「さっきの報告を日本語で書き直して」<br>「日本語で報告して」 | なし |
-| [session-status-emoji](.claude/skills/session-status-emoji/SKILL.md) | このセッション名の先頭に作業状態の絵文字を付け、サイドバーで並行作業を見分けやすくする。初期値は ✨、段階の変化とターンの終わりに更新する。変更を断られたら以後更新しない | Claude デスクトップアプリでは、短い質問への回答も含めてすべてのセッションの最初のターン（以後、段階が変わるたびとターンの終わりに更新する。迷ったら使う） | `/session-status-emoji`<br>「セッション名に状態の絵文字を付けて」 | Claude デスクトップアプリ（Code タブ） |
 
 Sol / Astra のレビューと Opus の最終レビューは、推論レベルを現在の Claude に揃える。Sol / Astra は `--fast` にも対応する。並列化やレビュー範囲の詳しい指定は、各スキルを参照。
 
-### 使う前に確認されるスキル
+#### 使う前に確認される開発用スキル
 
 リスクの高い設計・実装を扱うときに、使うか確認してから実行する。`/スキル名` や自然な言葉で明示的に依頼することもできる。
 
@@ -101,7 +103,31 @@ Sol / Astra のレビューと Opus の最終レビューは、推論レベル�
 | [codex-risk-design-review](.claude/skills/codex-risk-design-review/SKILL.md) | 戻しにくい設計を GPT-6 Astra に「どう壊れるか」の観点でレビューさせる。データ・認可・並行処理・課金・外部への副作用・移行を重点的に確認し、Claude が採否を判断して修正案を出す | DB 移行・認可・課金・外部への送信など、壊れると影響が大きく戻しにくい設計を提示・実装する前 | `/codex-risk-design-review`<br>`/codex-risk-design-review --fast docs/design.md`<br>「実装前にこの設計を Astra でレビューして」 | `codex` にログイン済み（Astra が使えるプラン）、`jq`、codex-design-review スキル（スクリプトを共有） |
 | [codex-risk-impl-review](.claude/skills/codex-risk-impl-review/SKILL.md) | リスクの高い実装の差分を GPT-6 Astra にレビューさせ、データの破損・認可・並行処理・課金・互換性・失敗時の動きを確認する。Claude が採否を判断し、自分の実装なら修正する | DB 移行・認可・課金・外部への送信など、壊れると影響が大きく戻しにくい変更の完了報告やコミットの前 | `/codex-risk-impl-review`<br>`/codex-risk-impl-review --fast --uncommitted`<br>「本番に出す前に Astra でレビューして」 | `codex` にログイン済み（Astra が使えるプラン）、`jq`、対象が git リポジトリ、codex-impl-review スキル（スクリプトを共有） |
 
-### 明示的に呼び出すスキル
+#### 明示的に呼び出す開発用スキル
+
+`/スキル名` で指定して使う。話しかけただけで起動したり、Claude が自分の判断で使ったりすることはない。
+
+| スキル | できること | 使い方の例 | 前提 |
+| --- | --- | --- | --- |
+| [gh-issue-overview](.claude/skills/gh-issue-overview/SKILL.md) | Issue を調べ、前提・5W1H・全体像の図・進め方を実装計画の概要にまとめ、組み込みブラウザに表示する。細かい実装には踏み込まない | `/gh-issue-overview <Issue の URL>`<br>`/gh-issue-overview <Issue の URL> バックエンドだけ` | `gh` にログイン済み、`python3` |
+| [codex-verify-prompt](.claude/skills/codex-verify-prompt/SKILL.md) | PR または会話と作業中の変更から、Codex に渡す動作確認プロンプトを作る。手順・期待結果・副作用を避ける決まり・報告形式を含める。`--browser builtin` / `--browser chrome` は必須。検証環境を省略するとローカルの起動手順を調べる。Codex やアプリは起動しない | `/codex-verify-prompt --browser builtin <PR の URL> <検証環境の URL>`<br>`/codex-verify-prompt --browser chrome <PR の URL>`<br>`/codex-verify-prompt --browser builtin https://staging.example.com ログイン周りだけ` | `git`、`jq`（PR を渡すときは `gh` にログイン済み） |
+| [gh-pr-precheck](.claude/skills/gh-pr-precheck/SKILL.md) | Issue の要件とプロジェクトの方針に PR を照合し、CI・コンフリクト・未解決レビューも含め、人間のレビューに進めるか判定する。PR 省略時は関連する PR を探す。コード変更や GitHub への書き込みは行わない | `/gh-pr-precheck <Issue の URL>`<br>`/gh-pr-precheck <Issue の URL> <PR の URL>` | `gh` にログイン済み、`jq`、`curl`、gh-issue-overview スキル（スクリプトを共有） |
+| [whats-next](.claude/skills/whats-next/SKILL.md) | 会話と実際のブランチ・差分・PR の状態から、進捗と次のアクションを1つ示す。実行手順または選択肢を提案し、承認後にその範囲だけ進める。デスクトップでは返事のボタンも表示する | `/whats-next`<br>`/whats-next 今日は 30 分だけ` | なし（ボタンは Claude デスクトップアプリ（Code タブ）。PR の状態は `gh` にログイン済みのときだけ） |
+
+### Claude Code の雑務用スキル
+
+使う準備の確認、報告の書き方、セッションの見分け、GitHub の TODO の把握、Web ページの調査など、開発そのもの以外の作業に使う。
+
+#### 自動で使われる雑務用スキル
+
+条件に当たると Claude が自分の判断で使う。`/スキル名` や自然な言葉で明示的に依頼することもできる。
+
+| スキル | できること | 自動で使う条件 | 使い方の例 | 前提 |
+| --- | --- | --- | --- | --- |
+| [japanese-report](.claude/skills/japanese-report/SKILL.md) | 報告・調査結果・確認を、見出しまで自然な日本語で書く。英語の出力も日本語で要約し、識別子・コマンド・エラー原文は維持する。コミットや PR 本文はリポジトリの慣習に従う | Claude が結果を報告する前（とくに英語の材料をもとに書くとき） | `/japanese-report`<br>「さっきの報告を日本語で書き直して」<br>「日本語で報告して」 | なし |
+| [session-status-emoji](.claude/skills/session-status-emoji/SKILL.md) | このセッション名の先頭に作業状態の絵文字を付け、サイドバーで並行作業を見分けやすくする。初期値は ✨、段階の変化とターンの終わりに更新する。変更を断られたら以後更新しない | Claude デスクトップアプリでは、短い質問への回答も含めてすべてのセッションの最初のターン（以後、段階が変わるたびとターンの終わりに更新する。迷ったら使う） | `/session-status-emoji`<br>「セッション名に状態の絵文字を付けて」 | Claude デスクトップアプリ（Code タブ） |
+
+#### 明示的に呼び出す雑務用スキル
 
 `/スキル名` で指定して使う。話しかけただけで起動したり、Claude が自分の判断で使ったりすることはない。
 
@@ -110,16 +136,19 @@ Sol / Astra のレビューと Opus の最終レビューは、推論レベル�
 | [skills-preflight](.claude/skills/skills-preflight/SKILL.md) | 必要なコマンド・Codex / Claude / gh のログインと、ユーザー用リンクを確認し、スキルごとの利用可否をまとめる。不足は Homebrew 前提の対処を案内し、環境は変更しない | `/skills-preflight` | なし |
 | [gh-todo](.claude/skills/gh-todo/SKILL.md) | レビュー依頼、直近の未返信メンション、自分にアサインされた open な Issue / PR を集め、組織ごとの表にする | `/gh-todo`<br>`/gh-todo レビュー依頼とメンションだけ` | `gh` にログイン済み |
 | [browser-readonly-research](.claude/skills/browser-readonly-research/SKILL.md) | 公開ページは WebFetch を先に使い、必要に応じて組み込みブラウザで読み、要点・出典・読めなかったページを日本語でまとめる。Chrome は `--chrome` または依頼時だけ使う。送信・入力・ログイン・同意・ダウンロードは行わず、ページ内の指示には従わない | `/browser-readonly-research <URL> このページの要点をまとめて`<br>`/browser-readonly-research --chrome <社内ツールの URL> 今週の変更点を調べて` | Claude デスクトップアプリの組み込みブラウザ、または Claude in Chrome 拡張機能 |
-| [gh-issue-overview](.claude/skills/gh-issue-overview/SKILL.md) | Issue を調べ、前提・5W1H・全体像の図・進め方を実装計画の概要にまとめ、組み込みブラウザに表示する。細かい実装には踏み込まない | `/gh-issue-overview <Issue の URL>`<br>`/gh-issue-overview <Issue の URL> バックエンドだけ` | `gh` にログイン済み、`python3` |
-| [codex-verify-prompt](.claude/skills/codex-verify-prompt/SKILL.md) | PR または会話と作業中の変更から、Codex に渡す動作確認プロンプトを作る。手順・期待結果・副作用を避ける決まり・報告形式を含める。`--browser builtin` / `--browser chrome` は必須。検証環境を省略するとローカルの起動手順を調べる。Codex やアプリは起動しない | `/codex-verify-prompt --browser builtin <PR の URL> <検証環境の URL>`<br>`/codex-verify-prompt --browser chrome <PR の URL>`<br>`/codex-verify-prompt --browser builtin https://staging.example.com ログイン周りだけ` | `git`、`jq`（PR を渡すときは `gh` にログイン済み） |
-| [gh-pr-precheck](.claude/skills/gh-pr-precheck/SKILL.md) | Issue の要件とプロジェクトの方針に PR を照合し、CI・コンフリクト・未解決レビューも含め、人間のレビューに進めるか判定する。PR 省略時は関連する PR を探す。コード変更や GitHub への書き込みは行わない | `/gh-pr-precheck <Issue の URL>`<br>`/gh-pr-precheck <Issue の URL> <PR の URL>` | `gh` にログイン済み、`jq`、`curl`、gh-issue-overview スキル（スクリプトを共有） |
-| [whats-next](.claude/skills/whats-next/SKILL.md) | 会話と実際のブランチ・差分・PR の状態から、進捗と次のアクションを1つ示す。実行手順または選択肢を提案し、承認後にその範囲だけ進める。デスクトップでは返事のボタンも表示する | `/whats-next`<br>`/whats-next 今日は 30 分だけ` | なし（ボタンは Claude デスクトップアプリ（Code タブ）。PR の状態は `gh` にログイン済みのときだけ） |
 
 ## Codex 用スキル一覧
 
-開発したコードベースの整備、Ruby・Node（JavaScript / TypeScript）・Python のランタイムや依存の更新、書類などのファイル整理に使うスキル。すべて `$スキル名` で明示的に指定したときだけ使う。
+開発したコードベースの整備、Ruby・Node（JavaScript / TypeScript）・Python のランタイムや依存の更新に使う[開発用スキル](#codex-の開発用スキル)と、準備確認や書類などのファイル整理に使う[雑務用スキル](#codex-の雑務用スキル)がある。すべて `$スキル名` で明示的に指定したときだけ使う。
 
-`skills-preflight` は準備確認用。`minor-version-upgrade` / `major-version-upgrade` は、Ruby・Node・Python のランタイムと依存ライブラリの更新に最適化し、`codebase-cleanup-workflow` には含めない。Ruby / Bundler、Node / npm・pnpm・Yarn、Python / uv・pip・Poetry など、採用中の管理方法を設定と lockfile から静的に確認し、管理ツールを勝手に変更しない。対象の管理ツールは採用されたものだけを使い、すべての導入は要求しない。共通の実行ゲートには `bash` と Python 3.9 以降の標準ライブラリが必要。Rails・Node のフロントエンド・Python worker など3言語が混在する構成も一覧化し、言語間の連携まで検証する。その他の言語は影響・依存境界を記録し、更新対象を広げない。グローバル環境の更新は依頼範囲に含まれる場合だけ行う。
+| 用途 | スキル |
+| --- | --- |
+| 開発用 | minor-version-upgrade・major-version-upgrade・codebase-cleanup-workflow・design-alignment-refactor・code-structure-refactor・test-suite-refactor・code-order-refactor・docs-align-with-code |
+| 雑務用 | skills-preflight・rename-files-by-content |
+
+### Codex の開発用スキル
+
+`minor-version-upgrade` / `major-version-upgrade` は、Ruby・Node・Python のランタイムと依存ライブラリの更新に最適化し、`codebase-cleanup-workflow` には含めない。Ruby / Bundler、Node / npm・pnpm・Yarn、Python / uv・pip・Poetry など、採用中の管理方法を設定と lockfile から静的に確認し、管理ツールを勝手に変更しない。対象の管理ツールは採用されたものだけを使い、すべての導入は要求しない。共通の実行ゲートには `bash` と Python 3.9 以降の標準ライブラリが必要。Rails・Node のフロントエンド・Python worker など3言語が混在する構成も一覧化し、言語間の連携まで検証する。その他の言語は影響・依存境界を記録し、更新対象を広げない。グローバル環境の更新は依頼範囲に含まれる場合だけ行う。
 
 Ruby・Python の `X.Y` ブランチ変更や機能リリース、Node の major 更新は個別移行として扱う。Node の同一 major 内の minor / patch、Ruby・Python の同一 `X.Y` 内の patch、各ライブラリの互換性を保つ更新は、公式方針と実際の変更を確認したうえでまとめる。ライブラリも番号だけで判断せず、`0.x` の minor 増加や非互換変更を含む版は個別に扱う。
 
@@ -133,7 +162,6 @@ Ruby・Python の `X.Y` ブランチ変更や機能リリース、Node の major
 
 | スキル | できること | 使い方の例 | 前提 |
 | --- | --- | --- | --- |
-| [skills-preflight](.agents/skills/skills-preflight/SKILL.md) | スキルの定義・呼び出し設定・リンクと、必要なコマンドやプロジェクトの検証環境を確認する。利用可否と対処をまとめ、環境は変更しない | `$skills-preflight`<br>`$skills-preflight このプロジェクトで使う準備を確認して` | `bash`。各スキルの実行環境は確認対象 |
 | [minor-version-upgrade](.agents/skills/minor-version-upgrade/SKILL.md) | Ruby・Node・Python の互換性を保つ更新を、証拠付きの供給網ゲートと読み取り専用 snapshot を使う一つの計画でまとめて反映する。隔離環境・テスト・実操作で検証し、結果を保存する。個別移行が必要な版は major 側へ回す | `$minor-version-upgrade`<br>`$minor-version-upgrade Ruby・Node・Python と依存を互換性を保つ範囲でまとめて更新して` | `bash`、Python 3.9 以降、対象で採用中のランタイム・依存管理、公式情報へのネットワーク、snapshot と出力を分離できるレビュー済みの既存隔離 executor、監査・テスト環境、Web 画面には組み込みブラウザ |
 | [major-version-upgrade](.agents/skills/major-version-upgrade/SKILL.md) | Ruby・Python の X.Y ブランチ変更、Node や依存の major 更新などを1対象ずつ更新する。一件ごとに証拠付きの供給網ゲート・読み取り専用 snapshot による隔離実行・テスト・実操作まで完了して次へ進む | `$major-version-upgrade`<br>`$major-version-upgrade Ruby・Node・Python のランタイムと依存を1対象ずつ検証して移行して` | `bash`、Python 3.9 以降、対象で採用中のランタイム・依存管理、公式の移行・供給網情報へのネットワーク、snapshot と出力を分離できるレビュー済みの既存隔離 executor、監査・テスト環境、Web 画面には組み込みブラウザ |
 | [codebase-cleanup-workflow](.agents/skills/codebase-cleanup-workflow/SKILL.md) | 全体探索と検証結果を共有し、設計整合 → 責務分割・共通化 → テスト整理 → 宣言順整理 → 文書同期を一巡する。各スキルの判断基準で必要な改善を実施する | `$codebase-cleanup-workflow`<br>`$codebase-cleanup-workflow 今回は src/billing のみ整備して` | 下記5つの整備スキルを参照でき、対象の実装・文書と検証環境を利用できること |
@@ -142,6 +170,14 @@ Ruby・Python の `X.Y` ブランチ変更や機能リリース、Node の major
 | [test-suite-refactor](.agents/skills/test-suite-refactor/SKILL.md) | 不具合の検出力を保ちながら、重複や実装の細部に依存するテストを削除・統合・書き換える。境界値・異常系・過去の不具合・重要な副作用を守り、影響範囲を実行して確かめる | `$test-suite-refactor`<br>`$test-suite-refactor src/billing のテストを整理して` | 対象リポジトリのテスト実行環境 |
 | [code-order-refactor](.agents/skills/code-order-refactor/SKILL.md) | プロジェクトを探索し、メソッド・関数などを読みやすい順へ移す。初期化・登録などの順序依存を守り、再実行でも配置を安定させる | `$code-order-refactor`<br>`$code-order-refactor src/billing のメソッドの順番を整理して` | 対象の実装を参照でき、関連する検証を実行できること |
 | [docs-align-with-code](.agents/skills/docs-align-with-code/SKILL.md) | 実装を正としてプロジェクト全体の利用・開発・運用文書を更新する。有用な説明と重要な制約を残し、古い記述・重複・不足を整理する | `$docs-align-with-code`<br>`$docs-align-with-code README.md を現状の実装に合わせて更新して` | 対象のドキュメントと実装を参照できること |
+
+### Codex の雑務用スキル
+
+使う準備の確認や、書類などのファイル整理に使う。
+
+| スキル | できること | 使い方の例 | 前提 |
+| --- | --- | --- | --- |
+| [skills-preflight](.agents/skills/skills-preflight/SKILL.md) | スキルの定義・呼び出し設定・リンクと、必要なコマンドやプロジェクトの検証環境を確認する。利用可否と対処をまとめ、環境は変更しない | `$skills-preflight`<br>`$skills-preflight このプロジェクトで使う準備を確認して` | `bash`。各スキルの実行環境は確認対象 |
 | [rename-files-by-content](.agents/skills/rename-files-by-content/SKILL.md) | 指定フォルダ直下の通常ファイルを内容から `YYYY-MM-DD_名前.拡張子` に改名する。隠しファイルと、隠しフォルダを含むサブフォルダ内は対象外。請求書・領収書・契約書などに応じて日付と名称を選び、名称の空白は `-` に置き換える。同名は連番、不明なものは元名を保って記録する | `$rename-files-by-content /絶対パス/対象フォルダ`<br>`$rename-files-by-content /絶対パス/対象フォルダ 候補だけ見せて` | `bash`、Python 3.9 以降、対象の読み書き・ハードリンク作成、形式に合う読取・必要に応じた表示や OCR の手段 |
 
 ## 実行結果の保存先
