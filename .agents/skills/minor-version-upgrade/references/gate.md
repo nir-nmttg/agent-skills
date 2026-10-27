@@ -2,15 +2,15 @@
 
 `scripts/supply-chain.py` は Python 3.9 以降の標準ライブラリで動く。更新計画・取得物・監査結果と、根拠付きの手動レビューを結びつけ、条件が揃わない導入を停止する。スクリプトへのパスは対象プロジェクトではなく、このスキルの実体から解決する。`archive_inspector.py`・`audit_report.py` は内部の補助で、これらだけの成功を実行許可に使わない。
 
-このスキル内のランタイム・依存の導入や更新は、必ず `run` を経由する。`check` の成功後に別コマンドで更新する方法、`check && npm install` などの代用、状態ファイルの直接編集、未確認項目の一括 `pass` は使わない。skip・force・公開後の待機期間を短縮する override はない。
+最終採用候補のランタイム・依存の導入や更新は、必ず `run` を経由する。隔離の準備・probe と、レビュー済み executor による調査用 scratch の依存解決、固定した更新前グラフの基準環境再現・テストは [隔離環境の準備](isolation.md) に従い、対象へ反映しない。`check` の成功後に別コマンドで更新する方法、`check && npm install` などの代用、状態ファイルの直接編集、未確認項目の一括 `pass` は使わない。skip・force・公開後の待機期間を短縮する override はない。
 
 ## 1. 実行状態と候補を分けて準備する
 
 1. `bash scripts/new-run.sh <project-slug>` の出力を実行記録先 `RUN` とする。ここに `report.md`・`plan.json`・証拠・ゲート状態を置く。対象プロジェクトと候補用コピーから分離し、候補コードや隔離 executor に `RUN` 全体を渡さない。
-2. 既存のコンテナ・VM・OS sandbox と executor の実体・設定を静的にレビューする。[隔離条件](verification.md#4-隔離を確認してから導入テスト起動する) を強制できるものを選び、秘密を除いた最小の候補用コピー、専用 cache、ダミー設定を用意する。スクリプトが OS の隔離環境を自動構築・証明することはない。
-3. 候補を解決し、配布物を取得する。Gemfile/gemspec・backend・plugin などを評価する解決やメタデータ取得には、この段階からレビュー済みの隔離を適用する。`init` 前ならコードを自由に実行できるという意味ではない。取得と導入を分け、未確認の依存をホストへ導入しない。
-4. 更新前後の全依存 inventory、全変更版の公開日時、正確な版・取得元・digest、取得物、機械判定用の監査 JSON を揃える。直接・間接・dev・build・optional・platform 別の範囲を説明し、未探索や監査の非対応を隠さない。Ruby・Node・Python 本体の公式セキュリティ告知も証拠に含める。
-5. 計画に候補・manifest・lockfile 相当・実行設定・配布物・inventory・監査結果と、レビュー済みの既存隔離 executor の argv 配列を固定する。設定の include・補助 script 等、候補外のファイル入力も `execution.inputs` に列挙して hash で結びつける。設定は自己完結・相対 include とするか、snapshot の入力先を executor の引数から受け取る構成にする。rootfs・image 等のファイルでない入力は immutable digest へ固定し、可変 tag を使わないことを `isolation` で確認する。shell のコマンド文字列や、未確認の wrapper を実行先にしない。導入時の未確認な再取得・再解決を許さない。
+2. [隔離環境の準備](isolation.md) に従い、同梱 `scripts/docker-sandbox.py prepare` で既存 Docker 上の設定と executor を自動生成し、同梱コード・image・生成物・worker・probe の結果をレビューする。[隔離条件](verification.md#4-隔離を確認してから導入テスト起動する) を満たす既存のコンテナ・VM・OS sandbox も利用できる。秘密を除いた最小の候補用コピー、専用 cache、ダミー設定を用意する。準備の成功だけではゲートの項目を `pass` にしない。
+3. 基準用は現在のランタイムと固定した更新前グラフを再現・照合してテストし、候補解決用とは worker・入力・出力を分ける。旧版と採用版の image が異なる場合はそれぞれ別の `RUN` で準備する。候補を解決し、配布物を取得する。Gemfile/gemspec・backend・plugin などを評価する解決やメタデータ取得には、この段階からレビュー済みの隔離を適用する。`init` 前ならコードを自由に実行できるという意味ではない。取得と導入を分け、未確認の依存をホストへ導入しない。
+4. 更新前後の全依存 inventory、全変更版の公開日時、正確な版・取得元・digest、取得物と、更新後の全ライブラリ・ビルド依存を覆う監査 JSON を揃える。ランタイムだけの変更でも既存依存を監査する。直接・間接・dev・build・optional・platform 別の範囲を説明し、未探索や監査の非対応を隠さない。Ruby・Node・Python 本体の公式セキュリティ告知も証拠に含める。
+5. 計画に候補・manifest・lockfile 相当・実行設定・配布物・inventory・監査結果と、準備・レビューした隔離 executor の argv 配列を固定する。自動準備時は `sandbox/execution.json` を `plan.execution` へ統合する。設定の include・補助 script 等、候補外のファイル入力も `execution.inputs` に列挙して hash で結びつける。設定は自己完結・相対 include とするか、snapshot の入力先を executor の引数から受け取る構成にする。rootfs・image 等のファイルでない入力は immutable digest へ固定し、可変 tag を使わないことを `isolation` で確認する。shell のコマンド文字列や、未確認の wrapper を実行先にしない。導入時の未確認な再取得・再解決を許さない。
 
 `RUN`・`PROJECT`・`CANDIDATE` は実際の絶対パスを設定する。`UPGRADE_PYTHON` はプロジェクト外の信頼済みPython 3.9以降の実体の絶対パス、`UPGRADE_GATE` はこのスキル実体の `scripts/supply-chain.py` の絶対パスとする。対象のvenv・shim・PATH上の未確認Pythonを使わず、常に `-I -S` で環境由来のimportとsite処理を無効化する。フラグなしの誤用は本体も拒否するが、フラグなしで起動した時点のsite処理まで後から防げるわけではない。
 
@@ -27,7 +27,7 @@
 | `coverage` | 全依存 inventory と更新差分が manifest・lockfile 相当・platform・dev/build/optional の範囲を覆い、未確認の変更版や取得物が残らない |
 | `sources` | 公開元・所有者・repository・配布 URL の連続性、名前の取り違えや取得元の切替を公式の履歴で裏づける |
 | `artifacts` | 実際の旧新版配布物の差分、実行 hook・生成コード・通信・秘密へのアクセスを読み、archive 検査の signal と整合する |
-| `advisories` | 対応する全依存の監査、DB の鮮度、公式の脆弱性・悪性告知、ランタイムの告知を照合し、対象・期限・未確認点を説明する |
+| `advisories` | 更新後 inventory の全ライブラリ・ビルド依存の監査、DB の鮮度、公式の脆弱性・悪性告知、ランタイムの告知を照合し、対象・期限・未確認点を説明する |
 | `authenticity` | 公認の digest、提供された署名・provenance を信頼した公開主体に照合する。未提供の場合は独立した代替根拠と限界を示す |
 | `isolation` | executor の実体と argv・設定・全入力をレビューし、snapshot を読み取り専用で受け取り隔離内の scratch へコピーすること、秘密・ホスト書込み・外部通信・資源の制限と `RUN` の分離を確認する。ファイルでない rootfs・image 等は immutable digest に固定する |
 | `compatibility` | 正確な更新版と公式の互換性方針、minor / major の境界、ABI・peer・ビルド依存・3言語の連携、検証計画を説明する |
@@ -53,7 +53,7 @@
 "$UPGRADE_PYTHON" -I -S "$UPGRADE_GATE" run --run "$RUN"
 ```
 
-`check`・`run` は、固定の7項目がすべて有効な `pass` でなければ非ゼロで停止する。証拠と監査の有効期間は24時間で、期限切れは再調査する。全変更版の公開から7日未満、公開日時の不明・未来も自動で停止する。組織の方針がより厳しければ追加で守る。緊急修正を理由にこの下限を短縮しない。
+`check`・`run` は、固定の7項目がすべて有効な `pass` でなければ非ゼロで停止する。証拠と監査の有効期間は24時間で、期限切れは再調査する。候補版と各実配布物の最も新しい公開日時から7日未満、公開日時の不明・未来も自動で停止する。組織の方針がより厳しければ追加で守る。緊急修正を理由にこの下限を短縮しない。
 
 自動検査は、全 candidate inventory の差分 coverage、取得物の SHA256、archive の path・link・type・件数とサイズの上限、`.gem` の内層・wheel を含む実行 hook の signal、公開後の日数と minor のランタイム境界を調べる。解析に用いた配布物・監査JSON・inventory・plan の bytes から求めた SHA256 も承認内容と照合し、hash 確認と解析の別読取りの間の差替えを拒否する。Ruby・Python 本体の同一 `X.Y`、Node 本体の同一 major でも互換性を自動保証するものではない。
 
@@ -61,9 +61,9 @@
 
 `run` は元の対象・候補・manifest・設定・取得物・証拠・executor・hash・argv を再検査し、承認した候補・設定・`inputs`・取得物を `RUN/execution-inputs` へ安全にコピーして hash を照合する。承認 hash と異なる内容をコピーしようとすれば停止し、コピー後は承認した snapshot だけを実行に使う。snapshot のファイルは `0400` と元の実行 bit、ディレクトリは `0500` とし、元の書込み可能な候補を実行しない。snapshot 作成後も、実行直前の現在時刻で証拠・監査の鮮度と整合を再検査する。
 
-executor の cwd と入力引数はこの読み取り専用 snapshot を参照する。executor は受け取った入力を隔離内の scratch へコピーして導入・テストし、結果は別の `RUN/execution-output` へ出す。入力 snapshot と出力先だけを渡し、`RUN` 全体を公開しない。token を解決した argv 配列を `shell=False` で一度だけ起動する。失敗時に同じ状態を流用したり、任意コマンドへ切り替えたりしない。承認はRUNとスキル名にも結びつけ、別のRUNへコピーしても流用できない。承認する候補・入力・計画を変える場合や、再取得・再解決、証拠の差替えや期限切れがあれば、新しい実行記録で準備と全レビューをやり直す。
+executor の cwd と入力引数はこの読み取り専用 snapshot を参照する。executor は受け取った入力を隔離内の scratch へコピーし、導入・実版/全グラフ/digest の照合・必須チェック・対象別の実操作まで完了して、許可差分と証拠を別の `RUN/execution-output` へ出す。必須処理の失敗は終了コードへ伝える。入力 snapshot と出力先だけを渡し、`RUN` 全体を公開しない。token を解決した argv 配列を `shell=False` で一度だけ起動する。失敗時に同じ状態を流用したり、任意コマンドへ切り替えたりしない。承認はRUNとスキル名にも結びつけ、別のRUNへコピーしても流用できない。承認する候補・入力・計画を変える場合や、再取得・再解決、証拠の差替えや期限切れがあれば、新しい実行記録で準備と全レビューをやり直す。
 
-実行後は実際の版・依存・digest を計画と照合し、同じ隔離条件でテスト・必要な実操作を行う。追加の導入や更新が必要なら、別のレビュー済み計画の `run` を経由する。`check`・`run` の結果と残る不確実性も `report.md` に残す。
+同梱 executor は終了時にコンテナと scratch を削除するため、導入済み環境での照合・テスト・CLI/consumer の実操作を最終 worker 内で完了させる。Web・DB 等が必要なら `init` 前に全工程を完遂できる既存 executor を選び、なければ未検証・適用保留とする。`run` 後は [保存・反映契約](isolation.md#6-検証した差分を保存して対象へ反映する)に従い、元プロジェクトからの全差分・実行 bit・削除と証拠を読み、元の全適用予定パスの初期状態を再照合してから許可差分だけを反映する。追加検証・失敗修正・部分除外は新しい実行記録・計画で全レビュー・導入・検証をやり直す。同じ計画の再実行やホストでの依存再現を使わない。`check`・`run` の結果と残る不確実性も `report.md` に残す。
 
 ## 防げる誤りと限界
 
@@ -73,7 +73,7 @@ executor の cwd と入力引数はこの読み取り専用 snapshot を参照�
 
 計画と状態は `schema_version: 2` を使い、旧形式の記録は流用しない。JSONは重複キー・未対応キー・不正な型を拒否する。`plan.json`、inventory、監査結果、取得物、隔離設定、追加のファイル入力、証拠はすべて `RUN` 内の通常ファイルとし、symlink・hardlink・特殊ファイルや `..` による参照を使わない。取得元URLから認証情報を除き、認証は取得用プロセスだけに渡す。
 
-次はNodeの1候補を表す構造例。公開日時の `null`、古い監査日時、ゼロのhash、架空のexecutorを含むため実行できない。公式の根拠・実測値・実際の隔離設定で埋め、全候補に展開してから初期化する。初期化後の変更は承認を無効にする。
+次はNodeの1候補を表す構造例。公開日時の `null`、古い監査日時、ゼロのhash、架空のexecutorを含むため実行できない。自動準備時の `execution` は `sandbox/execution.json` を使い、配布物等の token と追加ファイル入力を補う。公式の根拠・実測値・実際の隔離設定で埋め、全候補に展開してから初期化する。初期化後の変更は承認を無効にする。
 
 ```json
 {
@@ -128,12 +128,15 @@ executor の cwd と入力引数はこの読み取り専用 snapshot を参照�
 
 - `unit` は一つの更新単位の説明。majorでは一件の対象と不可分な関連セットを記録する。関連性そのものは `compatibility` と `coverage` の証拠で確認し、文字列があるだけで自動証明したとは扱わない。
 - `files` は対象・候補の双方で監視する相対パス。manifest・全lockfile・取得元設定・実行設定・CI等、今回の判断に関わるものを列挙する。指定範囲外の元プロジェクト全体を自動固定したことにはならない。候補コピー全体は別にhashとmodeを固定する。
-- `published_at` は公式資料で確認したUTCの `Z` 表記。`stability` は `stable/prerelease/unknown`、`compatibility` は `compatible/migration/unknown`。`unknown` や `prerelease`、minorでの `migration` は停止する。
-- `artifacts` はその候補の導入で使う全配布物。公認情報で確認したSHA256と実物を照合する。旧配布物との差分や署名の信頼は、別の必須レビューに根拠を残す。
-- `audits` は変更したライブラリ・ビルド依存の各 `ecosystem/component` に対応する実際の監査結果。形式は `node:npm-v2`、`python:pip-audit`、`ruby:bundler-audit`。`checked_at` と `exit_code` は隔離内で実際に実行した日時・終了結果を記録する。これらの申告内容とDB鮮度は `advisories` の証拠でも確認する。bundler-auditはJSON内の生成日時も24時間・未来日時の検査へ含める。
-- 本体ランタイムだけの更新は、対応するpackage監査JSONがなくても公式告知を必須の `advisories` で調べる。ライブラリがあるのに報告を省略することはできない。pip-auditは変更したpackageの正規化名・版が結果に含まれるか照合する。npm/bundlerのJSONだけでは全正常依存の解決版を証明できないため、監査範囲は `coverage` でも照合する。
-- `execution.argv[0]` は信頼済みの既存隔離 executor の実体の絶対パス。ホストのシェルや依存管理コマンドを直接指定せず、適用される隔離設定と入力・mount・通信制御をレビューする。以降の引数で入力先に使える token は `{candidate}`・`{config}`・`{input:RUN内の相対パス}`・`{artifact:RUN内の相対パス}`、出力先は `{output}`。`input` は `inputs`、`artifact` は候補の `artifacts` に列挙したものだけを使う。生の `PROJECT`・`CANDIDATE`・`RUN` やその他の絶対ホストパス、未知の token を引数へ入れない。token は実行用 snapshot と専用出力先へ解決され、cwd も snapshot の候補コピーとなる。
+- `published_at` は、候補版と新たに採用する全実配布物（`runtime_image` を含む）の公開日時のうち、公式資料で確認した最も新しい日時を UTC の `Z` 表記で指定する。各日時を証拠に残し、新しい wheel・image 等の公開日を候補版の古い初回公開日で代用しない。一つでも不明なら保留し、作成日時を公開日時と推定しない。`stability` は `stable/prerelease/unknown`、`compatibility` は `compatible/migration/unknown`。`unknown` や `prerelease`、minorでの `migration` は停止する。
+- `artifacts` はその候補の導入で使う全ファイル配布物。公認情報で確認したSHA256と実物を照合する。通常のライブラリ・archive で導入するランタイムは非空を必須とする。下記 `runtime_image` で実際に供給するランタイムだけは空配列を許可する。旧配布物との差分や署名の信頼は、別の必須レビューに根拠を残す。
+- `runtime_image` は image で供給する `kind: runtime` 候補だけに指定できる省略可能な object で、`reference`（tag を付けない `repository@sha256:<64桁>`）と `image_id`（`sha256:<64桁>`）を持つ。inventory の更新後 `source` を同じ参照にし、`execution.mechanism` を `container`、実際の JSON config の `image`・`image_id` を同一の image に固定する。Docker Hub の既知の省略表記だけを正規化して照合し、他の取得元・repository・digest・ID の代用を拒否する。`automated-checks.json` の `runtime_images` に結合結果を保存する。正確なランタイム版・公開日・出所・署名等は引き続き根拠付きで確認し、準備時と最終 worker の実版を inventory と照合する。image 自体の公開日時も上記 `published_at` の基準で確認し、ランタイム版の初回公開日で代用しない。compiler・headers や native のソース・生成器も入力として固定し、同版の拡張を再ビルドするだけなら架空の版変更を作らない。image で供給する実態を、使わない archive で置き換えない。
+- `audits` は更新後 inventory の全ライブラリ・ビルド依存の各 `ecosystem/component` に対応する実際の監査結果。変更していない依存も省略しない。形式は `node:npm-v2`、`python:pip-audit`、`ruby:bundler-audit`。`checked_at` と `exit_code` は隔離内、または [監査専用プロセスの条件](isolation.md#5-対象コードを実行しない監査照会) を満たす実行での実測を記録する。JSON は実際のツールの無加工出力を使い、ツール・ランタイムの版、送信先・送信内容と実行条件の根拠も残す。対象・依存コードの評価や再解決・導入・fix を伴う処理へこの扱いを広げない。申告内容とDB鮮度は `advisories` の証拠でも確認する。bundler-auditはJSON内の生成日時も24時間・未来日時の検査へ含める。
+- 更新後 inventory が本体ランタイムだけでライブラリ・ビルド依存を含まない場合に限り、package 監査 JSON は不要とする。ランタイムの公式告知は必須の `advisories` で調べる。ランタイムだけを変更する場合でも既存ライブラリの報告は省略しない。pip-auditは更新後の全 package の正規化名・版が結果に含まれるか照合する。npm/bundlerのJSONだけでは全正常依存の解決版を証明できないため、監査範囲は `coverage` でも照合する。
+- `execution.argv[0]` は自動準備・レビューした executor、または信頼済みの既存隔離 executor の実体の絶対パス。ホストのシェルや依存管理コマンドを直接指定せず、適用される隔離設定と入力・mount・通信制御をレビューする。以降の引数で入力先に使える token は `{candidate}`・`{config}`・`{input:RUN内の相対パス}`・`{artifact:RUN内の相対パス}`、出力先は `{output}`。`input` は `inputs`、`artifact` は候補の `artifacts` に列挙したものだけを使う。生の `PROJECT`・`CANDIDATE`・`RUN` やその他の絶対ホストパス、未知の token を引数へ入れない。token は実行用 snapshot と専用出力先へ解決され、cwd も snapshot の候補コピーとなる。
 - `execution.inputs` は必須の配列で、config 以外の候補外ファイル入力を `RUN` 内の相対パスですべて列挙する。追加の入力がなければ空配列にする。config の include や補助 script を未固定のホストパスから読む構成は使わない。`config` は実際に適用する隔離設定、`mechanism` は `container/vm/os-sandbox`。設定の意味と適用、ファイルでない入力の immutable digest、snapshot の読み取り専用 mount と scratch・出力の分離は `isolation` で確認し、この宣言だけで隔離が成立したとは扱わない。外側 executor へ渡す環境は固定の PATH/LANG だけである。
+
+`runtime_images` の `version` は inventory の固定申告値であり、image 内の実測値ではない。準備時と最終 worker での実版の観測・照合を `compatibility`・`isolation` の根拠へ残す。
 
 `inventory.json` は全直接・間接・ビルド依存の更新前後の解決結果を記録する。次も構造例であり、実際のmanifest・lockfile・採用ツールの結果を `coverage` で照合する必要がある。
 
@@ -165,6 +168,8 @@ executor の cwd と入力引数はこの読み取り専用 snapshot を参照�
 ```
 
 `id` は依存の位置・対象環境を区別できる一意で安定した識別子。`component` は `web/worker/ruby-app` 等、監査範囲と対応するラベルで、`.` は使わない。`ecosystem` は `ruby/node/python`、`kind` は `runtime/direct/transitive/build`。dev/optional/platform等の違いはIDと証拠で覆う。追加はafterのみ、削除はbeforeのみに記録する。after側で変わった全項目とcandidate IDが一致しなければ初期化できない。inventory自体から全依存を自動発見したことにはしない。
+
+同版で `source` が変わる実配布物の差替えは、版上昇と分けて候補にできる。ABI 別 wheel 等を識別できる正確な取得元を記録し、新旧配布物の全差分・hash・公開日・出所・監査・互換性をレビューする。公開日時は切替先の実配布物について確認し、同版の古い初回公開日で代用しない。minor は同版・同じ `source` で種類等の metadata だけを変える候補を拒否する。同版でも互換性が不明なら minor に含めず個別移行へ回し、major では一件の移行境界と互換性を精査する。
 
 ## 検査上限と非対応
 

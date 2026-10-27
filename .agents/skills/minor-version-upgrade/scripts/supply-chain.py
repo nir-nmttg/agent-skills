@@ -173,15 +173,18 @@ def reject_constant(_value):
     raise GateError("JSONに非有限数があります。")
 
 
-def load_json_bound(path):
+def parse_json(raw):
     def bounded_integer(value):
         require(len(value) <= 20, "JSON整数が上限を超えています。")
         return int(value)
+    return json.loads(raw.decode("utf-8"), object_pairs_hook=pairs_unique,
+                      parse_constant=reject_constant, parse_int=bounded_integer,
+                      parse_float=reject_constant)
+
+
+def load_json_bound(path):
     raw = safe_read(path, MAX_JSON, True)
-    value = json.loads(raw.decode("utf-8"), object_pairs_hook=pairs_unique,
-                       parse_constant=reject_constant, parse_int=bounded_integer,
-                       parse_float=reject_constant)
-    return value, digest(raw)
+    return parse_json(raw), digest(raw)
 
 
 def load_json(path):
@@ -279,7 +282,47 @@ def inventory(run, filename):
     before, after = sides
     changed = {key: item for key, item in after.items() if before.get(key) != item}
     require(bool(changed), "変更候補がありません。更新コマンドは実行しません。")
-    return before, changed, sha256
+    return before, after, changed, sha256
+
+
+def runtime_image_reference(value):
+    """tagを持たないimmutable参照を、Docker Hubの既知の表記だけ正規化する。"""
+    text_value(value)
+    require(re.fullmatch(r"[a-z0-9][a-z0-9._:/-]*@sha256:[0-9a-f]{64}", value),
+            "ランタイムimageはrepository@sha256の固定参照が必要です。")
+    name, sha256 = value.rsplit("@", 1)
+    parts = name.split("/")
+    require(":" not in parts[-1], "ランタイムimageの参照にtagは使えません。")
+    first = parts[0]
+    if len(parts) > 1 and ("." in first or ":" in first or first == "localhost"):
+        registry, repository = first, "/".join(parts[1:])
+    else:
+        registry, repository = "docker.io", "/".join(parts)
+    if registry == "index.docker.io":
+        registry = "docker.io"
+    if registry == "docker.io" and "/" not in repository:
+        repository = "library/" + repository
+    return registry, repository, sha256
+
+
+def validate_runtime_images(plan, changed, config):
+    images = [item for item in plan["candidates"] if "runtime_image" in item]
+    if not images:
+        return []
+    require(plan["execution"]["mechanism"] == "container",
+            "imageを使うランタイム候補にはcontainer executorが必要です。")
+    settings = parse_json(config)
+    require(type(settings) is dict, "ランタイムimageの実行設定はJSON objectにしてください。")
+    configured = runtime_image_reference(settings.get("image"))
+    image_id = text_value(settings.get("image_id"))
+    require(re.fullmatch(r"sha256:[0-9a-f]{64}", image_id), "実行設定のimage IDが未固定です。")
+    result = []
+    for candidate in images:
+        image = candidate["runtime_image"]
+        require(runtime_image_reference(image["reference"]) == configured and image["image_id"] == image_id,
+                "ランタイム候補と実行設定のimage・IDが一致しません。")
+        result.append({"id": candidate["id"], "version": changed[candidate["id"]]["version"], **image})
+    return result
 
 
 def read_plan(run, filename):
@@ -289,12 +332,12 @@ def read_plan(run, filename):
     text_value(plan["unit"])
     paths = [str(relative_path(p)) for p in array(plan["files"], True)]
     require(len(paths) == len(set(paths)), "監視ファイルが重複しています。")
-    before, changed, inventory_sha256 = inventory(run, plan["inventory"])
+    before, after, changed, inventory_sha256 = inventory(run, plan["inventory"])
     seen = set()
     candidates = array(plan["candidates"], True)
     require(len(candidates) <= MAX_CANDIDATES, "候補が200件を超えています。独立した更新計画に分割してください。")
     for candidate in candidates:
-        object_keys(candidate, ("id", "published_at", "stability", "compatibility", "artifacts"))
+        object_keys(candidate, ("id", "published_at", "stability", "compatibility", "artifacts"), ("runtime_image",))
         key = text_value(candidate["id"])
         require(key in changed and key not in seen, "候補IDが変更一覧と不一致、または重複しています。")
         seen.add(key)
@@ -302,8 +345,16 @@ def read_plan(run, filename):
                 and candidate["compatibility"] in ("compatible", "migration", "unknown"), "候補の分類が未対応です。")
         if candidate["published_at"] is not None:
             utc_time(candidate["published_at"])
+        if "runtime_image" in candidate:
+            image = candidate["runtime_image"]
+            object_keys(image, ("reference", "image_id"))
+            require(changed[key]["kind"] == "runtime", "runtime_imageは本体ランタイムだけに指定できます。")
+            require(runtime_image_reference(image["reference"]) == runtime_image_reference(changed[key]["source"]),
+                    "ランタイムのinventoryと候補のimage参照が一致しません。")
+            require(re.fullmatch(r"sha256:[0-9a-f]{64}", text_value(image["image_id"])),
+                    "ランタイム候補のimage IDが未固定です。")
         declared_paths = set()
-        for artifact in array(candidate["artifacts"], True):
+        for artifact in array(candidate["artifacts"], "runtime_image" not in candidate):
             object_keys(artifact, ("path", "sha256"))
             path = str(run_relative_path(artifact["path"]))
             require(path not in declared_paths and re.fullmatch(r"[0-9a-f]{64}", artifact["sha256"] or ""), "配布物のパス・SHA256が不正です。")
@@ -320,8 +371,8 @@ def read_plan(run, filename):
         run_relative_path(audit["path"])
         require(type(audit["exit_code"]) is int, "監査の終了コードが未確認です。")
         utc_time(audit["checked_at"])
-    needed = {(p["ecosystem"], p["component"]) for p in changed.values() if p["kind"] != "runtime"}
-    require(needed <= audits, "変更した系統・サブプロジェクトの監査JSONが不足しています。")
+    needed = {(p["ecosystem"], p["component"]) for p in after.values() if p["kind"] != "runtime"}
+    require(needed <= audits, "更新後の系統・サブプロジェクトの監査JSONが不足しています。")
     execution = plan["execution"]
     object_keys(execution, ("argv", "config", "mechanism", "inputs"))
     config = str(run_relative_path(execution["config"]))
@@ -333,11 +384,11 @@ def read_plan(run, filename):
     require(len(argv) <= 100, "実行引数が多すぎます。")
     for arg in argv:
         text_value(arg, 4000)
-    require(Path(argv[0]).is_absolute() and execution["mechanism"] in ("container", "vm", "os-sandbox"), "絶対パスの既存隔離executorが必要です。")
+    require(Path(argv[0]).is_absolute() and execution["mechanism"] in ("container", "vm", "os-sandbox"), "準備・確認した隔離executorの絶対パスが必要です。")
     require(Path(argv[0]).name not in ("sh", "bash", "zsh", "fish", "python", "python3", "ruby", "node", "npm", "pnpm", "yarn", "pip", "uv", "bundle"), "ホストのシェル・ランタイム・依存管理コマンドをexecutorにはできません。")
     for argument in argv[1:]:
         validate_argument(argument, plan)
-    return plan, before, changed, plan_sha256, inventory_sha256
+    return plan, before, after, changed, plan_sha256, inventory_sha256
 
 
 def candidate_tree(root):
@@ -373,7 +424,7 @@ def candidate_tree(root):
 
 
 def bindings(run, state):
-    plan, before, changed, plan_sha256, inventory_sha256 = read_plan(run, state["plan_file"])
+    plan, before, after, changed, plan_sha256, inventory_sha256 = read_plan(run, state["plan_file"])
     project, candidate = Path(state["project"]), Path(state["candidate"])
     require(project == project.resolve() and candidate == candidate.resolve()
             and project.is_dir() and candidate.is_dir(), "プロジェクト・候補の実体が変わっています。")
@@ -400,6 +451,7 @@ def bindings(run, state):
     config_path = run / run_relative_path(plan["execution"]["config"])
     config = safe_read(config_path, MAX_JSON, True)
     forbid_source_paths(config, run, state)
+    runtime_images = validate_runtime_images(plan, changed, config)
     snapshot_files[plan["execution"]["config"]] = {
         "sha256": digest(config), "mode": stat.S_IMODE(config_path.stat().st_mode), "limit": MAX_JSON}
     inputs = {}
@@ -423,12 +475,13 @@ def bindings(run, state):
              "plan": plan, "plan_sha256": plan_sha256, "inventory_sha256": inventory_sha256,
              "project": str(project), "candidate": str(candidate), "watched": watched,
              "candidate_tree": candidate_tree(candidate), "artifacts": artifacts, "audits": audits,
+             "runtime_images": runtime_images,
              "executor_sha256": file_digest(executor), "executor_mode": stat.S_IMODE(executor.stat().st_mode),
              "executor_uid": executor.stat().st_uid,
              "config_sha256": digest(config), "inputs": inputs, "snapshot_files": snapshot_files,
              "tools": {name: file_digest(SCRIPT_DIR / name) for name in ("supply-chain.py", "archive_inspector.py", "audit_report.py")},
              "environment": CHILD_ENV}
-    return digest(canonical(bound)), plan, before, changed, bound
+    return digest(canonical(bound)), plan, before, after, changed, bound
 
 
 def load_state(run):
@@ -592,7 +645,7 @@ def compatible_runtime(old, new, ecosystem):
 
 
 def checks(run, state):
-    binding, plan, before, changed, bound = assert_binding(run, state)
+    binding, plan, before, after, changed, bound = assert_binding(run, state)
     require(state["execution_status"] == "not_started", "実行済み・失敗・実行中の計画は再利用できません。")
     now = datetime.now(timezone.utc)
     signals = []
@@ -604,14 +657,16 @@ def checks(run, state):
         if SCRIPT_DIR.parent.name == "minor-version-upgrade":
             require(item["compatibility"] == "compatible", "互換性未確認・個別移行の候補は一括更新できません。")
             previous = before.get(item["id"])
-            if package["kind"] == "runtime":
+            if previous and previous["version"] == package["version"]:
+                require(previous["source"] != package["source"], "同版・同取得元の変更を一括更新できません。")
+            elif package["kind"] == "runtime":
                 require(compatible_runtime(previous["version"] if previous else None, package["version"], package["ecosystem"]), "ランタイムの系列変更を一括更新できません。")
             elif previous:
                 old = re.fullmatch(r"([0-9]+)\.([0-9]+)\.([0-9]+)", previous["version"])
                 new = re.fullmatch(r"([0-9]+)\.([0-9]+)\.([0-9]+)", package["version"])
                 if old and new:
                     x, y = tuple(map(int, old.groups())), tuple(map(int, new.groups()))
-                    require(x < y and x[0] == y[0] and (x[0] != 0 or x[1] == y[1]), "依存のmajor・0.xのminor変更・同版・downgradeを一括更新できません。")
+                    require(x < y and x[0] == y[0] and (x[0] != 0 or x[1] == y[1]), "依存のmajor・0.xのminor変更・downgradeを一括更新できません。")
         else:
             require(item["compatibility"] != "unknown", "個別移行の分類が未確認です。")
         require(not re.search(r"alpha|beta|preview|dev|rc[0-9]*", package["version"], re.I), "prereleaseの疑いがある版は採用できません。")
@@ -636,12 +691,13 @@ def checks(run, state):
         if audit["ecosystem"] == "python":
             normalize = lambda name: re.sub(r"[-_.]+", "-", name).lower()
             covered = {(normalize(p["name"]), p["version"]) for p in report["packages"]}
-            required = {(normalize(p["name"]), p["version"]) for p in changed.values()
+            required = {(normalize(p["name"]), p["version"]) for p in after.values()
                         if p["ecosystem"] == "python" and p["component"] == audit["component"] and p["kind"] != "runtime"}
             require(required <= covered, "Python監査の対象版に抜けがあります。")
     # 未確認レビューで停止する場合も、先に静的検査の根拠を保存する。
     # 同じ入力では同じ内容とし、レビュー時には別の証拠ファイルに根拠を残す。
-    atomic_write(run / "automated-checks.json", {"binding": binding, "artifacts": signals})
+    atomic_write(run / "automated-checks.json", {"binding": binding, "artifacts": signals,
+                                               "runtime_images": bound["runtime_images"]})
     validate_reviews(run, state, require_all=True)
     validate_freshness(plan, generated_times)
     bound["audit_generated_times"] = generated_times
