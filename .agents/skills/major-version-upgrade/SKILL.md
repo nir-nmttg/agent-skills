@@ -32,7 +32,7 @@ image が供給するランタイムの変更は、[計画の `runtime_image`](r
 
 [隔離環境の準備](references/isolation.md) に従い、対象のランタイム・管理ツール・OS に合う公認 image を調査して digest を固定し、同梱の `scripts/docker-sandbox.py prepare` で既存 Docker 上の設定と executor を自動生成する。同梱コード・生成設定・worker と probe の結果をレビューする。条件を満たす既存のコンテナ・VM・OS sandbox も利用できる。Web・DB 等を含む検証は `init` 前に全工程を完遂できる既存 executor を選び、用意できなければ検証・適用を保留する。準備成功だけで供給網レビューを `pass` にしない。
 
-Docker 本体の導入・daemon 起動・権限昇格・ホスト設定変更はこの準備で行わない。自動準備できなければ、未導入・未起動・通信・image のツール不足などの確認結果と再開条件を報告する。既存 executor のパスを一律に尋ねず、静的調査と差分案を続ける。
+Docker 本体の導入・daemon 起動、`sudo`・root 実行・socket の権限変更などのホスト設定変更はこの準備で行わない。信頼済みの同梱処理が既存 Docker へ接続するための [Codex の実行承認](references/isolation.md#docker-接続と-codex-の実行承認) は利用できる。通常実行の接続拒否だけで保留せず、正規の承認手続きで切り分ける。承認不可・未導入・未起動・通信・image のツール不足などで準備できなければ、確認結果と再開条件を報告する。既存 executor のパスを一律に尋ねず、静的調査と差分案を続ける。
 
 ## 一件ずつ次の工程を完了する
 
