@@ -622,6 +622,219 @@ class GateTests(unittest.TestCase):
                 else:
                     f.blocked()
 
+    def image_runtime(self, f, ecosystem="python", before="3.12.10", after="3.13.5"):
+        """imageの結合だけを検証する。fixture executorはDockerを起動しない。"""
+        f.runtime(ecosystem, before, after)
+        reference = "docker.io/library/" + ecosystem + "@sha256:" + "a" * 64
+        image_id = "sha256:" + "b" * 64
+        f.inventory["before"][0]["source"] = "docker.io/library/" + ecosystem + "@sha256:" + "c" * 64
+        f.inventory["after"][0]["source"] = reference
+        f.plan["candidates"][0].update(compatibility="migration", artifacts=[],
+                                      runtime_image={"reference": reference, "image_id": image_id})
+        f.plan["execution"]["mechanism"] = "container"
+        f.flush()
+        f.json(f.run_dir / "isolation.json", {"image": ecosystem + "@sha256:" + "a" * 64,
+                                              "image_id": image_id})
+
+    def test_image_runtime_candidate_binds_source_config_and_exact_version(self):
+        for ecosystem, before, after in (("ruby", "3.3.7", "4.0.0"), ("python", "3.12.10", "3.13.5")):
+            with self.subTest(ecosystem=ecosystem), self.fixture(MAJOR) as f:
+                self.image_runtime(f, ecosystem, before, after)
+                f.require_ok(f.init())
+                f.approve()
+                f.require_ok(f.command("check"))
+                automated = json.loads((f.run_dir / "automated-checks.json").read_text())
+                self.assertEqual(automated["artifacts"], [])
+                self.assertEqual(automated["runtime_images"], [{
+                    "id": ecosystem + ":" + ecosystem, "version": after,
+                    "reference": f.plan["candidates"][0]["runtime_image"]["reference"],
+                    "image_id": "sha256:" + "b" * 64,
+                }])
+                f.require_ok(f.command("run"))
+                self.assertEqual(len(f.invocations()), 1)
+                self.assertNotEqual(f.command("run").returncode, 0)
+
+    def test_empty_artifacts_require_an_image_backed_runtime(self):
+        for kind in ("direct", "transitive", "build", "archive-runtime"):
+            with self.subTest(kind=kind), self.fixture(MAJOR) as f:
+                if kind == "archive-runtime":
+                    f.runtime("python", "3.12.10", "3.13.5")
+                else:
+                    f.inventory["after"][0]["kind"] = kind
+                f.plan["candidates"][0]["artifacts"] = []
+                f.flush()
+                self.assertNotEqual(f.init().returncode, 0)
+                self.assertFalse(f.marker.exists())
+        for kind in ("direct", "transitive", "build"):
+            with self.subTest(image_kind=kind), self.fixture(MAJOR) as f:
+                self.image_runtime(f)
+                f.inventory["after"][0]["kind"] = kind
+                f.json(f.run_dir / "inventory.json", f.inventory)
+                self.assertNotEqual(f.init().returncode, 0)
+                self.assertFalse(f.marker.exists())
+
+    def test_runtime_image_rejects_mutable_tagged_and_mismatched_references(self):
+        invalid = ("python:3.13", "python:3.13@sha256:" + "a" * 64,
+                   "docker.io/library/python@sha256:" + "d" * 64,
+                   "other.example/python@sha256:" + "a" * 64,
+                   "docker.io/other/python@sha256:" + "a" * 64,
+                   "python@sha256:short")
+        for reference in invalid:
+            with self.subTest(reference=reference), self.fixture(MAJOR) as f:
+                self.image_runtime(f)
+                f.plan["candidates"][0]["runtime_image"]["reference"] = reference
+                f.json(f.run_dir / "plan.json", f.plan)
+                self.assertNotEqual(f.init().returncode, 0)
+                self.assertFalse(f.marker.exists())
+
+    def test_runtime_image_rejects_config_mechanism_and_image_id_mismatch(self):
+        for mutation in ("mechanism", "config-image", "config-id", "candidate-id", "extra-field", "duplicate-json"):
+            with self.subTest(mutation=mutation), self.fixture(MAJOR) as f:
+                self.image_runtime(f)
+                if mutation == "mechanism":
+                    f.plan["execution"]["mechanism"] = "vm"
+                    f.json(f.run_dir / "plan.json", f.plan)
+                elif mutation in ("config-image", "config-id"):
+                    key = "image" if mutation == "config-image" else "image_id"
+                    value = "other.example/python@sha256:" + "a" * 64 if key == "image" else "sha256:" + "e" * 64
+                    config = json.loads((f.run_dir / "isolation.json").read_text())
+                    config[key] = value
+                    f.json(f.run_dir / "isolation.json", config)
+                elif mutation == "candidate-id":
+                    f.plan["candidates"][0]["runtime_image"]["image_id"] = "latest"
+                    f.json(f.run_dir / "plan.json", f.plan)
+                elif mutation == "extra-field":
+                    f.plan["candidates"][0]["runtime_image"]["skip"] = True
+                    f.json(f.run_dir / "plan.json", f.plan)
+                else:
+                    (f.run_dir / "isolation.json").write_text(
+                        '{"image":"python@sha256:' + "a" * 64 + '","image_id":"sha256:'
+                        + "b" * 64 + '","image_id":"sha256:' + "b" * 64 + '"}')
+                self.assertNotEqual(f.init().returncode, 0)
+                self.assertFalse(f.marker.exists())
+
+    def test_runtime_image_keeps_release_review_and_minor_series_gates(self):
+        for mutation in ("young", "unknown", "review", "minor-series"):
+            with self.subTest(mutation=mutation), self.fixture(MINOR if mutation == "minor-series" else MAJOR) as f:
+                self.image_runtime(f)
+                if mutation == "young":
+                    f.plan["candidates"][0]["published_at"] = timestamp(-timedelta(days=1))
+                elif mutation == "unknown":
+                    f.plan["candidates"][0]["compatibility"] = "unknown"
+                elif mutation == "minor-series":
+                    f.plan["candidates"][0]["compatibility"] = "compatible"
+                f.json(f.run_dir / "plan.json", f.plan)
+                f.require_ok(f.init())
+                f.approve(except_checks=("isolation",) if mutation == "review" else ())
+                f.blocked()
+
+    def test_runtime_image_can_bind_an_unchanged_native_dependency_source(self):
+        with self.fixture(MAJOR) as f:
+            self.image_runtime(f)
+            native = f.package("1.0.0", "python", "direct", "native-demo")
+            f.inventory["before"].append(dict(native))
+            f.inventory["after"].append(dict(native))
+            f.json(f.run_dir / "inventory.json", f.inventory)
+            # source archive fixtureをruntime単位に追加しても、従来どおり検査される。
+            f.plan["candidates"][0]["artifacts"] = [{"path": f.artifact, "sha256": sha256(f.artifact_bytes)}]
+            f.plan["audits"] = [{"ecosystem": "python", "component": "app", "format": "pip-audit",
+                                 "path": "audit.json", "exit_code": 0, "checked_at": timestamp()}]
+            f.json(f.run_dir / "plan.json", f.plan)
+            f.json(f.run_dir / "audit.json", pip_report("native-demo", "1.0.0"))
+            f.require_ok(f.init())
+            f.approve()
+            f.require_ok(f.command("check"))
+            report = json.loads((f.run_dir / "automated-checks.json").read_text())
+            self.assertEqual(len(report["artifacts"]), 1)
+            self.assertEqual(len(report["runtime_images"]), 1)
+            f.require_ok(f.command("run"))
+
+    def test_runtime_image_requires_audits_for_unchanged_after_dependencies(self):
+        for skill in (MINOR, MAJOR):
+            for ecosystem, kind in (("ruby", "direct"), ("node", "transitive"), ("python", "build")):
+                with self.subTest(skill=skill, ecosystem=ecosystem, kind=kind), self.fixture(skill) as f:
+                    self.image_runtime(f, before="3.12.5", after="3.12.6")
+                    f.plan["candidates"][0]["compatibility"] = "compatible"
+                    existing = f.package("1.0.0", ecosystem, kind, "existing")
+                    existing["component"] = "worker"
+                    f.inventory["before"].append(dict(existing))
+                    f.inventory["after"].append(dict(existing))
+                    f.json(f.run_dir / "inventory.json", f.inventory)
+                    f.json(f.run_dir / "plan.json", f.plan)
+                    self.assertNotEqual(f.init().returncode, 0)
+                    self.assertFalse(f.marker.exists())
+
+    def test_python_audit_covers_all_after_dependencies_and_excludes_removed(self):
+        for skill in (MINOR, MAJOR):
+            for mutation in ("complete", "missing", "wrong-version"):
+                with self.subTest(skill=skill, mutation=mutation), self.fixture(skill) as f:
+                    self.image_runtime(f, before="3.12.5", after="3.12.6")
+                    f.plan["candidates"][0]["compatibility"] = "compatible"
+                    for name, kind in (("native.demo", "direct"), ("support", "transitive")):
+                        existing = f.package("1.0.0", "python", kind, name)
+                        f.inventory["before"].append(dict(existing))
+                        f.inventory["after"].append(dict(existing))
+                    f.inventory["before"].append(f.package("0.9.0", "python", "build", "removed"))
+                    f.plan["audits"] = [{"ecosystem": "python", "component": "app", "format": "pip-audit",
+                                         "path": "audit.json", "exit_code": 0, "checked_at": timestamp()}]
+                    report = pip_report("native-demo", "1.0.0")
+                    if mutation != "missing":
+                        report["dependencies"].append({"name": "support", "version": "0.9.0" if mutation == "wrong-version" else "1.0.0", "vulns": []})
+                    f.json(f.run_dir / "inventory.json", f.inventory)
+                    f.json(f.run_dir / "plan.json", f.plan)
+                    f.json(f.run_dir / "audit.json", report)
+                    f.require_ok(f.init())
+                    f.approve()
+                    if mutation == "complete":
+                        f.require_ok(f.command("run"))
+                        self.assertEqual(len(f.invocations()), 1)
+                    else:
+                        f.blocked()
+
+    def test_minor_runtime_patch_allows_reviewed_same_version_native_source_change(self):
+        with self.fixture() as f:
+            self.image_runtime(f, before="3.12.5", after="3.12.6")
+            f.plan["candidates"][0]["compatibility"] = "compatible"
+            native = f.package("1.0.0", "python", "direct", "native-demo")
+            f.inventory["before"].append(dict(native))
+            f.inventory["after"].append(dict(native, source="https://example.invalid/native-demo-1.0.0-cp312.whl"))
+            f.plan["candidates"].append({"id": "python:native-demo", "published_at": timestamp(-timedelta(days=10)),
+                                         "stability": "stable", "compatibility": "compatible",
+                                         "artifacts": [{"path": f.artifact, "sha256": sha256(f.artifact_bytes)}]})
+            f.plan["audits"] = [{"ecosystem": "python", "component": "app", "format": "pip-audit",
+                                 "path": "audit.json", "exit_code": 0, "checked_at": timestamp()}]
+            f.json(f.run_dir / "inventory.json", f.inventory)
+            f.json(f.run_dir / "plan.json", f.plan)
+            f.json(f.run_dir / "audit.json", pip_report("native-demo", "1.0.0"))
+            f.require_ok(f.init())
+            f.approve()
+            f.require_ok(f.command("run"))
+            self.assertEqual(len(f.invocations()), 1)
+
+    def test_minor_rejects_same_version_same_source_metadata_drift(self):
+        for field, value in (("name", "renamed"), ("kind", "transitive"), ("component", "worker")):
+            with self.subTest(field=field), self.fixture() as f:
+                f.inventory["after"][0].update(version="1.0.0", **{field: value})
+                if field == "component":
+                    f.plan["audits"][0]["component"] = value
+                f.ready()
+                f.blocked()
+
+    def test_minor_same_version_source_change_keeps_release_review_and_hash_gates(self):
+        for mutation in ("unknown", "young", "hash", "review"):
+            with self.subTest(mutation=mutation), self.fixture() as f:
+                f.inventory["after"][0].update(version="1.0.0", source="https://example.invalid/new-distribution")
+                if mutation == "unknown":
+                    f.plan["candidates"][0]["compatibility"] = "unknown"
+                elif mutation == "young":
+                    f.plan["candidates"][0]["published_at"] = timestamp(-timedelta(days=1))
+                elif mutation == "hash":
+                    f.plan["candidates"][0]["artifacts"][0]["sha256"] = "0" * 64
+                f.flush()
+                f.require_ok(f.init())
+                f.approve(except_checks=("sources",) if mutation == "review" else ())
+                f.blocked()
+
     def test_minor_runtime_allows_only_ecosystem_compatible_series(self):
         cases = (("ruby", "3.3.7", "3.3.8", True), ("ruby", "3.3.7", "3.4.0", False),
                  ("python", "3.12.5", "3.12.6", True), ("python", "3.12.5", "3.13.0", False),
@@ -638,10 +851,11 @@ class GateTests(unittest.TestCase):
                     f.blocked()
 
     def test_minor_rejects_indirect_major_and_zero_minor_changes(self):
-        for old, new in (("1.0.0", "2.0.0"), ("0.1.0", "0.2.0")):
+        for old, new in (("1.0.0", "2.0.0"), ("0.1.0", "0.2.0"), ("1.1.0", "1.0.0")):
             with self.subTest(old=old, new=new), self.fixture() as f:
                 f.inventory["before"][0].update(version=old, kind="transitive")
                 f.inventory["after"][0].update(version=new, kind="transitive")
+                f.inventory["after"][0]["source"] = "https://example.invalid/new-distribution"
                 f.ready()
                 f.blocked()
 

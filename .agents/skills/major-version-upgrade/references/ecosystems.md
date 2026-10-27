@@ -2,7 +2,7 @@
 
 両スキルで使う手引き。対象プロジェクトに存在する3言語の構成を調べ、該当する節だけを読む。NodeにはJavaScript／TypeScriptを含む。他言語は連携・依存境界を記録し、このスキルの更新対象へ広げない。
 
-以下の導入・更新コマンドは、[実行ゲート](gate.md)で確認した計画内の隔離executorから使う。ゲートを経由せず単独で実行する例ではない。解決・取得にコード評価がある場合も、初期化前から既存の隔離を適用する。
+以下の最終採用候補の導入・更新コマンドは、[実行ゲート](gate.md)で確認した計画内の隔離 executor から使う。調査用 scratch での解決と固定した更新前グラフの基準環境再現は [準備手順](isolation.md#4-準備段階と対応できない工程) に従い、対象へ反映しない。解決・取得にコード評価がある場合も、初期化前からレビュー済みの隔離を適用する。
 
 ## 管理方法と現在の版を特定する
 
@@ -29,6 +29,8 @@
 
 候補は公式のサポート方針・変更点・対象OS/archでも確認する。PythonのPEP 440はSemVerの保証ではない。CalVer・epoch・独自形式は公開元の方針で分類し、上表の数字だけで安全としない。Ruby/Pythonの別実装を使う場合も、その実装の公式方針を確認する。未確認候補は導入せず保留する。
 
+ABI 別 wheel 等の同版配布物へ切り替える場合は、版上昇と分け、実配布物を識別する正確な `source` の変更として候補に記録し、新旧配布物の差分・hash・公開日・出所・監査・互換性をすべて確認する。minor では同版・同じ取得元の metadata だけの変更を拒否する。互換性不明なら一括更新に含めず個別移行へ回し、major では一件の移行境界と互換性を精査する。
+
 ## Ruby・Bundler
 
 - Rubyの公式配布物をrelease記事のchecksumと照合する。Ruby指定、`Gemfile` のruby条件、`RUBY VERSION`、`BUNDLED WITH`、Rails等の要求範囲を突き合わせる。標準添付／bundled gem、OpenSSL、native extension、lockfileのplatformも確認する。
@@ -44,7 +46,7 @@
 - npmは候補用manifestと対応版の `npm install --package-lock-only --ignore-scripts --no-audit --no-fund` 等で解決し、全依存差分を読む。個別更新では対象と不可欠な関連依存だけを変える。解決結果が保留版を含むなら導入元も保留し、lockfile削除や `npm audit fix --force` で解消しない。
 - 取得済み依存は実行前に配布物を調べ、対応する `npm audit signatures` を署名／attestationの補助検証に使う。最終導入は確認済みlockfileの `npm ci --ignore-scripts` と専用cache等を使い、必要なscriptだけ内容確認後に隔離で動かす。`npm test`／`npm run` 本体もコード実行である。
 - pnpmの `ignoreScripts` だけではpnpmfileを止めない。Yarnの `yarnPath`／pluginsは起動時から影響し、`enableScripts: false` だけではworkspaceのscript抑止が不十分な場合がある。hook抑止・build許可・lockfile-only・frozen/immutable・skip-buildは導入版に合う方法を選び、全件build許可で通さない。
-- `packageManager` 等による管理ツールの取得・版切替も供給網確認に含める。Corepack経由でも未検査の版を即実行しない。既存のauditでprivate名の送信先と間接依存の範囲を確認する。
+- `packageManager` 等による管理ツールの取得・版切替も供給網確認に含める。Corepack経由でも未検査の版を即実行しない。既存のauditでprivate名の送信先と間接依存の範囲を確認する。通常の `npm audit` は [対象コードを実行しない監査照会](isolation.md#5-対象コードを実行しない監査照会) の条件を満たす場合に取得用プロセスで行える。`audit fix` は導入処理を含むため監査照会に使わない。
 - [Node配布物の検証](https://github.com/nodejs/node/blob/main/README.md#verifying-binaries)、[npm install](https://github.com/npm/cli/blob/latest/docs/lib/content/commands/npm-install.md)、[npm ci](https://github.com/npm/cli/blob/latest/docs/lib/content/commands/npm-ci.md)、[pnpm build設定](https://pnpm.io/settings/build)、[Yarn設定](https://yarnpkg.com/configuration/yarnrc)、[Corepack](https://github.com/nodejs/corepack#environment-variables)
 
 ## Python・uv／pip／Poetry等
@@ -53,12 +55,12 @@
 - uv／Poetry等のlockがあれば、対応版の同期・整合確認機能を使い、uvの `--locked` と整合確認を省く `--frozen` を混同しない。platform・Python版・marker・extras/groups別の解決範囲とbuild依存を調べ、固定できていない部分を記録する。Pipenv等の既存方式でも同じ基準を満たす公式手順を使う。
 - pipのrequirements方式では、全依存の正確な版・取得元・対象環境・検査済み配布物hashを記録し、対応する `--require-hashes` 等で再照合する。lockfileの存在を必須にせず、単なるインストール済み版一覧を出所と全対象環境の再現性の証明にしない。
 - metadata取得・download／解決でもbuild backend・`setup.py`・pluginが動き得る。`venv` やbuild isolationはセキュリティ境界ではなく、`--no-build` 等ですべてのbackend実行が止まるとも仮定しない。wheelの `.pth`、`sitecustomize`、`usercustomize` 等の起動時コードも調べる。wheelがなければsource buildとbuild依存をレビューして隔離し、保護を勝手に外さない。
-- index設定と依存ごとの出所を確認する。private/publicを併用、特に `--extra-index-url` を使う構成では、内部依存の同名packageを公開元から採用していないか調べる。uv等のPython自動取得も事前確認し、既存の `pip-audit` 等は依存解決を含めて隔離する。
+- index設定と依存ごとの出所を確認する。private/publicを併用、特に `--extra-index-url` を使う構成では、内部依存の同名packageを公開元から採用していないか調べる。uv等のPython自動取得も事前確認し、既存の `pip-audit` 等でも依存解決・backend評価を伴う処理は隔離する。再解決やコード評価を伴わない照会だけを行える場合は [監査専用プロセスの条件](isolation.md#5-対象コードを実行しない監査照会) を確認する。
 - [Python互換性方針](https://peps.python.org/pep-0387/)、[PyPA versioning](https://packaging.python.org/en/latest/discussions/versioning/)、[pipの安全な導入](https://pip.pypa.io/en/stable/topics/secure-installs/)、[pip build system](https://pip.pypa.io/en/stable/reference/build-system/)、[pip index併用の注意](https://pip.pypa.io/en/stable/cli/pip_install/#examples)、[uvの同期](https://docs.astral.sh/uv/concepts/projects/sync/)、[Poetry CLI](https://python-poetry.org/docs/cli/)、[Python署名情報](https://www.python.org/downloads/metadata/pgp/)、[Python起動時処理](https://docs.python.org/3.13/library/site.html)
 
 ## テストと3言語の連携を確認する
 
-CI・README・既存設定から実際に使うコマンドを選ぶ。下表のツールを新規導入したり、存在しないコマンドを一律に実行したりしない。実行は共通の隔離条件を満たしてから行う。
+CI・README・既存設定から実際に使うコマンドを選ぶ。下表のツールを新規導入したり、存在しないコマンドを一律に実行したりしない。基準用は現在版・更新前グラフを照合して測り、最終採用用は導入・照合・全チェック・対象別の実操作を同じ worker 内で完了する。同梱 sandbox は終了時に環境を削除するため、[保存・反映契約](isolation.md#6-検証した差分を保存して対象へ反映する)に従い全差分・実行 bit・削除と証拠を保存し、`run` 後は元の初期状態を再照合して許可差分だけを反映する。後続検証のためにホストへ依存を導入しない。Web・DB 等が必要なら `init` 前に全工程を完遂できる既存 executor を選ぶ。実行は共通の隔離条件を満たしてから行う。
 
 | 系統 | 既存構成に応じて確認すること |
 | --- | --- |
