@@ -17,7 +17,7 @@ description: このリポジトリの Codex スキルの定義・呼び出し設
 
 - 対象が指定されていればその場所、なければ現在のプロジェクトの指示・README・実行設定・CI を静的に読み、利用スキルに必要な構成を確認する。対象未指定なら固有の前提は未確認とする。
 - 整備スキルは対象文書・実装と影響範囲の既存検証手段を確認する。`codebase-cleanup-workflow` は組み合わせる5スキルの定義と前提を確認し、一部だけ実行可能なら範囲を示す。
-- `minor-version-upgrade`・`major-version-upgrade` は静的確認で差分を反映する。両本体と `references/gate.md`・`verification.md` を読み、信頼済み Python 3.9 以降を絶対パス・`-I -S` で使え、公式情報・取得物・manifest/lockfile・全依存 inventory・根拠を確認できるか調べる。計画はモード指定不要、`execution` なし。`init` 直後に事前 `check` の機械検査結果を読み、6レビュー後に最終 `check` → `run` と進む手順を確認する。事前検査の unknown による非ゼロと、機械異常・結果未生成を区別できることを調べる。ゲートは対象コードを起動せず snapshot を保存する。
+- `minor-version-upgrade` は静的確認で互換更新の差分を反映する。本体と `references/gate.md`・`verification.md` を読み、信頼済み Python 3.9 以降を絶対パス・`-I -S` で使え、公式情報・取得物・manifest/lockfile・全依存 inventory・根拠を確認できるか調べる。計画はモード指定不要、`execution` なし。`init` 直後に事前 `check` の機械検査結果を読み、6レビュー後に最終 `check` → `run` と進む手順を確認する。事前検査の unknown による非ゼロと、機械異常・結果未生成を区別できることを調べる。ゲートは対象コードを起動せず snapshot を保存する。
 - 候補版と全新規配布物（image を含む）の最新の公式公開から7日以上を確認できることを調べる。7日未満・不明・未来は保留し、最新が新しすぎれば経過済みの適切な安定版を選ぶ。待機の短縮や override はなく、保留対象は再開可能日または不明の理由を報告できる手順を確認する。
 - Ruby/Bundler、Node/npm・pnpm・Yarn、Python/uv・pip・Poetry 等の採用方式・版を、版指定・manifest・lockfile・CI から特定する。wrapper・Gemfile/gemspec・backend・plugin を版確認のために実行せず、採用していないツールや方式変更を要求しない。混在構成・直接/間接/build/platform 等の範囲を確認し、他言語へ更新範囲を広げない。
 - 正しい候補と lockfile を対象コードの評価なしに作れるか確認する。`lockfile-only`・`dry-run`・`ignore-scripts` の名前だけで判断しない。解決・生成にコード評価が不可欠なら `references/isolation.md` の隔離が必要で、実行できない対象は条件付きとする。完成した候補の追加テストやブラウザの不足だけで更新全体を利用不可にしない。

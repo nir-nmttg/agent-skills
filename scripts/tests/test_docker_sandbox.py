@@ -26,7 +26,6 @@ from unittest import mock
 REPO = Path(__file__).resolve().parents[2]
 SKILLS = REPO / ".agents" / "skills"
 MINOR = "minor-version-upgrade"
-MAJOR = "major-version-upgrade"
 IMAGE = "docker.io/library/node@sha256:" + "a" * 64
 IMAGE_ID = "sha256:" + "b" * 64
 TEMP_ROOT = str(Path(tempfile.gettempdir()).resolve())
@@ -75,9 +74,9 @@ def probe_tar(**kwargs):
     return tar_bytes(probe_entries(**kwargs))
 
 
-def load_sandbox(skill=MINOR):
-    path = SKILLS / skill / "scripts" / "docker-sandbox.py"
-    spec = importlib.util.spec_from_file_location("docker_sandbox_" + skill.replace("-", "_"), path)
+def load_sandbox():
+    path = SKILLS / MINOR / "scripts" / "docker-sandbox.py"
+    spec = importlib.util.spec_from_file_location("docker_sandbox_minor", path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
@@ -173,14 +172,13 @@ class FakeDocker:
 
 
 class SandboxFixture:
-    def __init__(self, testcase, skill=MINOR):
+    def __init__(self, testcase):
         self.testcase = testcase
-        self.skill = skill
-        self.cli = SKILLS / skill / "scripts" / "docker-sandbox.py"
+        self.cli = SKILLS / MINOR / "scripts" / "docker-sandbox.py"
         self.temporary = tempfile.TemporaryDirectory(prefix="docker-sandbox-test-", dir=TEMP_ROOT)
         self.root = Path(self.temporary.name)
         self.docker = FakeDocker(self.root)
-        artifact_root = REPO / "artifacts" / skill
+        artifact_root = REPO / "artifacts" / MINOR
         artifact_root.mkdir(parents=True, exist_ok=True)
         self.run_temporary = tempfile.TemporaryDirectory(prefix="sandbox-test-", dir=str(artifact_root))
         self.run = Path(self.run_temporary.name)
@@ -252,43 +250,40 @@ class PreparationRejectionTests(unittest.TestCase):
         self.assertFalse(any(command[0] == "run" for command in fixture.docker.commands()))
 
     def test_writable_docker_cli_is_rejected_before_context_discovery(self):
-        for skill in (MINOR, MAJOR):
-            for mode in (0o720, 0o702):
-                with self.subTest(skill=skill, mode=oct(mode)):
-                    fixture = SandboxFixture(self, skill)
-                    fixture.docker.path.chmod(mode)
-                    result = fixture.prepare()
-                    self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
-                    self.assertEqual(fixture.docker.records(), [])
-                    self.assertFalse((fixture.run / "sandbox" / "executor").exists())
+        for mode in (0o720, 0o702):
+            with self.subTest(mode=oct(mode)):
+                fixture = SandboxFixture(self)
+                fixture.docker.path.chmod(mode)
+                result = fixture.prepare()
+                self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertEqual(fixture.docker.records(), [])
+                self.assertFalse((fixture.run / "sandbox" / "executor").exists())
         self.assertFalse((fixture.run / "sandbox" / "executor").exists())
 
 
 class PreparationTests(unittest.TestCase):
-    def test_prepare_creates_optional_executor_config_and_probe_evidence_for_both_skills(self):
-        for skill in (MINOR, MAJOR):
-            with self.subTest(skill=skill):
-                fixture = SandboxFixture(self, skill)
-                prepared = fixture.prepare()
-                fixture.assert_ok(prepared)
-                result = json.loads(prepared.stdout)
-                config = json.loads((fixture.run / "sandbox/config.json").read_text())
-                evidence = json.loads((fixture.run / "evidence/isolation-setup.json").read_text())
-                self.assertEqual(config["image"], IMAGE)
-                self.assertEqual(config["image_id"], IMAGE_ID)
-                self.assertNotIn(str(fixture.run), json.dumps(config))
-                self.assertEqual(result["status"], "prepared")
-                self.assertEqual(result["config"], str(fixture.run / "sandbox/config.json"))
-                self.assertEqual(result["evidence"], str(fixture.run / "evidence/isolation-setup.json"))
-                executor = Path(result["executor"])
-                self.assertEqual(executor, fixture.run / "sandbox/executor")
-                self.assertTrue(executor.is_file())
-                self.assertTrue(os.access(executor, os.X_OK))
-                self.assertEqual(executor, executor.resolve())
-                self.assertNotIn("execution", result)
-                self.assertFalse((fixture.run / "sandbox/execution.json").exists())
-                self.assertTrue(evidence)
-                self.assertFalse((fixture.run / "gate-state.json").exists())
+    def test_prepare_creates_optional_executor_config_and_probe_evidence(self):
+        fixture = SandboxFixture(self)
+        prepared = fixture.prepare()
+        fixture.assert_ok(prepared)
+        result = json.loads(prepared.stdout)
+        config = json.loads((fixture.run / "sandbox/config.json").read_text())
+        evidence = json.loads((fixture.run / "evidence/isolation-setup.json").read_text())
+        self.assertEqual(config["image"], IMAGE)
+        self.assertEqual(config["image_id"], IMAGE_ID)
+        self.assertNotIn(str(fixture.run), json.dumps(config))
+        self.assertEqual(result["status"], "prepared")
+        self.assertEqual(result["config"], str(fixture.run / "sandbox/config.json"))
+        self.assertEqual(result["evidence"], str(fixture.run / "evidence/isolation-setup.json"))
+        executor = Path(result["executor"])
+        self.assertEqual(executor, fixture.run / "sandbox/executor")
+        self.assertTrue(executor.is_file())
+        self.assertTrue(os.access(executor, os.X_OK))
+        self.assertEqual(executor, executor.resolve())
+        self.assertNotIn("execution", result)
+        self.assertFalse((fixture.run / "sandbox/execution.json").exists())
+        self.assertTrue(evidence)
+        self.assertFalse((fixture.run / "gate-state.json").exists())
 
 
     def test_prepare_does_not_forward_parent_credentials_to_docker(self):
@@ -301,45 +296,43 @@ class PreparationTests(unittest.TestCase):
             self.assertNotIn("sentinel-private-value", json.dumps(record))
 
     def test_default_docker_discovery_ignores_a_parent_path_wrapper(self):
-        for skill in (MINOR, MAJOR):
-            with self.subTest(skill=skill):
-                fixture = SandboxFixture(self, skill)
-                sandbox = load_sandbox(skill)
-                trusted_bin = fixture.root / "reviewed-tools"
-                trusted_bin.mkdir()
-                trusted_docker = trusted_bin / "docker"
-                shutil.copyfile(fixture.docker.path, trusted_docker)
-                trusted_docker.chmod(0o700)
-                untrusted_bin = fixture.root / "project" / "bin"
-                untrusted_bin.mkdir(parents=True)
-                wrapper = untrusted_bin / "docker"
-                wrapper_marker = fixture.root / "wrapper-ran"
-                wrapper.write_text(
-                    "#!" + sys.executable + " -IS\nfrom pathlib import Path\nPath("
-                    + repr(str(wrapper_marker)) + ").write_text('unexpected wrapper execution')\n"
-                    "raise SystemExit(91)\n", encoding="utf-8")
-                wrapper.chmod(0o700)
-                args = argparse.Namespace(run=str(fixture.run), image=IMAGE, worker=fixture.worker_name,
-                                          docker=None, context="fixture-context", no_pull=True)
-                actual_run = sandbox.run_bounded
-                invoked_executables = []
+        fixture = SandboxFixture(self)
+        sandbox = load_sandbox()
+        trusted_bin = fixture.root / "reviewed-tools"
+        trusted_bin.mkdir()
+        trusted_docker = trusted_bin / "docker"
+        shutil.copyfile(fixture.docker.path, trusted_docker)
+        trusted_docker.chmod(0o700)
+        untrusted_bin = fixture.root / "project" / "bin"
+        untrusted_bin.mkdir(parents=True)
+        wrapper = untrusted_bin / "docker"
+        wrapper_marker = fixture.root / "wrapper-ran"
+        wrapper.write_text(
+            "#!" + sys.executable + " -IS\nfrom pathlib import Path\nPath("
+            + repr(str(wrapper_marker)) + ").write_text('unexpected wrapper execution')\n"
+            "raise SystemExit(91)\n", encoding="utf-8")
+        wrapper.chmod(0o700)
+        args = argparse.Namespace(run=str(fixture.run), image=IMAGE, worker=fixture.worker_name,
+                                  docker=None, context="fixture-context", no_pull=True)
+        actual_run = sandbox.run_bounded
+        invoked_executables = []
 
-                def run_only_fixture(argv, *arguments, **kwargs):
-                    # 回帰時にも、このマシンの本物Dockerを起動させない。
-                    self.assertIn(argv[0], (str(trusted_docker), str(wrapper)))
-                    invoked_executables.append(argv[0])
-                    return actual_run(argv, *arguments, **kwargs)
+        def run_only_fixture(argv, *arguments, **kwargs):
+            # 回帰時にも、このマシンの本物Dockerを起動させない。
+            self.assertIn(argv[0], (str(trusted_docker), str(wrapper)))
+            invoked_executables.append(argv[0])
+            return actual_run(argv, *arguments, **kwargs)
 
-                with mock.patch.object(sandbox, "DOCKER_DISCOVERY_PATH", str(trusted_bin)), \
-                        mock.patch.dict(os.environ, {"PATH": str(untrusted_bin)}), \
-                        mock.patch.object(sandbox, "run_bounded", side_effect=run_only_fixture), \
-                        mock.patch("sys.stdout", new=io.StringIO()):
-                    self.assertEqual(sandbox.prepare(args), 0)
-                config = json.loads((fixture.run / "sandbox" / "config.json").read_text())
-                self.assertEqual(config["docker"], str(trusted_docker))
-                self.assertTrue(invoked_executables)
-                self.assertEqual(set(invoked_executables), {str(trusted_docker)})
-                self.assertFalse(wrapper_marker.exists())
+        with mock.patch.object(sandbox, "DOCKER_DISCOVERY_PATH", str(trusted_bin)), \
+                mock.patch.dict(os.environ, {"PATH": str(untrusted_bin)}), \
+                mock.patch.object(sandbox, "run_bounded", side_effect=run_only_fixture), \
+                mock.patch("sys.stdout", new=io.StringIO()):
+            self.assertEqual(sandbox.prepare(args), 0)
+        config = json.loads((fixture.run / "sandbox" / "config.json").read_text())
+        self.assertEqual(config["docker"], str(trusted_docker))
+        self.assertTrue(invoked_executables)
+        self.assertEqual(set(invoked_executables), {str(trusted_docker)})
+        self.assertFalse(wrapper_marker.exists())
 
     def test_prepare_pulls_only_digest_when_missing(self):
         fixture = SandboxFixture(self)
@@ -350,14 +343,12 @@ class PreparationTests(unittest.TestCase):
         self.assertEqual(pulls, [["pull", IMAGE]])
 
     def test_familiar_docker_hub_digest_works_during_prepare_and_execute(self):
-        for skill in (MINOR, MAJOR):
-            with self.subTest(skill=skill):
-                fixture = SandboxFixture(self, skill)
-                fixture.docker.config["repo_digests"] = ["node@sha256:" + "a" * 64]
-                fixture.docker.flush()
-                fixture.ready()
-                fixture.assert_ok(fixture.execute())
-                self.assertTrue(any(command[0] == "run" for command in fixture.docker.commands()))
+        fixture = SandboxFixture(self)
+        fixture.docker.config["repo_digests"] = ["node@sha256:" + "a" * 64]
+        fixture.docker.flush()
+        fixture.ready()
+        fixture.assert_ok(fixture.execute())
+        self.assertTrue(any(command[0] == "run" for command in fixture.docker.commands()))
 
     def test_failed_probe_does_not_publish_an_executor(self):
         fixture = SandboxFixture(self)
@@ -387,12 +378,11 @@ class ImageReferenceTests(unittest.TestCase):
                  ("index.docker.io/library/node", "docker.io/library/node"),
                  ("docker.io/acme/widget", "acme/widget"),
                  ("docker.io/library/node:24", "node"))
-        for skill in (MINOR, MAJOR):
-            sandbox = load_sandbox(skill)
-            for requested, recorded in pairs:
-                with self.subTest(skill=skill, requested=requested, recorded=recorded):
-                    self.assertEqual(self.inspect(sandbox, requested + digest, recorded + digest),
-                                     (IMAGE_ID, []))
+        sandbox = load_sandbox()
+        for requested, recorded in pairs:
+            with self.subTest(requested=requested, recorded=recorded):
+                self.assertEqual(self.inspect(sandbox, requested + digest, recorded + digest),
+                                 (IMAGE_ID, []))
 
     def test_same_digest_cannot_substitute_another_registry_or_repository(self):
         digest = "@sha256:" + "a" * 64
@@ -402,18 +392,17 @@ class ImageReferenceTests(unittest.TestCase):
                  ("docker.io/library/node", "ruby"),
                  ("ghcr.io/library/node", "node"),
                  ("ghcr.io/acme/widget", "acme/widget"))
-        for skill in (MINOR, MAJOR):
-            sandbox = load_sandbox(skill)
-            for requested, recorded in pairs:
-                with self.subTest(skill=skill, requested=requested, recorded=recorded):
-                    with self.assertRaises(sandbox.SandboxError):
-                        self.inspect(sandbox, requested + digest, recorded + digest)
-            with self.subTest(skill=skill, mismatch="digest"):
+        sandbox = load_sandbox()
+        for requested, recorded in pairs:
+            with self.subTest(requested=requested, recorded=recorded):
                 with self.assertRaises(sandbox.SandboxError):
-                    self.inspect(sandbox, IMAGE, "node@sha256:" + "c" * 64)
-            with self.subTest(skill=skill, match="non-Docker-Hub registry"):
-                reference = "ghcr.io/acme/widget" + digest
-                self.assertEqual(self.inspect(sandbox, reference, reference), (IMAGE_ID, []))
+                    self.inspect(sandbox, requested + digest, recorded + digest)
+        with self.subTest(mismatch="digest"):
+            with self.assertRaises(sandbox.SandboxError):
+                self.inspect(sandbox, IMAGE, "node@sha256:" + "c" * 64)
+        with self.subTest(match="non-Docker-Hub registry"):
+            reference = "ghcr.io/acme/widget" + digest
+            self.assertEqual(self.inspect(sandbox, reference, reference), (IMAGE_ID, []))
 
 
 class OutputExtractionTests(unittest.TestCase):
@@ -719,27 +708,26 @@ class BootstrapWorkerTests(unittest.TestCase):
     def test_worker_stops_before_later_success_can_mask_a_failure(self):
         # bootstrap全体やDockerは動かさず、実際のworker起動argvだけを使って
         # 自作の無害なshell fixtureで失敗伝播を検証する。
-        for skill in (MINOR, MAJOR):
-            sandbox = load_sandbox(skill)
-            line = next(line for line in sandbox.BOOTSTRAP.splitlines() if "/worker >" in line)
-            tokens = shlex.split(line)
-            worker_index = tokens.index("/worker")
-            self.assertEqual(tokens[0], "/bin/sh")
-            for failure in ("false", ': "$UNSET_FIXTURE_VALUE"'):
-                with self.subTest(skill=skill, failure=failure), tempfile.TemporaryDirectory(
-                        prefix="sandbox-worker-test-", dir=TEMP_ROOT) as temporary:
-                    root = Path(temporary)
-                    worker = root / "worker.sh"
-                    worker.write_text("printf 'started\\n'\n" + failure
-                                      + '\nprintf "continued\\n" > "$OUTPUT/continued"\n', encoding="utf-8")
-                    result = subprocess.run(
-                        tokens[:worker_index] + [str(worker)], cwd=str(root),
-                        env={"PATH": "/usr/bin:/bin", "LANG": "C.UTF-8", "OUTPUT": str(root)},
-                        stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=5, check=False,
-                    )
-                    self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
-                    self.assertEqual(result.stdout, b"started\n")
-                    self.assertFalse((root / "continued").exists())
+        sandbox = load_sandbox()
+        line = next(line for line in sandbox.BOOTSTRAP.splitlines() if "/worker >" in line)
+        tokens = shlex.split(line)
+        worker_index = tokens.index("/worker")
+        self.assertEqual(tokens[0], "/bin/sh")
+        for failure in ("false", ': "$UNSET_FIXTURE_VALUE"'):
+            with self.subTest(failure=failure), tempfile.TemporaryDirectory(
+                    prefix="sandbox-worker-test-", dir=TEMP_ROOT) as temporary:
+                root = Path(temporary)
+                worker = root / "worker.sh"
+                worker.write_text("printf 'started\\n'\n" + failure
+                                  + '\nprintf "continued\\n" > "$OUTPUT/continued"\n', encoding="utf-8")
+                result = subprocess.run(
+                    tokens[:worker_index] + [str(worker)], cwd=str(root),
+                    env={"PATH": "/usr/bin:/bin", "LANG": "C.UTF-8", "OUTPUT": str(root)},
+                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=5, check=False,
+                )
+                self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertEqual(result.stdout, b"started\n")
+                self.assertFalse((root / "continued").exists())
 
 
 class GateIntegrationTests(unittest.TestCase):
@@ -748,31 +736,29 @@ class GateIntegrationTests(unittest.TestCase):
             "gate_fixture_for_docker_sandbox", Path(__file__).with_name("test_supply_chain_gate.py"))
         gate_tests = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(gate_tests)
-        for skill in (MINOR, MAJOR):
-            with self.subTest(skill=skill):
-                sandbox = SandboxFixture(self, skill)
-                sandbox.ready()
-                gate = gate_tests.Fixture(self, skill)
-                self.addCleanup(gate.close)
-                gate.ready()
-                gate.require_ok(gate.command("run"))
-                self.assertEqual(sandbox.docker.commands(), [])
-                report = json.loads((gate.run_dir / "execution-output/static-result.json").read_text())
-                self.assertFalse(report["runtime_verified"])
-                snapshot = gate.run_dir / report["candidate_snapshot"]
-                result = sandbox.command(
-                    "execute", "--config", sandbox.run / "sandbox/config.json",
-                    "--candidate", snapshot, "--worker", sandbox.worker, "--output", sandbox.output)
-                sandbox.assert_ok(result)
-                self.assertEqual((sandbox.output / "result.txt").read_text(), "fixture result\n")
-                self.assertFalse(gate.marker.exists())
-                commands = sandbox.docker.commands()
-                run = next(command for command in commands if command[0] == "run")
-                mounts = [run[index + 1] for index, item in enumerate(run) if item == "--mount"]
-                self.assertTrue(any(str(snapshot) in mount for mount in mounts))
-                self.assertFalse(any(str(gate.candidate) in mount or str(gate.project) in mount for mount in mounts))
-                self.assertFalse(any(str(gate.run_dir) + "," in mount for mount in mounts))
-                self.assertNotEqual(gate.command("run").returncode, 0)
+        sandbox = SandboxFixture(self)
+        sandbox.ready()
+        gate = gate_tests.Fixture(self)
+        self.addCleanup(gate.close)
+        gate.ready()
+        gate.require_ok(gate.command("run"))
+        self.assertEqual(sandbox.docker.commands(), [])
+        report = json.loads((gate.run_dir / "execution-output/static-result.json").read_text())
+        self.assertFalse(report["runtime_verified"])
+        snapshot = gate.run_dir / report["candidate_snapshot"]
+        result = sandbox.command(
+            "execute", "--config", sandbox.run / "sandbox/config.json",
+            "--candidate", snapshot, "--worker", sandbox.worker, "--output", sandbox.output)
+        sandbox.assert_ok(result)
+        self.assertEqual((sandbox.output / "result.txt").read_text(), "fixture result\n")
+        self.assertFalse(gate.marker.exists())
+        commands = sandbox.docker.commands()
+        run = next(command for command in commands if command[0] == "run")
+        mounts = [run[index + 1] for index, item in enumerate(run) if item == "--mount"]
+        self.assertTrue(any(str(snapshot) in mount for mount in mounts))
+        self.assertFalse(any(str(gate.candidate) in mount or str(gate.project) in mount for mount in mounts))
+        self.assertFalse(any(str(gate.run_dir) + "," in mount for mount in mounts))
+        self.assertNotEqual(gate.command("run").returncode, 0)
 
 
 

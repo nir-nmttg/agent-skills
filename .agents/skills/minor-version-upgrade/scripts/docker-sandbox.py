@@ -550,7 +550,7 @@ def prepare(args):
     run = real_directory(args.run, private=True)
     script_dir = Path(__file__).resolve().parent
     skill_name = script_dir.parent.name
-    require(skill_name in ("minor-version-upgrade", "major-version-upgrade"),
+    require(skill_name == "minor-version-upgrade",
             "prepareはスキル本体のscripts/docker-sandbox.pyから実行してください。")
     artifact_root = script_dir.parents[3] / "artifacts" / skill_name
     require(artifact_root == artifact_root.resolve() and artifact_root in run.parents,

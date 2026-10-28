@@ -28,7 +28,6 @@ import zipfile
 REPO = Path(__file__).resolve().parents[2]
 SKILLS = REPO / ".agents" / "skills"
 MINOR = "minor-version-upgrade"
-MAJOR = "major-version-upgrade"
 TEMP_ROOT = str(Path(tempfile.gettempdir()).resolve())
 REVIEWS = ("coverage", "sources", "artifacts", "advisories", "authenticity", "compatibility")
 STATIC_REVIEWS = REVIEWS
@@ -150,10 +149,9 @@ def bundler_report():
 class Fixture:
     """実際の CLI の入出力を使い、production の判定関数は呼び出さない。"""
 
-    def __init__(self, testcase, skill=MINOR):
+    def __init__(self, testcase):
         self.testcase = testcase
-        self.skill = skill
-        self.cli = SKILLS / skill / "scripts" / "supply-chain.py"
+        self.cli = SKILLS / MINOR / "scripts" / "supply-chain.py"
         self.temporary = tempfile.TemporaryDirectory(prefix="supply-gate-test-", dir=TEMP_ROOT)
         self.root = Path(self.temporary.name)
         self.project = self.root / "project"
@@ -164,7 +162,7 @@ class Fixture:
             self.json(root / "app" / "package-lock.json", {"lockfileVersion": 3, "fixture": version})
             (root / "app" / "index.js").write_text("module.exports = 1;\n", encoding="utf-8")
         # 実行記録の保存先制約も実際のCLIで検証する。
-        artifact_root = REPO / "artifacts" / skill
+        artifact_root = REPO / "artifacts" / MINOR
         artifact_root.mkdir(parents=True, exist_ok=True)
         self.run_temporary = tempfile.TemporaryDirectory(prefix="gate-test-", dir=str(artifact_root))
         self.run_dir = Path(self.run_temporary.name)
@@ -279,48 +277,46 @@ class Fixture:
 
 class GateTests(unittest.TestCase):
     @contextmanager
-    def fixture(self, skill=MINOR):
-        fixture = Fixture(self, skill)
+    def fixture(self):
+        fixture = Fixture(self)
         try:
             yield fixture
         finally:
             fixture.close()
 
     def test_approved_plan_exports_snapshot_once_and_check_never_executes(self):
-        for skill in (MINOR, MAJOR):
-            with self.subTest(skill=skill), self.fixture(skill) as f:
-                f.ready()
-                f.require_ok(f.command("check"))
-                self.assertFalse(f.marker.exists())
-                result = f.require_ok(f.command("run"))
-                self.assertEqual(json.loads(result.stdout)["status"], "static_ready")
-                report = json.loads((f.run_dir / "execution-output/static-result.json").read_text())
-                self.assertFalse(report["runtime_verified"])
-                self.assertEqual((f.run_dir / report["candidate_snapshot"] / "app/index.js").read_bytes(),
-                                 (f.candidate / "app/index.js").read_bytes())
-                self.assertEqual(f.invocations(), [])
-                self.assertEqual(f.state()["execution_status"], "succeeded")
-                self.assertEqual(f.state()["exit_code"], 0)
-                self.assertNotEqual(f.command("run").returncode, 0)
-                self.assertNotEqual(f.command("check").returncode, 0)
+        with self.fixture() as f:
+            f.ready()
+            f.require_ok(f.command("check"))
+            self.assertFalse(f.marker.exists())
+            result = f.require_ok(f.command("run"))
+            self.assertEqual(json.loads(result.stdout)["status"], "static_ready")
+            report = json.loads((f.run_dir / "execution-output/static-result.json").read_text())
+            self.assertFalse(report["runtime_verified"])
+            self.assertEqual((f.run_dir / report["candidate_snapshot"] / "app/index.js").read_bytes(),
+                             (f.candidate / "app/index.js").read_bytes())
+            self.assertEqual(f.invocations(), [])
+            self.assertEqual(f.state()["execution_status"], "succeeded")
+            self.assertEqual(f.state()["exit_code"], 0)
+            self.assertNotEqual(f.command("run").returncode, 0)
+            self.assertNotEqual(f.command("check").returncode, 0)
 
 
     def test_legacy_execution_configuration_is_rejected_before_any_launch(self):
-        for skill in (MINOR, MAJOR):
-            for mutation in ("empty", "host-interpreter", "complete-legacy", "explicit-strict"):
-                with self.subTest(skill=skill, mutation=mutation), self.fixture(skill) as f:
-                    configuration = {"argv": [str(f.launcher), "{output}/invocations.jsonl", "approved-argument", "0"],
-                                     "config": "isolation.json", "inputs": [], "mechanism": "os-sandbox"}
-                    if mutation == "empty":
-                        configuration = {}
-                    elif mutation == "host-interpreter":
-                        configuration["argv"][0] = "/usr/bin/python3"
-                    elif mutation == "explicit-strict":
-                        f.plan["verification_mode"] = "strict"
-                    f.plan["execution"] = configuration
-                    f.flush()
-                    self.assertNotEqual(f.init().returncode, 0)
-                    self.assertFalse(f.marker.exists())
+        for mutation in ("empty", "host-interpreter", "complete-legacy", "explicit-strict"):
+            with self.subTest(mutation=mutation), self.fixture() as f:
+                configuration = {"argv": [str(f.launcher), "{output}/invocations.jsonl", "approved-argument", "0"],
+                                 "config": "isolation.json", "inputs": [], "mechanism": "os-sandbox"}
+                if mutation == "empty":
+                    configuration = {}
+                elif mutation == "host-interpreter":
+                    configuration["argv"][0] = "/usr/bin/python3"
+                elif mutation == "explicit-strict":
+                    f.plan["verification_mode"] = "strict"
+                f.plan["execution"] = configuration
+                f.flush()
+                self.assertNotEqual(f.init().returncode, 0)
+                self.assertFalse(f.marker.exists())
 
 
 
@@ -620,20 +616,20 @@ class GateTests(unittest.TestCase):
                 else:
                     f.blocked()
 
-    def image_runtime(self, f, ecosystem="python", before="3.12.10", after="3.13.5"):
+    def image_runtime(self, f, ecosystem="python", before="3.12.10", after="3.12.11"):
         """image参照の静的な結合だけを検証し、Dockerを使わない。"""
         f.runtime(ecosystem, before, after)
         reference = "docker.io/library/" + ecosystem + "@sha256:" + "a" * 64
         image_id = "sha256:" + "b" * 64
         f.inventory["before"][0]["source"] = "docker.io/library/" + ecosystem + "@sha256:" + "c" * 64
         f.inventory["after"][0]["source"] = reference
-        f.plan["candidates"][0].update(compatibility="migration", artifacts=[],
+        f.plan["candidates"][0].update(compatibility="compatible", artifacts=[],
                                       runtime_image={"reference": reference, "image_id": image_id})
         f.flush()
 
     def test_image_runtime_candidate_binds_declared_source_and_version_without_execution(self):
-        for ecosystem, before, after in (("ruby", "3.3.7", "4.0.0"), ("python", "3.12.10", "3.13.5")):
-            with self.subTest(ecosystem=ecosystem), self.fixture(MAJOR) as f:
+        for ecosystem, before, after in (("ruby", "3.3.7", "3.3.8"), ("python", "3.12.10", "3.12.11")):
+            with self.subTest(ecosystem=ecosystem), self.fixture() as f:
                 self.image_runtime(f, ecosystem, before, after)
                 f.require_ok(f.init())
                 f.approve()
@@ -651,9 +647,9 @@ class GateTests(unittest.TestCase):
 
     def test_empty_artifacts_require_an_image_backed_runtime(self):
         for kind in ("direct", "transitive", "build", "archive-runtime"):
-            with self.subTest(kind=kind), self.fixture(MAJOR) as f:
+            with self.subTest(kind=kind), self.fixture() as f:
                 if kind == "archive-runtime":
-                    f.runtime("python", "3.12.10", "3.13.5")
+                    f.runtime("python", "3.12.10", "3.12.11")
                 else:
                     f.inventory["after"][0]["kind"] = kind
                 f.plan["candidates"][0]["artifacts"] = []
@@ -661,7 +657,7 @@ class GateTests(unittest.TestCase):
                 self.assertNotEqual(f.init().returncode, 0)
                 self.assertFalse(f.marker.exists())
         for kind in ("direct", "transitive", "build"):
-            with self.subTest(image_kind=kind), self.fixture(MAJOR) as f:
+            with self.subTest(image_kind=kind), self.fixture() as f:
                 self.image_runtime(f)
                 f.inventory["after"][0]["kind"] = kind
                 f.json(f.run_dir / "inventory.json", f.inventory)
@@ -675,7 +671,7 @@ class GateTests(unittest.TestCase):
                    "docker.io/other/python@sha256:" + "a" * 64,
                    "python@sha256:short")
         for reference in invalid:
-            with self.subTest(reference=reference), self.fixture(MAJOR) as f:
+            with self.subTest(reference=reference), self.fixture() as f:
                 self.image_runtime(f)
                 f.plan["candidates"][0]["runtime_image"]["reference"] = reference
                 f.json(f.run_dir / "plan.json", f.plan)
@@ -684,7 +680,7 @@ class GateTests(unittest.TestCase):
 
     def test_runtime_image_rejects_malformed_id_unknown_fields_and_duplicate_keys(self):
         for mutation in ("candidate-id", "extra-field", "duplicate-json"):
-            with self.subTest(mutation=mutation), self.fixture(MAJOR) as f:
+            with self.subTest(mutation=mutation), self.fixture() as f:
                 self.image_runtime(f)
                 image = f.plan["candidates"][0]["runtime_image"]
                 if mutation == "candidate-id":
@@ -702,21 +698,22 @@ class GateTests(unittest.TestCase):
 
     def test_runtime_image_keeps_release_review_and_minor_series_gates(self):
         for mutation in ("young", "unknown", "review", "minor-series"):
-            with self.subTest(mutation=mutation), self.fixture(MINOR if mutation == "minor-series" else MAJOR) as f:
+            with self.subTest(mutation=mutation), self.fixture() as f:
                 self.image_runtime(f)
                 if mutation == "young":
                     f.plan["candidates"][0]["published_at"] = timestamp(-timedelta(days=1))
                 elif mutation == "unknown":
                     f.plan["candidates"][0]["compatibility"] = "unknown"
                 elif mutation == "minor-series":
-                    f.plan["candidates"][0]["compatibility"] = "compatible"
+                    f.inventory["after"][0]["version"] = "3.13.5"
+                    f.json(f.run_dir / "inventory.json", f.inventory)
                 f.json(f.run_dir / "plan.json", f.plan)
                 f.require_ok(f.init())
                 f.approve(except_checks=("sources",) if mutation == "review" else ())
                 f.blocked()
 
     def test_runtime_image_can_bind_an_unchanged_native_dependency_source(self):
-        with self.fixture(MAJOR) as f:
+        with self.fixture() as f:
             self.image_runtime(f)
             native = f.package("1.0.0", "python", "direct", "native-demo")
             f.inventory["before"].append(dict(native))
@@ -737,49 +734,47 @@ class GateTests(unittest.TestCase):
             f.require_ok(f.command("run"))
 
     def test_runtime_image_lists_manual_audits_for_unchanged_after_dependencies(self):
-        for skill in (MINOR, MAJOR):
-            for ecosystem, kind in (("ruby", "direct"), ("node", "transitive"), ("python", "build")):
-                with self.subTest(skill=skill, ecosystem=ecosystem, kind=kind), self.fixture(skill) as f:
-                    self.image_runtime(f, before="3.12.5", after="3.12.6")
-                    f.plan["candidates"][0]["compatibility"] = "compatible"
-                    existing = f.package("1.0.0", ecosystem, kind, "existing")
-                    existing["component"] = "worker"
-                    f.inventory["before"].append(dict(existing))
-                    f.inventory["after"].append(dict(existing))
-                    f.ready()
-                    f.require_ok(f.command("check"))
-                    report = json.loads((f.run_dir / "automated-checks.json").read_text())
-                    self.assertEqual(report["manual_advisory_components"],
-                                     [{"ecosystem": ecosystem, "component": "worker"}])
-                    self.assertFalse(f.marker.exists())
+        for ecosystem, kind in (("ruby", "direct"), ("node", "transitive"), ("python", "build")):
+            with self.subTest(ecosystem=ecosystem, kind=kind), self.fixture() as f:
+                self.image_runtime(f, before="3.12.5", after="3.12.6")
+                f.plan["candidates"][0]["compatibility"] = "compatible"
+                existing = f.package("1.0.0", ecosystem, kind, "existing")
+                existing["component"] = "worker"
+                f.inventory["before"].append(dict(existing))
+                f.inventory["after"].append(dict(existing))
+                f.ready()
+                f.require_ok(f.command("check"))
+                report = json.loads((f.run_dir / "automated-checks.json").read_text())
+                self.assertEqual(report["manual_advisory_components"],
+                                 [{"ecosystem": ecosystem, "component": "worker"}])
+                self.assertFalse(f.marker.exists())
 
 
     def test_python_audit_covers_all_after_dependencies_and_excludes_removed(self):
-        for skill in (MINOR, MAJOR):
-            for mutation in ("complete", "missing", "wrong-version"):
-                with self.subTest(skill=skill, mutation=mutation), self.fixture(skill) as f:
-                    self.image_runtime(f, before="3.12.5", after="3.12.6")
-                    f.plan["candidates"][0]["compatibility"] = "compatible"
-                    for name, kind in (("native.demo", "direct"), ("support", "transitive")):
-                        existing = f.package("1.0.0", "python", kind, name)
-                        f.inventory["before"].append(dict(existing))
-                        f.inventory["after"].append(dict(existing))
-                    f.inventory["before"].append(f.package("0.9.0", "python", "build", "removed"))
-                    f.plan["audits"] = [{"ecosystem": "python", "component": "app", "format": "pip-audit",
-                                         "path": "audit.json", "exit_code": 0, "checked_at": timestamp()}]
-                    report = pip_report("native-demo", "1.0.0")
-                    if mutation != "missing":
-                        report["dependencies"].append({"name": "support", "version": "0.9.0" if mutation == "wrong-version" else "1.0.0", "vulns": []})
-                    f.json(f.run_dir / "inventory.json", f.inventory)
-                    f.json(f.run_dir / "plan.json", f.plan)
-                    f.json(f.run_dir / "audit.json", report)
-                    f.require_ok(f.init())
-                    f.approve()
-                    if mutation == "complete":
-                        f.require_ok(f.command("run"))
-                        self.assertEqual(f.invocations(), [])
-                    else:
-                        f.blocked()
+        for mutation in ("complete", "missing", "wrong-version"):
+            with self.subTest(mutation=mutation), self.fixture() as f:
+                self.image_runtime(f, before="3.12.5", after="3.12.6")
+                f.plan["candidates"][0]["compatibility"] = "compatible"
+                for name, kind in (("native.demo", "direct"), ("support", "transitive")):
+                    existing = f.package("1.0.0", "python", kind, name)
+                    f.inventory["before"].append(dict(existing))
+                    f.inventory["after"].append(dict(existing))
+                f.inventory["before"].append(f.package("0.9.0", "python", "build", "removed"))
+                f.plan["audits"] = [{"ecosystem": "python", "component": "app", "format": "pip-audit",
+                                     "path": "audit.json", "exit_code": 0, "checked_at": timestamp()}]
+                report = pip_report("native-demo", "1.0.0")
+                if mutation != "missing":
+                    report["dependencies"].append({"name": "support", "version": "0.9.0" if mutation == "wrong-version" else "1.0.0", "vulns": []})
+                f.json(f.run_dir / "inventory.json", f.inventory)
+                f.json(f.run_dir / "plan.json", f.plan)
+                f.json(f.run_dir / "audit.json", report)
+                f.require_ok(f.init())
+                f.approve()
+                if mutation == "complete":
+                    f.require_ok(f.command("run"))
+                    self.assertEqual(f.invocations(), [])
+                else:
+                    f.blocked()
 
     def test_minor_runtime_patch_allows_reviewed_same_version_native_source_change(self):
         with self.fixture() as f:
@@ -849,25 +844,20 @@ class GateTests(unittest.TestCase):
                 f.ready()
                 f.blocked()
 
-    def test_major_migration_allows_series_change_and_still_requires_classification(self):
+    def test_minor_rejects_migration_and_unknown_compatibility(self):
         for compatibility in ("migration", "unknown"):
-            with self.subTest(compatibility=compatibility), self.fixture(MAJOR) as f:
-                f.runtime("ruby", "3.3.7", "3.4.0")
+            with self.subTest(compatibility=compatibility), self.fixture() as f:
                 f.plan["candidates"][0]["compatibility"] = compatibility
                 f.ready()
-                if compatibility == "migration":
-                    f.require_ok(f.command("run"))
-                    self.assertEqual(f.invocations(), [])
-                else:
-                    f.blocked()
+                f.blocked()
 
-    def test_major_unit_must_be_nonempty_and_fixed_after_review(self):
-        with self.fixture(MAJOR) as f:
+    def test_plan_unit_must_be_nonempty_and_fixed_after_review(self):
+        with self.fixture() as f:
             f.plan["unit"] = ""
             f.flush()
             self.assertNotEqual(f.init().returncode, 0)
             self.assertFalse(f.marker.exists())
-        with self.fixture(MAJOR) as f:
+        with self.fixture() as f:
             f.ready()
             f.plan["unit"] = "unreviewed second upgrade"
             f.json(f.run_dir / "plan.json", f.plan)
@@ -1115,38 +1105,37 @@ class StaticGateTests(unittest.TestCase):
         fixture.plan.pop("execution", None)
 
     def test_static_export_never_runs_candidate_or_executor_and_preserves_source_modes(self):
-        for skill in (MINOR, MAJOR):
-            with self.subTest(skill=skill), self.fixture(skill) as f:
-                self.static(f)
-                trap = f.candidate / "app" / "never-run.py"
-                trap_marker = f.root / "unexpected-candidate-execution"
-                trap.write_text("from pathlib import Path\nPath(" + repr(str(trap_marker))
-                                + ").write_text('executed')\n", encoding="utf-8")
-                trap.chmod(0o751)
-                f.launcher.unlink()
-                f.ready()
-                # 静的承認に隔離のpassを偽装しない。
-                self.assertNotIn("isolation", f.state()["reviews"])
-                result = f.require_ok(f.command("run"))
-                self.assertEqual(json.loads(result.stdout)["status"], "static_ready")
-                report = json.loads((f.run_dir / "execution-output/static-result.json").read_text())
-                self.assertEqual(report["status"], "static_ready")
-                self.assertEqual(report["verification_mode"], "static")
-                self.assertFalse(report["runtime_verified"])
-                self.assertTrue({"installation", "runtime_version", "tests", "interaction"}
-                                <= set(report["not_performed"]))
-                snapshot = f.run_dir / report["candidate_snapshot"]
-                self.assertEqual((snapshot / "app/never-run.py").read_bytes(), trap.read_bytes())
-                self.assertEqual(report["source_manifest"]["files"]["app/never-run.py"],
-                                 {"sha256": sha256(trap.read_bytes()), "mode": 0o751})
-                self.assertEqual(stat.S_IMODE(trap.stat().st_mode), 0o751)
-                for path in snapshot.rglob("*"):
-                    self.assertFalse(path.stat().st_mode & 0o222)
-                self.assertFalse(trap_marker.exists())
-                self.assertFalse(f.marker.exists())
-                self.assertEqual(f.state()["execution_status"], "succeeded")
-                self.assertNotEqual(f.command("run").returncode, 0)
-                self.assertNotEqual(f.command("check").returncode, 0)
+        with self.fixture() as f:
+            self.static(f)
+            trap = f.candidate / "app" / "never-run.py"
+            trap_marker = f.root / "unexpected-candidate-execution"
+            trap.write_text("from pathlib import Path\nPath(" + repr(str(trap_marker))
+                            + ").write_text('executed')\n", encoding="utf-8")
+            trap.chmod(0o751)
+            f.launcher.unlink()
+            f.ready()
+            # 静的承認に隔離のpassを偽装しない。
+            self.assertNotIn("isolation", f.state()["reviews"])
+            result = f.require_ok(f.command("run"))
+            self.assertEqual(json.loads(result.stdout)["status"], "static_ready")
+            report = json.loads((f.run_dir / "execution-output/static-result.json").read_text())
+            self.assertEqual(report["status"], "static_ready")
+            self.assertEqual(report["verification_mode"], "static")
+            self.assertFalse(report["runtime_verified"])
+            self.assertTrue({"installation", "runtime_version", "tests", "interaction"}
+                            <= set(report["not_performed"]))
+            snapshot = f.run_dir / report["candidate_snapshot"]
+            self.assertEqual((snapshot / "app/never-run.py").read_bytes(), trap.read_bytes())
+            self.assertEqual(report["source_manifest"]["files"]["app/never-run.py"],
+                             {"sha256": sha256(trap.read_bytes()), "mode": 0o751})
+            self.assertEqual(stat.S_IMODE(trap.stat().st_mode), 0o751)
+            for path in snapshot.rglob("*"):
+                self.assertFalse(path.stat().st_mode & 0o222)
+            self.assertFalse(trap_marker.exists())
+            self.assertFalse(f.marker.exists())
+            self.assertEqual(f.state()["execution_status"], "succeeded")
+            self.assertNotEqual(f.command("run").returncode, 0)
+            self.assertNotEqual(f.command("check").returncode, 0)
 
     def test_static_still_requires_every_non_isolation_review_with_evidence(self):
         for missing in STATIC_REVIEWS:
@@ -1173,102 +1162,98 @@ class StaticGateTests(unittest.TestCase):
             self.assertFalse((f.run_dir / "execution-output/static-result.json").exists())
 
     def test_only_static_mode_is_supported_with_optional_legacy_static_marker(self):
-        for skill in (MINOR, MAJOR):
-            for marker in (None, "static"):
-                with self.subTest(skill=skill, marker=marker), self.fixture(skill) as f:
-                    if marker is not None:
-                        f.plan["verification_mode"] = marker
-                    f.ready()
-                    f.require_ok(f.command("run"))
-                    self.assertFalse(f.marker.exists())
-            for marker in ("strict", "skip-tests", None, 1):
-                with self.subTest(skill=skill, invalid_marker=marker), self.fixture(skill) as f:
+        for marker in (None, "static"):
+            with self.subTest(marker=marker), self.fixture() as f:
+                if marker is not None:
                     f.plan["verification_mode"] = marker
-                    f.flush()
-                    self.assertNotEqual(f.init().returncode, 0)
-                    self.assertFalse(f.marker.exists())
+                f.ready()
+                f.require_ok(f.command("run"))
+                self.assertFalse(f.marker.exists())
+        for marker in ("strict", "skip-tests", None, 1):
+            with self.subTest(invalid_marker=marker), self.fixture() as f:
+                f.plan["verification_mode"] = marker
+                f.flush()
+                self.assertNotEqual(f.init().returncode, 0)
+                self.assertFalse(f.marker.exists())
 
 
     def test_seven_day_wait_is_required_for_default_and_explicit_static_plans(self):
-        for skill in (MINOR, MAJOR):
-            for explicit in (False, True):
-                for age, succeeds in ((timedelta(days=7), True),
-                                      (timedelta(days=7) - timedelta(minutes=1), False),
-                                      (timedelta(days=1), False)):
-                    with self.subTest(skill=skill, explicit=explicit, age=age), self.fixture(skill) as f:
-                        if explicit:
-                            self.static(f)
-                        f.plan["candidates"][0]["published_at"] = timestamp(-age)
-                        f.ready()
-                        if succeeds:
-                            f.require_ok(f.command("run"))
-                        else:
-                            f.blocked("check")
-                            f.blocked()
-                        self.assertFalse(f.marker.exists())
-                for value in (None, timestamp(timedelta(days=1))):
-                    with self.subTest(skill=skill, explicit=explicit, published=value), self.fixture(skill) as f:
-                        if explicit:
-                            self.static(f)
-                        f.plan["candidates"][0]["published_at"] = value
-                        f.ready()
+        for explicit in (False, True):
+            for age, succeeds in ((timedelta(days=7), True),
+                                  (timedelta(days=7) - timedelta(minutes=1), False),
+                                  (timedelta(days=1), False)):
+                with self.subTest(explicit=explicit, age=age), self.fixture() as f:
+                    if explicit:
+                        self.static(f)
+                    f.plan["candidates"][0]["published_at"] = timestamp(-age)
+                    f.ready()
+                    if succeeds:
+                        f.require_ok(f.command("run"))
+                    else:
+                        f.blocked("check")
                         f.blocked()
+                    self.assertFalse(f.marker.exists())
+            for value in (None, timestamp(timedelta(days=1))):
+                with self.subTest(explicit=explicit, published=value), self.fixture() as f:
+                    if explicit:
+                        self.static(f)
+                    f.plan["candidates"][0]["published_at"] = value
+                    f.ready()
+                    f.blocked()
 
 
     def test_exact_seven_day_boundary_and_post_snapshot_recheck(self):
-        for skill in (MINOR, MAJOR):
-            for move_back_after_copy in (False, True):
-                with self.subTest(skill=skill, move_back_after_copy=move_back_after_copy), self.fixture(skill) as f:
-                    boundary = datetime.now(timezone.utc).replace(microsecond=0) + timedelta(hours=1)
-                    f.plan["candidates"][0]["published_at"] = (boundary - timedelta(days=7)).isoformat().replace("+00:00", "Z")
-                    f.ready()
-                    gate = load_gate(f.cli)
-                    class BoundaryDateTime(datetime):
-                        @classmethod
-                        def now(cls, tz=None):
-                            return boundary
-                    class JustBeforeBoundaryDateTime(datetime):
-                        @classmethod
-                        def now(cls, tz=None):
-                            return boundary - timedelta(microseconds=1)
-                    gate.datetime = BoundaryDateTime
-                    if move_back_after_copy:
-                        saved = gate.prepare_execution
-                        def move_clock_after_copy(*args):
-                            result = saved(*args)
-                            gate.datetime = JustBeforeBoundaryDateTime
-                            return result
-                        gate.prepare_execution = move_clock_after_copy
-                        with self.assertRaises(gate.GateError):
-                            invoke_gate(gate, f)
-                        self.assertEqual(f.state()["execution_status"], "failed")
-                        self.assertFalse((f.run_dir / "execution-output/static-result.json").exists())
-                    else:
-                        self.assertEqual(invoke_gate(gate, f), 0)
-                        self.assertTrue((f.run_dir / "execution-output/static-result.json").is_file())
-                    self.assertFalse(f.marker.exists())
+        for move_back_after_copy in (False, True):
+            with self.subTest(move_back_after_copy=move_back_after_copy), self.fixture() as f:
+                boundary = datetime.now(timezone.utc).replace(microsecond=0) + timedelta(hours=1)
+                f.plan["candidates"][0]["published_at"] = (boundary - timedelta(days=7)).isoformat().replace("+00:00", "Z")
+                f.ready()
+                gate = load_gate(f.cli)
+                class BoundaryDateTime(datetime):
+                    @classmethod
+                    def now(cls, tz=None):
+                        return boundary
+                class JustBeforeBoundaryDateTime(datetime):
+                    @classmethod
+                    def now(cls, tz=None):
+                        return boundary - timedelta(microseconds=1)
+                gate.datetime = BoundaryDateTime
+                if move_back_after_copy:
+                    saved = gate.prepare_execution
+                    def move_clock_after_copy(*args):
+                        result = saved(*args)
+                        gate.datetime = JustBeforeBoundaryDateTime
+                        return result
+                    gate.prepare_execution = move_clock_after_copy
+                    with self.assertRaises(gate.GateError):
+                        invoke_gate(gate, f)
+                    self.assertEqual(f.state()["execution_status"], "failed")
+                    self.assertFalse((f.run_dir / "execution-output/static-result.json").exists())
+                else:
+                    self.assertEqual(invoke_gate(gate, f), 0)
+                    self.assertTrue((f.run_dir / "execution-output/static-result.json").is_file())
+                self.assertFalse(f.marker.exists())
 
     def test_static_manual_advisories_include_unchanged_dependencies_and_all_versions(self):
-        for skill in (MINOR, MAJOR):
-            with self.subTest(skill=skill), self.fixture(skill) as f:
-                self.static(f)
-                f.plan["audits"] = []
-                existing = f.package("0.5.0", "python", "build", "existing")
-                existing["component"] = "worker"
-                f.inventory["before"].append(dict(existing))
-                f.inventory["after"].append(dict(existing))
-                f.ready()
-                f.require_ok(f.command("check"))
-                report = json.loads((f.run_dir / "automated-checks.json").read_text())
-                expected = [{"ecosystem": "node", "component": "app"},
-                            {"ecosystem": "python", "component": "worker"}]
-                self.assertEqual(report["manual_advisory_components"], expected)
-                self.assertEqual({(item["id"], item["version"]) for item in report["inventory_after"]},
-                                 {("node:demo", "1.1.0"), ("python:existing", "0.5.0")})
-                f.require_ok(f.command("run"))
-                exported = json.loads((f.run_dir / "execution-output/static-result.json").read_text())
-                self.assertEqual(exported["manual_advisory_components"], expected)
-                self.assertEqual(exported["inventory_after"], report["inventory_after"])
+        with self.fixture() as f:
+            self.static(f)
+            f.plan["audits"] = []
+            existing = f.package("0.5.0", "python", "build", "existing")
+            existing["component"] = "worker"
+            f.inventory["before"].append(dict(existing))
+            f.inventory["after"].append(dict(existing))
+            f.ready()
+            f.require_ok(f.command("check"))
+            report = json.loads((f.run_dir / "automated-checks.json").read_text())
+            expected = [{"ecosystem": "node", "component": "app"},
+                        {"ecosystem": "python", "component": "worker"}]
+            self.assertEqual(report["manual_advisory_components"], expected)
+            self.assertEqual({(item["id"], item["version"]) for item in report["inventory_after"]},
+                             {("node:demo", "1.1.0"), ("python:existing", "0.5.0")})
+            f.require_ok(f.command("run"))
+            exported = json.loads((f.run_dir / "execution-output/static-result.json").read_text())
+            self.assertEqual(exported["manual_advisory_components"], expected)
+            self.assertEqual(exported["inventory_after"], report["inventory_after"])
 
     def test_static_missing_component_is_manual_but_supplied_report_is_not_ignored(self):
         with self.fixture() as f:
@@ -1299,39 +1284,37 @@ class StaticGateTests(unittest.TestCase):
                 f.blocked()
 
     def test_static_supplied_python_audit_must_cover_its_whole_component(self):
-        for skill in (MINOR, MAJOR):
-            for mutation in ("missing", "wrong-version"):
-                with self.subTest(skill=skill, mutation=mutation), self.fixture(skill) as f:
-                    self.static(f)
-                    f.inventory = {"before": [f.package("1.0.0", "python")],
-                                   "after": [f.package("1.1.0", "python")]}
-                    existing = f.package("0.5.0", "python", "build", "support")
-                    f.inventory["before"].append(dict(existing))
-                    f.inventory["after"].append(dict(existing))
-                    f.plan["candidates"][0]["id"] = "python:demo"
-                    f.plan["audits"][0].update(ecosystem="python", format="pip-audit")
-                    f.audit = pip_report()
-                    if mutation == "wrong-version":
-                        f.audit["dependencies"].append({"name": "support", "version": "0.4.0", "vulns": []})
-                    f.ready()
-                    f.blocked()
+        for mutation in ("missing", "wrong-version"):
+            with self.subTest(mutation=mutation), self.fixture() as f:
+                self.static(f)
+                f.inventory = {"before": [f.package("1.0.0", "python")],
+                               "after": [f.package("1.1.0", "python")]}
+                existing = f.package("0.5.0", "python", "build", "support")
+                f.inventory["before"].append(dict(existing))
+                f.inventory["after"].append(dict(existing))
+                f.plan["candidates"][0]["id"] = "python:demo"
+                f.plan["audits"][0].update(ecosystem="python", format="pip-audit")
+                f.audit = pip_report()
+                if mutation == "wrong-version":
+                    f.audit["dependencies"].append({"name": "support", "version": "0.4.0", "vulns": []})
+                f.ready()
+                f.blocked()
 
     def test_static_image_runtime_needs_no_docker_config_or_image_id(self):
-        for skill in (MINOR, MAJOR):
-            with self.subTest(skill=skill), self.fixture(skill) as f:
-                self.image_runtime(f, before="3.12.5", after="3.12.6")
-                self.static(f)
-                f.plan["candidates"][0]["compatibility"] = "compatible"
-                del f.plan["candidates"][0]["runtime_image"]["image_id"]
-                f.flush()
-                (f.run_dir / "isolation.json").unlink()
-                f.launcher.unlink()
-                f.require_ok(f.init())
-                f.approve()
-                f.require_ok(f.command("run"))
-                self.assertFalse(f.marker.exists())
+        with self.fixture() as f:
+            self.image_runtime(f, before="3.12.5", after="3.12.6")
+            self.static(f)
+            f.plan["candidates"][0]["compatibility"] = "compatible"
+            del f.plan["candidates"][0]["runtime_image"]["image_id"]
+            f.flush()
+            (f.run_dir / "isolation.json").unlink()
+            f.launcher.unlink()
+            f.require_ok(f.init())
+            f.approve()
+            f.require_ok(f.command("run"))
+            self.assertFalse(f.marker.exists())
         for mutation in ("source", "image-id", "tag"):
-            with self.subTest(mutation=mutation), self.fixture(MAJOR) as f:
+            with self.subTest(mutation=mutation), self.fixture() as f:
                 self.image_runtime(f)
                 self.static(f)
                 image = f.plan["candidates"][0]["runtime_image"]
@@ -1390,83 +1373,82 @@ class StaticGateTests(unittest.TestCase):
                 self.assertFalse((f.run_dir / "execution-output/static-result.json").exists())
 
     def test_static_applied_update_can_be_withdrawn_and_replanned_with_source_fix(self):
-        for skill in (MINOR, MAJOR):
-            with self.subTest(skill=skill), self.fixture(skill) as f:
-                self.static(f)
-                original_inventory = json.loads(json.dumps(f.inventory))
-                original = {name: (path.read_bytes(), stat.S_IMODE(path.stat().st_mode))
-                            for path in f.project.rglob("*") if path.is_file()
-                            for name in (path.relative_to(f.project).as_posix(),)}
+        with self.fixture() as f:
+            self.static(f)
+            original_inventory = json.loads(json.dumps(f.inventory))
+            original = {name: (path.read_bytes(), stat.S_IMODE(path.stat().st_mode))
+                        for path in f.project.rglob("*") if path.is_file()
+                        for name in (path.relative_to(f.project).as_posix(),)}
+            f.ready()
+            first_marker = f.marker
+            f.require_ok(f.command("run"))
+            report = json.loads((f.run_dir / "execution-output/static-result.json").read_text())
+            snapshot = f.run_dir / report["candidate_snapshot"]
+            adopted = {}
+            for name, info in report["source_manifest"]["files"].items():
+                data = (snapshot / name).read_bytes()
+                self.assertEqual(sha256(data), info["sha256"])
+                adopted[name] = data
+                (f.project / name).write_bytes(data)
+                (f.project / name).chmod(info["mode"])
+            self.assertEqual(json.loads((f.project / "app/package.json").read_text())["version"], "1.1.0")
+
+            # 反映後の利用箇所修正だけでは、版・取得元に更新差分がなくゲートを初期化できない。
+            user_file = f.project / "app/user-notes.txt"
+            user_file.write_text("keep independent user change\n", encoding="utf-8")
+            user_bytes = user_file.read_bytes()
+            fixed_source = b"module.exports = 2;\n"
+            (f.candidate / "app/index.js").write_bytes(fixed_source)
+            record_root = f.run_dir.parent
+            with tempfile.TemporaryDirectory(prefix="gate-test-source-only-", dir=str(record_root)) as same_run:
+                f.run_dir = Path(same_run)
+                f.marker = f.run_dir / "execution-output/invocations.jsonl"
+                f.inventory = {"before": original_inventory["after"], "after": original_inventory["after"]}
+                f.flush()
+                rejected = f.init()
+                self.assertNotEqual(rejected.returncode, 0)
+                self.assertIn("変更候補がありません", rejected.stderr)
+                self.assertFalse((f.run_dir / "gate-state.json").exists())
+                self.assertFalse(f.marker.exists())
+
+            # 元bytesと現在の自分の適用分を照合し、その更新だけ取り下げる。
+            for name, (before, mode) in original.items():
+                if before != adopted[name]:
+                    self.assertEqual((f.project / name).read_bytes(), adopted[name])
+                    (f.project / name).write_bytes(before)
+                    (f.project / name).chmod(mode)
+            self.assertEqual(json.loads((f.project / "app/package.json").read_text())["version"], "1.0.0")
+            self.assertEqual(user_file.read_bytes(), user_bytes)
+
+            # 現在の実際の更新前グラフから、利用箇所修正を含む候補を新RUNで確認し直す。
+            corrected = f.root / "corrected-candidate"
+            shutil.copytree(f.project, corrected)
+            f.candidate = corrected
+            for name, data in adopted.items():
+                (corrected / name).write_bytes(data)
+            (corrected / "app/index.js").write_bytes(fixed_source)
+            f.inventory = original_inventory
+            f.plan["files"].append("app/index.js")
+            with tempfile.TemporaryDirectory(prefix="gate-test-corrected-", dir=str(record_root)) as fixed_run:
+                f.run_dir = Path(fixed_run)
+                f.marker = f.run_dir / "execution-output/invocations.jsonl"
                 f.ready()
-                first_marker = f.marker
-                f.require_ok(f.command("run"))
+                self.assertTrue(all(f.state()["reviews"][name]["status"] == "pass" for name in STATIC_REVIEWS))
+                self.assertNotIn("isolation", f.state()["reviews"])
+                result = f.require_ok(f.command("run"))
+                self.assertEqual(json.loads(result.stdout)["status"], "static_ready")
                 report = json.loads((f.run_dir / "execution-output/static-result.json").read_text())
                 snapshot = f.run_dir / report["candidate_snapshot"]
-                adopted = {}
+                self.assertEqual((snapshot / "app/index.js").read_bytes(), fixed_source)
+                self.assertEqual((snapshot / "app/user-notes.txt").read_bytes(), user_bytes)
                 for name, info in report["source_manifest"]["files"].items():
-                    data = (snapshot / name).read_bytes()
-                    self.assertEqual(sha256(data), info["sha256"])
-                    adopted[name] = data
-                    (f.project / name).write_bytes(data)
+                    (f.project / name).write_bytes((snapshot / name).read_bytes())
                     (f.project / name).chmod(info["mode"])
                 self.assertEqual(json.loads((f.project / "app/package.json").read_text())["version"], "1.1.0")
-
-                # 反映後の利用箇所修正だけでは、版・取得元に更新差分がなくゲートを初期化できない。
-                user_file = f.project / "app/user-notes.txt"
-                user_file.write_text("keep independent user change\n", encoding="utf-8")
-                user_bytes = user_file.read_bytes()
-                fixed_source = b"module.exports = 2;\n"
-                (f.candidate / "app/index.js").write_bytes(fixed_source)
-                record_root = f.run_dir.parent
-                with tempfile.TemporaryDirectory(prefix="gate-test-source-only-", dir=str(record_root)) as same_run:
-                    f.run_dir = Path(same_run)
-                    f.marker = f.run_dir / "execution-output/invocations.jsonl"
-                    f.inventory = {"before": original_inventory["after"], "after": original_inventory["after"]}
-                    f.flush()
-                    rejected = f.init()
-                    self.assertNotEqual(rejected.returncode, 0)
-                    self.assertIn("変更候補がありません", rejected.stderr)
-                    self.assertFalse((f.run_dir / "gate-state.json").exists())
-                    self.assertFalse(f.marker.exists())
-
-                # 元bytesと現在の自分の適用分を照合し、その更新だけ取り下げる。
-                for name, (before, mode) in original.items():
-                    if before != adopted[name]:
-                        self.assertEqual((f.project / name).read_bytes(), adopted[name])
-                        (f.project / name).write_bytes(before)
-                        (f.project / name).chmod(mode)
-                self.assertEqual(json.loads((f.project / "app/package.json").read_text())["version"], "1.0.0")
+                self.assertEqual((f.project / "app/index.js").read_bytes(), fixed_source)
                 self.assertEqual(user_file.read_bytes(), user_bytes)
-
-                # 現在の実際の更新前グラフから、利用箇所修正を含む候補を新RUNで確認し直す。
-                corrected = f.root / "corrected-candidate"
-                shutil.copytree(f.project, corrected)
-                f.candidate = corrected
-                for name, data in adopted.items():
-                    (corrected / name).write_bytes(data)
-                (corrected / "app/index.js").write_bytes(fixed_source)
-                f.inventory = original_inventory
-                f.plan["files"].append("app/index.js")
-                with tempfile.TemporaryDirectory(prefix="gate-test-corrected-", dir=str(record_root)) as fixed_run:
-                    f.run_dir = Path(fixed_run)
-                    f.marker = f.run_dir / "execution-output/invocations.jsonl"
-                    f.ready()
-                    self.assertTrue(all(f.state()["reviews"][name]["status"] == "pass" for name in STATIC_REVIEWS))
-                    self.assertNotIn("isolation", f.state()["reviews"])
-                    result = f.require_ok(f.command("run"))
-                    self.assertEqual(json.loads(result.stdout)["status"], "static_ready")
-                    report = json.loads((f.run_dir / "execution-output/static-result.json").read_text())
-                    snapshot = f.run_dir / report["candidate_snapshot"]
-                    self.assertEqual((snapshot / "app/index.js").read_bytes(), fixed_source)
-                    self.assertEqual((snapshot / "app/user-notes.txt").read_bytes(), user_bytes)
-                    for name, info in report["source_manifest"]["files"].items():
-                        (f.project / name).write_bytes((snapshot / name).read_bytes())
-                        (f.project / name).chmod(info["mode"])
-                    self.assertEqual(json.loads((f.project / "app/package.json").read_text())["version"], "1.1.0")
-                    self.assertEqual((f.project / "app/index.js").read_bytes(), fixed_source)
-                    self.assertEqual(user_file.read_bytes(), user_bytes)
-                    self.assertFalse(first_marker.exists())
-                    self.assertFalse(f.marker.exists())
+                self.assertFalse(first_marker.exists())
+                self.assertFalse(f.marker.exists())
 
     def test_static_path_never_invokes_a_child_process(self):
         with self.fixture() as f:
@@ -1558,220 +1540,212 @@ class AdvisoryFreshnessTests(unittest.TestCase):
         return relative
 
     def test_initial_check_exports_signals_and_manual_scope_without_approving_any_review(self):
-        for skill in (MINOR, MAJOR):
-            with self.subTest(skill=skill), self.fixture(skill) as f:
-                f.plan["audits"] = []
-                existing = f.package("0.5.0", "python", "build", "support")
-                existing["component"] = "worker"
-                f.inventory["before"].append(dict(existing))
-                f.inventory["after"].append(dict(existing))
-                f.artifact_bytes = gzip.compress(tar_bytes([
-                    ("package/package.json", b'{"scripts":{"postinstall":"node hook.js"}}'),
-                    ("package/hook.js", b"module.exports = 1;\n"),
-                ]))
-                f.plan["candidates"][0]["artifacts"][0]["sha256"] = sha256(f.artifact_bytes)
-                f.flush()
-                f.require_ok(f.init())
-                initial = f.state()
-                self.assertEqual(initial["reviews"], {name: {"status": "unknown"} for name in REVIEWS})
-                self.assertNotEqual(f.command("check").returncode, 0)
-                report = json.loads((f.run_dir / "automated-checks.json").read_text())
-                self.assertTrue(report["artifacts"])
-                signals = report["artifacts"][0]["inspection"]["signals"]
-                self.assertIn("node-lifecycle-script:postinstall", {signal["kind"] for signal in signals})
-                self.assertEqual(report["manual_advisory_components"],
-                                 [{"ecosystem": "node", "component": "app"},
-                                  {"ecosystem": "python", "component": "worker"}])
-                self.assertEqual({(item["id"], item["version"]) for item in report["inventory_after"]},
-                                 {("node:demo", "1.1.0"), ("python:support", "0.5.0")})
-                self.assertEqual(f.state(), initial)
-                self.assertFalse(f.marker.exists())
-                f.approve()
-                f.require_ok(f.command("check"))
-                f.require_ok(f.command("run"))
-                self.assertFalse(f.marker.exists())
+        with self.fixture() as f:
+            f.plan["audits"] = []
+            existing = f.package("0.5.0", "python", "build", "support")
+            existing["component"] = "worker"
+            f.inventory["before"].append(dict(existing))
+            f.inventory["after"].append(dict(existing))
+            f.artifact_bytes = gzip.compress(tar_bytes([
+                ("package/package.json", b'{"scripts":{"postinstall":"node hook.js"}}'),
+                ("package/hook.js", b"module.exports = 1;\n"),
+            ]))
+            f.plan["candidates"][0]["artifacts"][0]["sha256"] = sha256(f.artifact_bytes)
+            f.flush()
+            f.require_ok(f.init())
+            initial = f.state()
+            self.assertEqual(initial["reviews"], {name: {"status": "unknown"} for name in REVIEWS})
+            self.assertNotEqual(f.command("check").returncode, 0)
+            report = json.loads((f.run_dir / "automated-checks.json").read_text())
+            self.assertTrue(report["artifacts"])
+            signals = report["artifacts"][0]["inspection"]["signals"]
+            self.assertIn("node-lifecycle-script:postinstall", {signal["kind"] for signal in signals})
+            self.assertEqual(report["manual_advisory_components"],
+                             [{"ecosystem": "node", "component": "app"},
+                              {"ecosystem": "python", "component": "worker"}])
+            self.assertEqual({(item["id"], item["version"]) for item in report["inventory_after"]},
+                             {("node:demo", "1.1.0"), ("python:support", "0.5.0")})
+            self.assertEqual(f.state(), initial)
+            self.assertFalse(f.marker.exists())
+            f.approve()
+            f.require_ok(f.command("check"))
+            f.require_ok(f.command("run"))
+            self.assertFalse(f.marker.exists())
 
     def test_reconfirming_all_six_passes_cannot_extend_the_original_freshness_window(self):
-        for skill in (MINOR, MAJOR):
-            with self.subTest(skill=skill), self.fixture(skill) as f:
+        with self.fixture() as f:
+            f.plan["audits"] = []
+            f.flush()
+            f.require_ok(f.init())
+            gate = load_gate(f.cli)
+            start = datetime.now(timezone.utc).replace(microsecond=0)
+            observed = start.isoformat().replace("+00:00", "Z")
+            self.clock(gate, start)
+            for check in REVIEWS:
+                evidence = self.evidence(f, check)
+                arguments = ("--observed-at", observed) if check == "advisories" else ()
+                with mock.patch("sys.stdout", new=io.StringIO()):
+                    self.assertEqual(invoke_action(gate, f, "review", "--check", check, "--status", "pass",
+                                                   "--evidence", evidence, "--note", "initial proof", *arguments), 0)
+            original = f.state()["reviews"]
+            self.clock(gate, start + timedelta(hours=23))
+            for check in REVIEWS:
+                with mock.patch("sys.stdout", new=io.StringIO()):
+                    self.assertEqual(invoke_action(gate, f, "review", "--check", check, "--status", "pass",
+                                                   "--evidence", original[check]["evidence"],
+                                                   "--note", "same proof reconfirmed"), 0)
+            repeated = f.state()["reviews"]
+            for check in REVIEWS:
+                self.assertEqual(repeated[check]["checked_at"], original[check]["checked_at"])
+            self.assertEqual(repeated["advisories"]["observed_at"], observed)
+            with mock.patch("sys.stdout", new=io.StringIO()):
+                self.assertEqual(invoke_action(gate, f, "check"), 0)
+            self.clock(gate, start + timedelta(hours=25))
+            with self.assertRaises(gate.GateError):
+                invoke_gate(gate, f)
+            self.assertFalse((f.run_dir / "execution-output/static-result.json").exists())
+            self.assertFalse(f.marker.exists())
+
+    def test_advisories_first_pass_requires_a_fresh_nonfuture_observation_time(self):
+        for observation in (None, timestamp(-timedelta(hours=25)), timestamp(timedelta(hours=1))):
+            with self.subTest(observation=observation), self.fixture() as f:
                 f.plan["audits"] = []
                 f.flush()
                 f.require_ok(f.init())
-                gate = load_gate(f.cli)
-                start = datetime.now(timezone.utc).replace(microsecond=0)
-                observed = start.isoformat().replace("+00:00", "Z")
-                self.clock(gate, start)
-                for check in REVIEWS:
-                    evidence = self.evidence(f, check)
-                    arguments = ("--observed-at", observed) if check == "advisories" else ()
-                    with mock.patch("sys.stdout", new=io.StringIO()):
-                        self.assertEqual(invoke_action(gate, f, "review", "--check", check, "--status", "pass",
-                                                       "--evidence", evidence, "--note", "initial proof", *arguments), 0)
-                original = f.state()["reviews"]
-                self.clock(gate, start + timedelta(hours=23))
-                for check in REVIEWS:
-                    with mock.patch("sys.stdout", new=io.StringIO()):
-                        self.assertEqual(invoke_action(gate, f, "review", "--check", check, "--status", "pass",
-                                                       "--evidence", original[check]["evidence"],
-                                                       "--note", "same proof reconfirmed"), 0)
-                repeated = f.state()["reviews"]
-                for check in REVIEWS:
-                    self.assertEqual(repeated[check]["checked_at"], original[check]["checked_at"])
-                self.assertEqual(repeated["advisories"]["observed_at"], observed)
-                with mock.patch("sys.stdout", new=io.StringIO()):
-                    self.assertEqual(invoke_action(gate, f, "check"), 0)
-                self.clock(gate, start + timedelta(hours=25))
-                with self.assertRaises(gate.GateError):
-                    invoke_gate(gate, f)
-                self.assertFalse((f.run_dir / "execution-output/static-result.json").exists())
+                evidence = self.evidence(f, "advisories")
+                arguments = ("--observed-at", observation) if observation is not None else ()
+                result = f.command("review", "--check", "advisories", "--status", "pass",
+                                   "--evidence", evidence, "--note", "fixture observation", *arguments)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertEqual(f.state()["reviews"]["advisories"], {"status": "unknown"})
                 self.assertFalse(f.marker.exists())
-
-    def test_advisories_first_pass_requires_a_fresh_nonfuture_observation_time(self):
-        for skill in (MINOR, MAJOR):
-            for observation in (None, timestamp(-timedelta(hours=25)), timestamp(timedelta(hours=1))):
-                with self.subTest(skill=skill, observation=observation), self.fixture(skill) as f:
-                    f.plan["audits"] = []
-                    f.flush()
-                    f.require_ok(f.init())
-                    evidence = self.evidence(f, "advisories")
-                    arguments = ("--observed-at", observation) if observation is not None else ()
-                    result = f.command("review", "--check", "advisories", "--status", "pass",
-                                       "--evidence", evidence, "--note", "fixture observation", *arguments)
-                    self.assertNotEqual(result.returncode, 0)
-                    self.assertEqual(f.state()["reviews"]["advisories"], {"status": "unknown"})
-                    self.assertFalse(f.marker.exists())
 
     def test_observation_expiry_blocks_run_even_when_initial_approval_is_still_fresh(self):
-        for skill in (MINOR, MAJOR):
-            with self.subTest(skill=skill), self.fixture(skill) as f:
-                f.plan["audits"] = []
-                f.advisories_observed_at = timestamp(-timedelta(hours=23))
-                f.ready()
-                approval = f.state()["reviews"]["advisories"]
-                gate = load_gate(f.cli)
-                later = datetime.now(timezone.utc) + timedelta(hours=2)
-                approved_at = datetime.fromisoformat(approval["checked_at"].replace("Z", "+00:00"))
-                observed_at = datetime.fromisoformat(approval["observed_at"].replace("Z", "+00:00"))
-                self.assertLess(later - approved_at, timedelta(hours=24))
-                self.assertGreater(later - observed_at, timedelta(hours=24))
-                self.clock(gate, later)
-                with self.assertRaises(gate.GateError):
-                    invoke_gate(gate, f)
-                self.assertFalse((f.run_dir / "execution-output/static-result.json").exists())
-                self.assertFalse(f.marker.exists())
+        with self.fixture() as f:
+            f.plan["audits"] = []
+            f.advisories_observed_at = timestamp(-timedelta(hours=23))
+            f.ready()
+            approval = f.state()["reviews"]["advisories"]
+            gate = load_gate(f.cli)
+            later = datetime.now(timezone.utc) + timedelta(hours=2)
+            approved_at = datetime.fromisoformat(approval["checked_at"].replace("Z", "+00:00"))
+            observed_at = datetime.fromisoformat(approval["observed_at"].replace("Z", "+00:00"))
+            self.assertLess(later - approved_at, timedelta(hours=24))
+            self.assertGreater(later - observed_at, timedelta(hours=24))
+            self.clock(gate, later)
+            with self.assertRaises(gate.GateError):
+                invoke_gate(gate, f)
+            self.assertFalse((f.run_dir / "execution-output/static-result.json").exists())
+            self.assertFalse(f.marker.exists())
 
     def test_pass_reconfirmation_inherits_or_reuses_but_never_replaces_observation_time(self):
-        for skill in (MINOR, MAJOR):
-            with self.subTest(skill=skill), self.fixture(skill) as f:
-                f.ready()
-                original = f.state()["reviews"]["advisories"]
-                shared = ("--check", "advisories", "--status", "pass", "--evidence", original["evidence"],
-                          "--note", "same observation")
-                f.require_ok(f.command("review", *shared))
-                self.assertEqual(f.state()["reviews"]["advisories"]["observed_at"], original["observed_at"])
-                f.require_ok(f.command("review", *shared, "--observed-at", original["observed_at"]))
-                repeated = f.state()["reviews"]["advisories"]
-                self.assertEqual(repeated["checked_at"], original["checked_at"])
-                self.assertEqual(repeated["observed_at"], original["observed_at"])
-                changed = (datetime.fromisoformat(original["observed_at"].replace("Z", "+00:00"))
-                           - timedelta(minutes=1)).isoformat().replace("+00:00", "Z")
-                self.assertNotEqual(f.command("review", *shared, "--observed-at", changed).returncode, 0)
-                self.assertEqual(f.state()["reviews"]["advisories"], repeated)
-                self.assertFalse(f.marker.exists())
+        with self.fixture() as f:
+            f.ready()
+            original = f.state()["reviews"]["advisories"]
+            shared = ("--check", "advisories", "--status", "pass", "--evidence", original["evidence"],
+                      "--note", "same observation")
+            f.require_ok(f.command("review", *shared))
+            self.assertEqual(f.state()["reviews"]["advisories"]["observed_at"], original["observed_at"])
+            f.require_ok(f.command("review", *shared, "--observed-at", original["observed_at"]))
+            repeated = f.state()["reviews"]["advisories"]
+            self.assertEqual(repeated["checked_at"], original["checked_at"])
+            self.assertEqual(repeated["observed_at"], original["observed_at"])
+            changed = (datetime.fromisoformat(original["observed_at"].replace("Z", "+00:00"))
+                       - timedelta(minutes=1)).isoformat().replace("+00:00", "Z")
+            self.assertNotEqual(f.command("review", *shared, "--observed-at", changed).returncode, 0)
+            self.assertEqual(f.state()["reviews"]["advisories"], repeated)
+            self.assertFalse(f.marker.exists())
 
 
     def test_new_finding_can_replace_pass_with_fail_and_new_observation(self):
-        for skill in (MINOR, MAJOR):
-            with self.subTest(skill=skill), self.fixture(skill) as f:
-                f.plan["audits"] = []
-                f.ready()
-                original = f.state()["reviews"]["advisories"]
-                gate = load_gate(f.cli)
-                later = datetime.now(timezone.utc).replace(microsecond=0) + timedelta(hours=1)
-                self.clock(gate, later)
-                evidence = "evidence/new-advisory-finding.txt"
-                contents = b"fixture new advisory finding\n"
-                (f.run_dir / evidence).write_bytes(contents)
-                observed = later.isoformat().replace("+00:00", "Z")
-                with mock.patch("sys.stdout", new=io.StringIO()):
-                    self.assertEqual(invoke_action(gate, f, "review", "--check", "advisories", "--status", "fail",
-                                                   "--evidence", evidence, "--observed-at", observed,
-                                                   "--note", "new fixture finding"), 0)
-                failed = f.state()["reviews"]["advisories"]
-                self.assertEqual(failed["status"], "fail")
-                self.assertEqual(failed["evidence"], evidence)
-                self.assertEqual(failed["sha256"], sha256(contents))
-                self.assertEqual(failed["observed_at"], observed)
-                self.assertEqual(failed["checked_at"], observed)
-                self.assertNotEqual(failed["checked_at"], original["checked_at"])
-                self.assertNotEqual(failed["observed_at"], original["observed_at"])
-                for review in f.state()["reviews"].values():
-                    checked = datetime.fromisoformat(review["checked_at"].replace("Z", "+00:00"))
-                    self.assertLess(later - checked, timedelta(hours=24))
-                # 同じclockで実行し、未来日時や期限切れではなくfail状態が停止の理由になる。
-                with self.assertRaisesRegex(gate.GateError, "advisories"):
-                    invoke_gate(gate, f)
-                self.assertEqual(f.state()["reviews"]["advisories"], failed)
-                self.assertFalse((f.run_dir / "execution-output/static-result.json").exists())
-                self.assertFalse(f.marker.exists())
+        with self.fixture() as f:
+            f.plan["audits"] = []
+            f.ready()
+            original = f.state()["reviews"]["advisories"]
+            gate = load_gate(f.cli)
+            later = datetime.now(timezone.utc).replace(microsecond=0) + timedelta(hours=1)
+            self.clock(gate, later)
+            evidence = "evidence/new-advisory-finding.txt"
+            contents = b"fixture new advisory finding\n"
+            (f.run_dir / evidence).write_bytes(contents)
+            observed = later.isoformat().replace("+00:00", "Z")
+            with mock.patch("sys.stdout", new=io.StringIO()):
+                self.assertEqual(invoke_action(gate, f, "review", "--check", "advisories", "--status", "fail",
+                                               "--evidence", evidence, "--observed-at", observed,
+                                               "--note", "new fixture finding"), 0)
+            failed = f.state()["reviews"]["advisories"]
+            self.assertEqual(failed["status"], "fail")
+            self.assertEqual(failed["evidence"], evidence)
+            self.assertEqual(failed["sha256"], sha256(contents))
+            self.assertEqual(failed["observed_at"], observed)
+            self.assertEqual(failed["checked_at"], observed)
+            self.assertNotEqual(failed["checked_at"], original["checked_at"])
+            self.assertNotEqual(failed["observed_at"], original["observed_at"])
+            for review in f.state()["reviews"].values():
+                checked = datetime.fromisoformat(review["checked_at"].replace("Z", "+00:00"))
+                self.assertLess(later - checked, timedelta(hours=24))
+            # 同じclockで実行し、未来日時や期限切れではなくfail状態が停止の理由になる。
+            with self.assertRaisesRegex(gate.GateError, "advisories"):
+                invoke_gate(gate, f)
+            self.assertEqual(f.state()["reviews"]["advisories"], failed)
+            self.assertFalse((f.run_dir / "execution-output/static-result.json").exists())
+            self.assertFalse(f.marker.exists())
 
     def test_observation_exactly_twenty_four_hours_old_passes_but_one_microsecond_more_does_not(self):
-        for skill in (MINOR, MAJOR):
-            for beyond_boundary in (False, True):
-                with self.subTest(skill=skill, beyond_boundary=beyond_boundary), self.fixture(skill) as f:
-                    f.plan["audits"] = []
-                    f.flush()
-                    f.require_ok(f.init())
-                    f.approve(except_checks=("advisories",))
-                    evidence = self.evidence(f, "advisories")
-                    gate = load_gate(f.cli)
-                    now = datetime.now(timezone.utc).replace(microsecond=0) + timedelta(hours=1)
-                    self.clock(gate, now)
-                    elapsed = timedelta(hours=24) + (timedelta(microseconds=1) if beyond_boundary else timedelta())
-                    observed = (now - elapsed).isoformat().replace("+00:00", "Z")
-                    arguments = ("--check", "advisories", "--status", "pass", "--evidence", evidence,
-                                 "--observed-at", observed, "--note", "boundary fixture observation")
-                    if beyond_boundary:
-                        with self.assertRaises(gate.GateError):
-                            invoke_action(gate, f, "review", *arguments)
-                        self.assertEqual(f.state()["reviews"]["advisories"], {"status": "unknown"})
-                    else:
-                        with mock.patch("sys.stdout", new=io.StringIO()):
-                            self.assertEqual(invoke_action(gate, f, "review", *arguments), 0)
-                            self.assertEqual(invoke_gate(gate, f), 0)
-                        self.assertEqual(f.state()["reviews"]["advisories"]["observed_at"], observed)
-                        self.assertTrue((f.run_dir / "execution-output/static-result.json").is_file())
-                    self.assertFalse(f.marker.exists())
+        for beyond_boundary in (False, True):
+            with self.subTest(beyond_boundary=beyond_boundary), self.fixture() as f:
+                f.plan["audits"] = []
+                f.flush()
+                f.require_ok(f.init())
+                f.approve(except_checks=("advisories",))
+                evidence = self.evidence(f, "advisories")
+                gate = load_gate(f.cli)
+                now = datetime.now(timezone.utc).replace(microsecond=0) + timedelta(hours=1)
+                self.clock(gate, now)
+                elapsed = timedelta(hours=24) + (timedelta(microseconds=1) if beyond_boundary else timedelta())
+                observed = (now - elapsed).isoformat().replace("+00:00", "Z")
+                arguments = ("--check", "advisories", "--status", "pass", "--evidence", evidence,
+                             "--observed-at", observed, "--note", "boundary fixture observation")
+                if beyond_boundary:
+                    with self.assertRaises(gate.GateError):
+                        invoke_action(gate, f, "review", *arguments)
+                    self.assertEqual(f.state()["reviews"]["advisories"], {"status": "unknown"})
+                else:
+                    with mock.patch("sys.stdout", new=io.StringIO()):
+                        self.assertEqual(invoke_action(gate, f, "review", *arguments), 0)
+                        self.assertEqual(invoke_gate(gate, f), 0)
+                    self.assertEqual(f.state()["reviews"]["advisories"]["observed_at"], observed)
+                    self.assertTrue((f.run_dir / "execution-output/static-result.json").is_file())
+                self.assertFalse(f.marker.exists())
 
     def test_observation_expiring_during_snapshot_fails_without_extending_fresh_approval(self):
-        for skill in (MINOR, MAJOR):
-            with self.subTest(skill=skill), self.fixture(skill) as f:
-                f.plan["audits"] = []
-                f.advisories_observed_at = timestamp(-timedelta(hours=23))
-                f.ready()
-                review = f.state()["reviews"]["advisories"]
-                observed = datetime.fromisoformat(review["observed_at"].replace("Z", "+00:00"))
-                checked = datetime.fromisoformat(review["checked_at"].replace("Z", "+00:00"))
-                boundary = observed + timedelta(hours=24)
-                self.assertLess(boundary + timedelta(microseconds=1) - checked, timedelta(hours=24))
-                gate = load_gate(f.cli)
-                self.clock(gate, boundary)
-                saved = gate.prepare_execution
-                def expire_observation_after_copy(*arguments):
-                    snapshot = saved(*arguments)
-                    self.clock(gate, boundary + timedelta(microseconds=1))
-                    return snapshot
-                gate.prepare_execution = expire_observation_after_copy
-                with self.assertRaises(gate.GateError):
-                    invoke_gate(gate, f)
-                self.assertTrue((f.run_dir / "execution-inputs/candidate").is_dir())
-                self.assertEqual(f.state()["execution_status"], "failed")
-                self.assertEqual(f.state()["exit_code"], 1)
-                self.assertEqual(f.state()["reviews"]["advisories"]["checked_at"], review["checked_at"])
-                self.assertFalse((f.run_dir / "execution-output/static-result.json").exists())
-                with self.assertRaisesRegex(gate.GateError, "実行済み・失敗・実行中"):
-                    invoke_gate(gate, f)
-                self.assertFalse(f.marker.exists())
+        with self.fixture() as f:
+            f.plan["audits"] = []
+            f.advisories_observed_at = timestamp(-timedelta(hours=23))
+            f.ready()
+            review = f.state()["reviews"]["advisories"]
+            observed = datetime.fromisoformat(review["observed_at"].replace("Z", "+00:00"))
+            checked = datetime.fromisoformat(review["checked_at"].replace("Z", "+00:00"))
+            boundary = observed + timedelta(hours=24)
+            self.assertLess(boundary + timedelta(microseconds=1) - checked, timedelta(hours=24))
+            gate = load_gate(f.cli)
+            self.clock(gate, boundary)
+            saved = gate.prepare_execution
+            def expire_observation_after_copy(*arguments):
+                snapshot = saved(*arguments)
+                self.clock(gate, boundary + timedelta(microseconds=1))
+                return snapshot
+            gate.prepare_execution = expire_observation_after_copy
+            with self.assertRaises(gate.GateError):
+                invoke_gate(gate, f)
+            self.assertTrue((f.run_dir / "execution-inputs/candidate").is_dir())
+            self.assertEqual(f.state()["execution_status"], "failed")
+            self.assertEqual(f.state()["exit_code"], 1)
+            self.assertEqual(f.state()["reviews"]["advisories"]["checked_at"], review["checked_at"])
+            self.assertFalse((f.run_dir / "execution-output/static-result.json").exists())
+            with self.assertRaisesRegex(gate.GateError, "実行済み・失敗・実行中"):
+                invoke_gate(gate, f)
+            self.assertFalse(f.marker.exists())
 
 
 class HelperTests(unittest.TestCase):
