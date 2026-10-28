@@ -543,21 +543,18 @@ def checks(run, state):
         package = changed[item["id"]]
         require(item["stability"] == "stable" and item["published_at"] is not None, "安定版・公開日時が未確認です。")
         require(now - utc_time(item["published_at"]) >= MIN_RELEASE_AGE, "公開から7日未満、または未来の公開日時です。")
-        if SCRIPT_DIR.parent.name == "minor-version-upgrade":
-            require(item["compatibility"] == "compatible", "互換性未確認・個別移行の候補は一括更新できません。")
-            previous = before.get(item["id"])
-            if previous and previous["version"] == package["version"]:
-                require(previous["source"] != package["source"], "同版・同取得元の変更を一括更新できません。")
-            elif package["kind"] == "runtime":
-                require(compatible_runtime(previous["version"] if previous else None, package["version"], package["ecosystem"]), "ランタイムの系列変更を一括更新できません。")
-            elif previous:
-                old = re.fullmatch(r"([0-9]+)\.([0-9]+)\.([0-9]+)", previous["version"])
-                new = re.fullmatch(r"([0-9]+)\.([0-9]+)\.([0-9]+)", package["version"])
-                if old and new:
-                    x, y = tuple(map(int, old.groups())), tuple(map(int, new.groups()))
-                    require(x < y and x[0] == y[0] and (x[0] != 0 or x[1] == y[1]), "依存のmajor・0.xのminor変更・downgradeを一括更新できません。")
-        else:
-            require(item["compatibility"] != "unknown", "個別移行の分類が未確認です。")
+        require(item["compatibility"] == "compatible", "非互換・互換性未確認の候補は一括更新できません。")
+        previous = before.get(item["id"])
+        if previous and previous["version"] == package["version"]:
+            require(previous["source"] != package["source"], "同版・同取得元の変更を一括更新できません。")
+        elif package["kind"] == "runtime":
+            require(compatible_runtime(previous["version"] if previous else None, package["version"], package["ecosystem"]), "ランタイムの系列変更を一括更新できません。")
+        elif previous:
+            old = re.fullmatch(r"([0-9]+)\.([0-9]+)\.([0-9]+)", previous["version"])
+            new = re.fullmatch(r"([0-9]+)\.([0-9]+)\.([0-9]+)", package["version"])
+            if old and new:
+                x, y = tuple(map(int, old.groups())), tuple(map(int, new.groups()))
+                require(x < y and x[0] == y[0] and (x[0] != 0 or x[1] == y[1]), "依存のmajor・0.xのminor変更・downgradeを一括更新できません。")
         require(not re.search(r"alpha|beta|preview|dev|rc[0-9]*", package["version"], re.I), "prereleaseの疑いがある版は採用できません。")
         for artifact in item["artifacts"]:
             path = run / run_relative_path(artifact["path"])

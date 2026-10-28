@@ -15,7 +15,7 @@ Ruby・Node（JavaScript／TypeScript）・Pythonのランタイムと依存を�
 
 1. 対象の指示、未コミット差分、README、CI、manifest・ビルド定義・既存 lockfile、環境の版指定を静的に読む。採用中の Ruby/Bundler、npm/pnpm/Yarn、uv/pip/Poetry 等を [管理系統の見分け方](references/ecosystems.md) で確認し、管理方式を勝手に変えない。未知のラッパーやプロジェクトコードを版確認のために実行しない。
 2. 範囲指定がなければ現在のプロジェクトにある3言語のランタイムと全依存を一覧化する。他言語は影響と依存境界を記録し、グローバル環境・OS・管理ツール本体は依頼範囲だけ扱う。
-3. Ruby・CPython 本体は同一 `X.Y` の patch、Node 本体は同一 major 内の互換更新を候補にする。Ruby/Python の系列変更、Node の major、ライブラリの major・`0.x` minor・非互換・分類不明の変更は `$major-version-upgrade` へ回す。製品の公式方針を優先し、PEP 440 等を SemVer の互換保証と解釈しない。
+3. Ruby・CPython 本体は同一 `X.Y` の patch、Node 本体は同一 major 内の互換更新を候補にする。Ruby/Python の系列変更、Node の major、ライブラリの major・`0.x` minor・非互換・分類不明の変更は対象外として報告する。製品の公式方針を優先し、PEP 440 等を SemVer の互換保証と解釈しない。
 4. スキル実体から `bash scripts/new-run.sh <project-slug>` を実行し、`RUN/report.md` に元の差分、候補一覧、根拠 URL と取得日時、結果を記録する。候補編集前に [保存・反映契約](references/isolation.md#6-検証した差分を保存して対象へ反映する) の全許可パスと初期状態を記録する。秘密・実データは保存しない。
 
 ## 静的に確認する
@@ -26,7 +26,7 @@ Ruby・Node（JavaScript／TypeScript）・Pythonのランタイムと依存を�
 4. `init` 直後に事前の `check` を行う。レビューが `unknown` のための非ゼロは想定内だが、機械検査の異常・結果未生成等は停止して調査する。現在の計画の `automated-checks.json` にある archive signal・`manual_advisory_components`・`inventory_after` を読み、根拠を確認してから、`coverage`・`sources`・`artifacts`・`advisories`・`authenticity`・`compatibility` の6項目を非空の証拠と説明で `review` する。`advisories` の初回 `pass` は、公式・ランタイム告知と手動照会を含む全照会の最古の実取得時刻を `--observed-at` へ指定する。6レビュー後に最終 `check` を通す。初回承認時刻と実取得時刻の24時間の期限は再登録で延長せず、調査結果・時刻を変えるなら新 RUN で全項目を確認する。詳細は [ゲート手順](references/gate.md) に従い、不明を確認済みとしない。
 5. 取得元・hash の不一致、採用を妨げる既知の脆弱性・悪性告知、明確な非互換、未解決の依存制約や必須移行の漏れは修正するか、その対象を保留する。根拠・候補・計画の変更、失敗や期限切れはゲートに従って新しい `RUN` に分ける。
 
-同版の ABI 別 wheel 等への切替は、実際の `source` と hash の変更を記録して確認する。同版・同じ取得元の metadata だけの変更は更新候補にせず、互換性不明なら個別移行へ回す。保留対象を除外するときは、残る組合せを解決・確認し直し、未確認の版を間接依存に残さない。
+同版の ABI 別 wheel 等への切替は、実際の `source` と hash の変更を記録して確認する。同版・同じ取得元の metadata だけの変更は更新候補にせず、互換性不明なら対象外とする。保留対象を除外するときは、残る組合せを解決・確認し直し、未確認の版を間接依存に残さない。
 
 ## 更新差分を反映する
 

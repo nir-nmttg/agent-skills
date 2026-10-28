@@ -23,7 +23,7 @@ Claude Code のスキルは機能を作って届けるまでの開発を、Codex
 典型的な流れは次のとおり。
 
 1. **Claude Code で開発する**: 設計・実装・検証を進め、PR まで仕上げる。実装・テスト・レビューの一部は Claude のスキルが Codex CLI（GPT-6 Luna / GPT-6.1 Sol / GPT-6 Astra）に任せるが、指示・採否の判断・反映は Claude が行う。
-2. **Codex で整備する**: 時間やトークンに余裕があるとき、プロジェクト全体の設計とのずれ・責務の混在や重複・冗長なテスト・宣言順・古いドキュメントを繰り返し整える。`$codebase-cleanup-workflow` でまとめて実行するか、目的ごとのスキルを指定する。ランタイム・依存の更新は別途 `$minor-version-upgrade` / `$major-version-upgrade` で依頼し、静的確認で反映し、利用可能な環境でテスト・画面操作を追加する。
+2. **Codex で整備する**: 時間やトークンに余裕があるとき、プロジェクト全体の設計とのずれ・責務の混在や重複・冗長なテスト・宣言順・古いドキュメントを繰り返し整える。`$codebase-cleanup-workflow` でまとめて実行するか、目的ごとのスキルを指定する。ランタイム・依存の互換更新は別途 `$minor-version-upgrade` で依頼し、静的確認で反映し、利用可能な環境でテスト・画面操作を追加する。
 3. **整ったコードベースで、また Claude Code で次の開発に進む。**
 
 ## はじめに
@@ -143,16 +143,16 @@ Sol / Astra のレビューと Opus の最終レビューは、推論レベル�
 
 | 用途 | スキル |
 | --- | --- |
-| 開発用 | minor-version-upgrade・major-version-upgrade・codebase-cleanup-workflow・design-alignment-refactor・code-structure-refactor・test-suite-refactor・code-order-refactor・docs-align-with-code |
+| 開発用 | minor-version-upgrade・codebase-cleanup-workflow・design-alignment-refactor・code-structure-refactor・test-suite-refactor・code-order-refactor・docs-align-with-code |
 | 雑務用 | skills-preflight・rename-files-by-content |
 
 ### Codex の開発用スキル
 
-`minor-version-upgrade` / `major-version-upgrade` は、Ruby・Node・Python のランタイムと依存ライブラリの更新に最適化し、`codebase-cleanup-workflow` には含めない。Ruby / Bundler、Node / npm・pnpm・Yarn、Python / uv・pip・Poetry など、採用中の管理方法を設定と lockfile から静的に確認し、管理ツールを勝手に変更しない。対象の管理ツールは採用されたものだけを使い、すべての導入は要求しない。共通の実行ゲートには `bash` と Python 3.9 以降の標準ライブラリが必要。Rails・Node のフロントエンド・Python worker など3言語が混在する構成も一覧化し、言語間の連携を静的に確認して、利用可能なら実行検証する。その他の言語は影響・依存境界を記録し、更新対象を広げない。グローバル環境の更新は依頼範囲に含まれる場合だけ行う。
+`minor-version-upgrade` は、Ruby・Node・Python のランタイムと依存ライブラリの互換更新に最適化し、`codebase-cleanup-workflow` には含めない。Ruby / Bundler、Node / npm・pnpm・Yarn、Python / uv・pip・Poetry など、採用中の管理方法を設定と lockfile から静的に確認し、管理ツールを勝手に変更しない。対象の管理ツールは採用されたものだけを使い、すべての導入は要求しない。静的ゲートには `bash` と Python 3.9 以降の標準ライブラリが必要。Rails・Node のフロントエンド・Python worker など3言語が混在する構成も一覧化し、言語間の連携を静的に確認して、利用可能なら実行検証する。その他の言語は影響・依存境界を記録し、更新対象を広げない。グローバル環境の更新は依頼範囲に含まれる場合だけ行う。
 
-Ruby・Python の `X.Y` ブランチ変更や機能リリース、Node の major 更新は個別移行として扱う。Node の同一 major 内の minor / patch、Ruby・Python の同一 `X.Y` 内の patch、各ライブラリの互換性を保つ更新は、公式方針と実際の変更を確認したうえでまとめる。ライブラリも番号だけで判断せず、`0.x` の minor 増加や非互換変更を含む版は個別に扱う。同版の ABI 別 wheel 等への切替も実際の `source` 変更として記録し、新旧配布物の差分・hash・公開日・出所・監査・互換性を確認する。同版を安全とせず、互換性不明なら個別移行へ回す。
+Ruby・Python の `X.Y` ブランチ変更や機能リリース、Node の major 更新は対象外とする。Node の同一 major 内の minor / patch、Ruby・Python の同一 `X.Y` 内の patch、各ライブラリの互換性を保つ更新は、公式方針と実際の変更を確認したうえでまとめる。ライブラリも番号だけで判断せず、major、`0.x` の minor 増加、非互換・互換性不明の変更は対象外として報告する。同版の ABI 別 wheel 等への切替も実際の `source` 変更として記録し、新旧配布物の差分・hash・公開日・出所・監査・互換性を確認する。同版を安全とせず、互換性不明なら対象外とする。
 
-更新は [minor の静的ゲート](.agents/skills/minor-version-upgrade/references/gate.md) / [major の静的ゲート](.agents/skills/major-version-upgrade/references/gate.md) の静的確認に統一する。正しい manifest・lockfile・環境指定・必要な移行ソースを用意し、`coverage`・`sources`・`artifacts`・`advisories`・`authenticity`・`compatibility` の6項目を根拠付きで確認して反映する。`schema_version: 2` の計画はモード指定不要で、ゲートは executor や Docker を起動しない。`init` 後の事前 `check` で機械検査の signal・手動監査範囲を読み、未確認レビューによる停止と機械異常を区別してから6レビューを行い、最終 `check` → `run` へ進む。
+更新は [静的ゲート](.agents/skills/minor-version-upgrade/references/gate.md) で確認する。正しい manifest・lockfile・環境指定・必要な修正ソースを用意し、`coverage`・`sources`・`artifacts`・`advisories`・`authenticity`・`compatibility` の6項目を根拠付きで確認して反映する。`schema_version: 2` の計画はモード指定不要で、ゲートは executor や Docker を起動しない。`init` 後の事前 `check` で機械検査の signal・手動監査範囲を読み、未確認レビューによる停止と機械異常を区別してから6レビューを行い、最終 `check` → `run` へ進む。
 
 候補版と全新規配布物（wheel・image 等）の最新の公式公開日時から **7日以上** を必須にする。同版の新規配布物を版の古い初回公開日で代用せず、7日未満・日時不明・未来は保留する。最新安定版が新しすぎれば経過済みの適切な安定版を選び、なければ再開可能日または不明の理由を報告する。緊急修正でも短縮せず、待機を外す override はない。
 
@@ -169,7 +169,6 @@ Ruby・Python の `X.Y` ブランチ変更や機能リリース、Node の major
 | スキル | できること | 使い方の例 | 前提 |
 | --- | --- | --- | --- |
 | [minor-version-upgrade](.agents/skills/minor-version-upgrade/SKILL.md) | Ruby・Node・Python の互換更新をまとめ、候補版・全新規配布物の公開から7日以上を必須にして静的確認後に反映する。テスト・実操作は利用可能な場合に追加する | `$minor-version-upgrade`<br>`$minor-version-upgrade Ruby・Node・Python と依存を互換性を保つ範囲でまとめて更新して` | `bash`、Python 3.9 以降、公式情報・配布物と正しい候補・lockfile を確認できること。コード評価が必要な候補作成・追加検証には条件を満たす隔離環境 |
-| [major-version-upgrade](.agents/skills/major-version-upgrade/SKILL.md) | Ruby・Python の系列変更、Node や依存の major 更新を一件ずつ移行し、候補版・全新規配布物の公開から7日以上を必須にして静的確認後に反映する。実行検証は利用可能な場合に行う | `$major-version-upgrade`<br>`$major-version-upgrade Ruby・Node・Python のランタイムと依存を一件ずつ移行して` | `bash`、Python 3.9 以降、公式の移行・供給網情報と正しい候補・lockfile を確認できること。コード評価が必要な候補作成・追加検証には条件を満たす隔離環境 |
 | [codebase-cleanup-workflow](.agents/skills/codebase-cleanup-workflow/SKILL.md) | 全体探索と検証結果を共有し、設計整合 → 責務分割・共通化 → テスト整理 → 宣言順整理 → 文書同期を一巡する。各スキルの判断基準で必要な改善を実施する | `$codebase-cleanup-workflow`<br>`$codebase-cleanup-workflow 今回は src/billing のみ整備して` | 下記5つの整備スキルを参照でき、対象の実装・文書と検証環境を利用できること |
 | [design-alignment-refactor](.agents/skills/design-alignment-refactor/SKILL.md) | 文書とコードからプロジェクトの設計方針を読み取り、責務分担や依存関係の逸脱を修正する。意図的な例外を尊重し、既存の振る舞いを保って検証する | `$design-alignment-refactor`<br>`$design-alignment-refactor src/billing をプロジェクトの設計に合わせてリファクタリングして` | 対象の設計・実装を参照でき、関連する検証を実行できること |
 | [code-structure-refactor](.agents/skills/code-structure-refactor/SKILL.md) | 責務の混在や重複を探索し、責務分割・共通化で保守性・可読性・拡張性を改善する。既存の振る舞いを保ち、効果のない抽象化を避ける | `$code-structure-refactor`<br>`$code-structure-refactor src/billing の責務分割と共通化を進めて` | 対象の実装を参照でき、関連する検証を実行できること |

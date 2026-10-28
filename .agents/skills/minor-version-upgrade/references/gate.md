@@ -89,10 +89,10 @@
 }
 ```
 
-- `unit` は更新単位の説明。major は一件と不可分な関連セットを記録し、関連性は `coverage` / `compatibility` で確認する。
+- `unit` は互換更新の対象範囲の説明。関連する依存の範囲は `coverage` / `compatibility` で確認する。
 - `files` は対象・候補の双方で監視する相対パス。manifest・lockfile・取得元設定・CI 等を列挙する。候補コピー全体も別に hash/mode を固定するが、元プロジェクト全体を自動固定したことにはしない。
 - `published_at` は候補版と全新規配布物（`runtime_image` を含む）の公式公開日時のうち最新の値を UTC の `Z` 表記で指定する。新しい wheel/image を古い版の初回公開日で代用しない。作成日時を公開日と推定せず、一つでも不明なら保留する。
-- `stability` は `stable/prerelease/unknown`、`compatibility` は `compatible/migration/unknown`。安定版を選び、互換性が不明な候補を承認しない。minor は `compatible` のみ扱う。
+- `stability` は `stable/prerelease/unknown`、`compatibility` は `compatible/migration/unknown`。安定版かつ `compatible` の候補のみ扱い、非互換・互換性不明の候補は対象外とする。
 - `artifacts` は採用する全ファイル配布物の RUN 内相対パスと公認 SHA256。通常のライブラリ・archive で供給するランタイムは非空。`runtime_image` で供給するランタイムだけは空を許可する。旧配布物との差分と出所は別途レビューする。
 - `runtime_image` は `kind: runtime` 専用の省略可能な object。`reference` は tag のない `repository@sha256:<64桁>` で、更新後 inventory の `source` と同じ参照にする。`image_id` は任意で、指定するなら `sha256:<64桁>`。Docker の実行設定や実測版は要求せず、`runtime_images.version` は inventory の申告値であると区別する。image 自体の公開日・出所・署名等も確認する。
 - `audits` は実際の無加工 JSON の RUN 内パスと `ecosystem/component/format/exit_code/checked_at`。形式は `node:npm-v2`、`python:pip-audit`、`ruby:bundler-audit`。`checked_at`・終了コードは実測値とし、ツール版・送信先・範囲・DB 鮮度も根拠に残す。Python は全 after package の正規化名・版を照合する。npm/bundler の範囲は `coverage` でも確認する。JSON 未提供分の手動照会も全依存を覆う必要がある。
@@ -111,7 +111,7 @@ inventory は全依存の更新前後の解決結果を記録する。次も構�
 }
 ```
 
-`id` は依存位置・対象環境を区別する一意で安定した識別子。`component` は `web/worker/ruby-app` 等で `.` は使わない。`ecosystem` は `ruby/node/python`、`kind` は `runtime/direct/transitive/build`。dev/optional/platform 等は ID と根拠で覆う。追加は after のみ、削除は before のみに記録し、after 側の全変更項目と候補 ID を一致させる。同版の ABI 別 wheel 等は正確な `source` 変更として扱い、差分・hash・最新公開日・出所・監査・互換性を確認する。minor は同版・同じ source の metadata 変更を拒否する。
+`id` は依存位置・対象環境を区別する一意で安定した識別子。`component` は `web/worker/ruby-app` 等で `.` は使わない。`ecosystem` は `ruby/node/python`、`kind` は `runtime/direct/transitive/build`。dev/optional/platform 等は ID と根拠で覆う。追加は after のみ、削除は before のみに記録し、after 側の全変更項目と候補 ID を一致させる。同版の ABI 別 wheel 等は正確な `source` 変更として扱い、差分・hash・最新公開日・出所・監査・互換性を確認する。同版・同じ source の metadata 変更は拒否する。
 
 ## 検査上限と限界
 
