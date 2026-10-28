@@ -4,16 +4,14 @@
 # 使い方: new-run.sh <slug>
 #   slug  タスクの短い名前（英数字・ハイフン）。フォルダ名に使う
 #
-# 保存先は $HAIKU_IMPL_DIR（既定: このリポジトリ直下の artifacts/haiku-impl）/<日時>-<slug>/。
+# 保存先はこのリポジトリ直下の artifacts/haiku-impl/<日時>-<slug>/。
 set -euo pipefail
 
 slug=${1:-}
 [[ $slug =~ ^[A-Za-z0-9][A-Za-z0-9_-]{0,59}$ ]] || { sed -n '4,5p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 1; }
 
-# ~/.claude/skills のシンボリックリンク経由で呼ばれても、リンク先のリポジトリに保存する
-repo_root=$(cd -P "$(dirname "$0")/../../../.." && pwd)
-root=${HAIKU_IMPL_DIR:-$repo_root/artifacts/haiku-impl}
-[[ $root == /* ]] || { echo "エラー: HAIKU_IMPL_DIR は絶対パスで指定してください（${root}）" >&2; exit 1; }
+source "$(dirname "$0")/lib.sh"
+root=$(runs_root)
 dir="$root/$(date +%Y%m%d-%H%M%S)-$slug"
 mkdir -p "$dir"
 

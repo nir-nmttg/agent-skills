@@ -3,7 +3,7 @@
 # 悪意のある回避（sh -c で包むなど）は想定しない。監視はメインのセッションの権限（auto モードの分類器など）に任せる。
 #
 # 標準入力に hook の JSON を受け取り、許可なら終了コード 0、止めるなら理由を標準エラーに出して終了コード 2 で終わる。
-# 作業場所として認めるのは、実行フォルダの置き場所（$HAIKU_IMPL_DIR、既定は artifacts/haiku-impl）のうち、
+# 作業場所として認めるのは、実行フォルダの置き場所（このリポジトリ直下の artifacts/haiku-impl）のうち、
 # prepare.sh で準備済み（repo と worktree がある）の実行フォルダだけ。
 # - Edit / Write: 実体のパスが worktree の中（.git を除く）でなければ止める。リンクした依存フォルダは実体がもとのリポジトリなので止まる
 # - Grep / Glob: path が実行フォルダの中でなければ止める（省略するとメインの作業フォルダが対象になるので止める）。
@@ -57,12 +57,14 @@ case $tool in
   Grep | Glob)
     path=$(field .tool_input.path) || exit 2
     [[ -n $path ]] || deny "path を指定してください（省略するとメインの作業フォルダが対象になります）。${workplace_hint}"
-    # まず見かけのパス（.. を含まないもの）で判定し、だめなら実体のパスで判定する
+    # まず見かけのパスで判定する（読み取りだけなので、リンクした依存フォルダの中も通す）。
+    # 重複する / と . の要素を除き、.. の要素がないときだけ使う。だめなら実体のパスで判定する（/tmp と /private/tmp などの別表記）
     abs=$path
     [[ $abs == /* ]] || abs=${cwd:-$PWD}/$abs
+    abs=$(sed -E -e 's#/+#/#g' -e ':a' -e 's#/\./#/#' -e 'ta' -e 's#/\.$##' <<<"$abs")
     lexical_ok=""
-    if [[ $abs != *"/../"* && $abs != *"/.." ]]; then
-      for base in "$root" "$root_real"; do
+    if [[ /$abs/ != */../* ]]; then
+      for base in "$root_real" "$root"; do
         [[ $abs == "$base"/* ]] || continue
         run_of "$root_real/${abs#"$base"/}" >/dev/null && lexical_ok=1
         break

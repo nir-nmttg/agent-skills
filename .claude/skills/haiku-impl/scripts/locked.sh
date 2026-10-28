@@ -4,7 +4,7 @@
 # 使い方: locked.sh <コマンド> [引数...]
 #   シェルの機能（パイプ、&& など）を使うときは locked.sh bash -c '...' のように渡す
 #
-# ロックは実行フォルダの置き場所（$HAIKU_IMPL_DIR、既定は artifacts/haiku-impl）の .test-lock。
+# ロックは実行フォルダの置き場所（このリポジトリ直下の artifacts/haiku-impl）の .test-lock。
 # 待つのは HAIKU_IMPL_LOCK_WAIT 秒まで（既定 300 秒）で、超えたら終了コード 75 で終わる。
 # macOS に flock コマンドがないため perl の flock を使う。ロックのファイルをコマンドに引き継ぐので、
 # ロックはコマンドが終わるまで残り、プロセスが終われば自動で外れる。

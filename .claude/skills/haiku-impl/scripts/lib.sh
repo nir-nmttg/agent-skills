@@ -1,4 +1,4 @@
-# prepare.sh・diff.sh・apply.sh で共有する関数。source して使う。
+# haiku-impl のスクリプトで共有する関数。source して使う。
 
 # snapshot <dir> [<除外するパスの一覧ファイル>]
 # 作業ツリーの状態（未コミット・未追跡を含む、.gitignore 対象は除く）を、本物のインデックスに触れずに
@@ -19,15 +19,12 @@ snapshot() {
   rm -f "$idx"
 }
 
-# runs_root  実行フォルダを置く場所を出力する（$HAIKU_IMPL_DIR、既定はこのリポジトリ直下の artifacts/haiku-impl）。
-# ~/.claude/skills のシンボリックリンク経由で呼ばれても、リンク先のリポジトリを指す。
-# 相対パスは呼び出す場所（worktree など）で指す先が変わり、ロックや guard.sh の判定がずれるので受け付けない
+# runs_root  実行フォルダを置く場所（このリポジトリ直下の artifacts/haiku-impl）を出力する。
+# ~/.claude/skills のシンボリックリンク経由で呼ばれても、リンク先のリポジトリを指す
 runs_root() {
-  local repo_root dir
+  local repo_root
   repo_root=$(cd -P "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)
-  dir=${HAIKU_IMPL_DIR:-$repo_root/artifacts/haiku-impl}
-  [[ $dir == /* ]] || { echo "エラー: HAIKU_IMPL_DIR は絶対パスで指定してください（${dir}）" >&2; return 1; }
-  echo "$dir"
+  echo "$repo_root/artifacts/haiku-impl"
 }
 
 # real_path <path>  実体のパスを出力する（存在しない末尾はそのままつなぐ）。相対パスは今のフォルダから
