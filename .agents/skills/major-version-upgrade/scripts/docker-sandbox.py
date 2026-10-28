@@ -597,7 +597,7 @@ def prepare(args):
     if not evidence.exists():
         evidence.mkdir(mode=0o700)
     real_directory(evidence)
-    destinations = (sandbox / "config.json", sandbox / "executor", sandbox / "execution.json",
+    destinations = (sandbox / "config.json", sandbox / "executor",
                     evidence / "isolation-setup.json")
     require(all(not path.exists() and not path.is_symlink() for path in destinations),
             "既存の隔離設定は上書きしません。新しい実行記録を作ってください。")
@@ -605,10 +605,6 @@ def prepare(args):
     require(not any(c.isspace() for c in interpreter) and len(interpreter.encode("utf-8")) <= 240,
             "executor用の信頼済みPython実体は空白なし・240 bytes以内のパスが必要です。")
     controls = probe(config, sandbox)
-    execution = {"mechanism": "container", "config": "sandbox/config.json",
-                 "argv": [str(sandbox / "executor"), "execute", "--config", "{config}",
-                          "--candidate", "{candidate}", "--worker", "{input:" + worker_name.as_posix() + "}",
-                          "--output", "{output}"], "inputs": [worker_name.as_posix()]}
     source = read_file(Path(__file__).resolve())
     body = source.split(b"\n", 1)[1] if source.startswith(b"#!") else source
     launcher = ("#!" + interpreter + " -IS\n").encode("utf-8") + body
@@ -618,9 +614,9 @@ def prepare(args):
               "review_required": True}
     write_exclusive(sandbox / "config.json", json_bytes(config))
     write_exclusive(sandbox / "executor", launcher, 0o700)
-    write_exclusive(sandbox / "execution.json", json_bytes(execution))
     write_exclusive(evidence / "isolation-setup.json", json_bytes(report))
-    print(json.dumps({"status": "prepared", "execution": str(sandbox / "execution.json"),
+    print(json.dumps({"status": "prepared", "config": str(sandbox / "config.json"),
+                      "executor": str(sandbox / "executor"),
                       "evidence": str(evidence / "isolation-setup.json"), "review_required": True},
                      ensure_ascii=True))
     return 0

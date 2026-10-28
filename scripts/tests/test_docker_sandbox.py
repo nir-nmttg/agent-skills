@@ -265,30 +265,31 @@ class PreparationRejectionTests(unittest.TestCase):
 
 
 class PreparationTests(unittest.TestCase):
-    def test_prepare_creates_gate_execution_and_probe_evidence_for_both_skills(self):
+    def test_prepare_creates_optional_executor_config_and_probe_evidence_for_both_skills(self):
         for skill in (MINOR, MAJOR):
             with self.subTest(skill=skill):
                 fixture = SandboxFixture(self, skill)
-                fixture.assert_ok(fixture.prepare())
-                config = json.loads((fixture.run / "sandbox" / "config.json").read_text())
-                execution = json.loads((fixture.run / "sandbox" / "execution.json").read_text())
-                evidence = json.loads((fixture.run / "evidence" / "isolation-setup.json").read_text())
+                prepared = fixture.prepare()
+                fixture.assert_ok(prepared)
+                result = json.loads(prepared.stdout)
+                config = json.loads((fixture.run / "sandbox/config.json").read_text())
+                evidence = json.loads((fixture.run / "evidence/isolation-setup.json").read_text())
                 self.assertEqual(config["image"], IMAGE)
                 self.assertEqual(config["image_id"], IMAGE_ID)
                 self.assertNotIn(str(fixture.run), json.dumps(config))
-                self.assertEqual(execution["mechanism"], "container")
-                self.assertEqual(execution["config"], "sandbox/config.json")
-                self.assertIn(fixture.worker_name, execution["inputs"])
-                self.assertIn("{candidate}", execution["argv"])
-                self.assertIn("{config}", execution["argv"])
-                self.assertIn("{output}", execution["argv"])
-                self.assertIn("{input:" + fixture.worker_name + "}", execution["argv"])
-                executor = Path(execution["argv"][0])
+                self.assertEqual(result["status"], "prepared")
+                self.assertEqual(result["config"], str(fixture.run / "sandbox/config.json"))
+                self.assertEqual(result["evidence"], str(fixture.run / "evidence/isolation-setup.json"))
+                executor = Path(result["executor"])
+                self.assertEqual(executor, fixture.run / "sandbox/executor")
                 self.assertTrue(executor.is_file())
                 self.assertTrue(os.access(executor, os.X_OK))
                 self.assertEqual(executor, executor.resolve())
+                self.assertNotIn("execution", result)
+                self.assertFalse((fixture.run / "sandbox/execution.json").exists())
                 self.assertTrue(evidence)
                 self.assertFalse((fixture.run / "gate-state.json").exists())
+
 
     def test_prepare_does_not_forward_parent_credentials_to_docker(self):
         fixture = SandboxFixture(self)
@@ -742,7 +743,7 @@ class BootstrapWorkerTests(unittest.TestCase):
 
 
 class GateIntegrationTests(unittest.TestCase):
-    def test_generated_executor_runs_only_the_gate_snapshot_for_both_skills(self):
+    def test_optional_executor_accepts_static_gate_snapshot_without_gate_launching_it(self):
         spec = importlib.util.spec_from_file_location(
             "gate_fixture_for_docker_sandbox", Path(__file__).with_name("test_supply_chain_gate.py"))
         gate_tests = importlib.util.module_from_spec(spec)
@@ -753,23 +754,26 @@ class GateIntegrationTests(unittest.TestCase):
                 sandbox.ready()
                 gate = gate_tests.Fixture(self, skill)
                 self.addCleanup(gate.close)
-                for relative in ("sandbox/config.json", sandbox.worker_name):
-                    destination = gate.run_dir / relative
-                    destination.parent.mkdir(parents=True, exist_ok=True)
-                    shutil.copyfile(sandbox.run / relative, destination)
-                gate.plan["execution"] = json.loads((sandbox.run / "sandbox" / "execution.json").read_text())
                 gate.ready()
                 gate.require_ok(gate.command("run"))
-                self.assertEqual((gate.run_dir / "execution-output" / "result.txt").read_text(), "fixture result\n")
-                self.assertEqual(gate.state()["execution_status"], "succeeded")
+                self.assertEqual(sandbox.docker.commands(), [])
+                report = json.loads((gate.run_dir / "execution-output/static-result.json").read_text())
+                self.assertFalse(report["runtime_verified"])
+                snapshot = gate.run_dir / report["candidate_snapshot"]
+                result = sandbox.command(
+                    "execute", "--config", sandbox.run / "sandbox/config.json",
+                    "--candidate", snapshot, "--worker", sandbox.worker, "--output", sandbox.output)
+                sandbox.assert_ok(result)
+                self.assertEqual((sandbox.output / "result.txt").read_text(), "fixture result\n")
+                self.assertFalse(gate.marker.exists())
                 commands = sandbox.docker.commands()
                 run = next(command for command in commands if command[0] == "run")
                 mounts = [run[index + 1] for index, item in enumerate(run) if item == "--mount"]
-                self.assertTrue(any(str(gate.run_dir / "execution-inputs" / "candidate") in mount
-                                    for mount in mounts))
+                self.assertTrue(any(str(snapshot) in mount for mount in mounts))
                 self.assertFalse(any(str(gate.candidate) in mount or str(gate.project) in mount for mount in mounts))
                 self.assertFalse(any(str(gate.run_dir) + "," in mount for mount in mounts))
                 self.assertNotEqual(gate.command("run").returncode, 0)
+
 
 
 if __name__ == "__main__":
