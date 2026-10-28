@@ -188,6 +188,7 @@ class Fixture:
         self.artifact_bytes = gzip.compress(tar_bytes([("package/package.json", b'{"name":"demo","version":"1.1.0"}'),
                                                       ("package/index.js", b"module.exports = 1;\n")]))
         self.audit = npm_report()
+        self.advisories_observed_at = timestamp()
         self.plan = {
             "schema_version": 2, "unit": "demo", "files": ["app/package.json", "app/package-lock.json"],
             "inventory": "inventory.json",
@@ -239,8 +240,9 @@ class Fixture:
                 path = self.run_dir / evidence
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text("reviewed fixture inputs for " + check + "\n", encoding="utf-8")
+                observed = ("--observed-at", self.advisories_observed_at) if check == "advisories" else ()
                 self.require_ok(self.command("review", "--check", check, "--status", "pass", "--evidence", evidence,
-                                             "--note", "fixtureの証拠と対象範囲を確認"))
+                                             "--note", "fixtureの証拠と対象範囲を確認", *observed))
 
     def ready(self):
         self.flush()
@@ -1018,8 +1020,10 @@ class GateTests(unittest.TestCase):
     def test_unchanged_fresh_proof_can_be_reconfirmed(self):
         with self.fixture() as f:
             f.ready()
+            checked_at = f.state()["reviews"]["sources"]["checked_at"]
             f.require_ok(f.command("review", "--check", "sources", "--status", "pass", "--evidence", "evidence/sources.txt",
                                    "--note", "同じ根拠を再確認"))
+            self.assertEqual(f.state()["reviews"]["sources"]["checked_at"], checked_at)
             f.require_ok(f.command("run"))
             self.assertEqual(f.invocations(), [])
 
@@ -1514,9 +1518,13 @@ def load_gate(path):
 
 
 def invoke_gate(gate, fixture):
+    return invoke_action(gate, fixture, "run")
+
+
+def invoke_action(gate, fixture, action, *arguments):
     previous = sys.argv
     try:
-        sys.argv = [str(fixture.cli), "run", "--run", str(fixture.run_dir)]
+        sys.argv = [str(fixture.cli), action, "--run", str(fixture.run_dir), *arguments]
         return gate.main()
     finally:
         sys.argv = previous
@@ -1528,6 +1536,242 @@ def load_helper(name):
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+class AdvisoryFreshnessTests(unittest.TestCase):
+    fixture = GateTests.fixture
+
+    @staticmethod
+    def clock(gate, instant):
+        class FixedDateTime(datetime):
+            @classmethod
+            def now(cls, tz=None):
+                return instant
+        gate.datetime = FixedDateTime
+
+    @staticmethod
+    def evidence(fixture, check):
+        relative = "evidence/" + check + ".txt"
+        path = fixture.run_dir / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("reviewed fixture inputs for " + check + "\n", encoding="utf-8")
+        return relative
+
+    def test_initial_check_exports_signals_and_manual_scope_without_approving_any_review(self):
+        for skill in (MINOR, MAJOR):
+            with self.subTest(skill=skill), self.fixture(skill) as f:
+                f.plan["audits"] = []
+                existing = f.package("0.5.0", "python", "build", "support")
+                existing["component"] = "worker"
+                f.inventory["before"].append(dict(existing))
+                f.inventory["after"].append(dict(existing))
+                f.artifact_bytes = gzip.compress(tar_bytes([
+                    ("package/package.json", b'{"scripts":{"postinstall":"node hook.js"}}'),
+                    ("package/hook.js", b"module.exports = 1;\n"),
+                ]))
+                f.plan["candidates"][0]["artifacts"][0]["sha256"] = sha256(f.artifact_bytes)
+                f.flush()
+                f.require_ok(f.init())
+                initial = f.state()
+                self.assertEqual(initial["reviews"], {name: {"status": "unknown"} for name in REVIEWS})
+                self.assertNotEqual(f.command("check").returncode, 0)
+                report = json.loads((f.run_dir / "automated-checks.json").read_text())
+                self.assertTrue(report["artifacts"])
+                signals = report["artifacts"][0]["inspection"]["signals"]
+                self.assertIn("node-lifecycle-script:postinstall", {signal["kind"] for signal in signals})
+                self.assertEqual(report["manual_advisory_components"],
+                                 [{"ecosystem": "node", "component": "app"},
+                                  {"ecosystem": "python", "component": "worker"}])
+                self.assertEqual({(item["id"], item["version"]) for item in report["inventory_after"]},
+                                 {("node:demo", "1.1.0"), ("python:support", "0.5.0")})
+                self.assertEqual(f.state(), initial)
+                self.assertFalse(f.marker.exists())
+                f.approve()
+                f.require_ok(f.command("check"))
+                f.require_ok(f.command("run"))
+                self.assertFalse(f.marker.exists())
+
+    def test_reconfirming_all_six_passes_cannot_extend_the_original_freshness_window(self):
+        for skill in (MINOR, MAJOR):
+            with self.subTest(skill=skill), self.fixture(skill) as f:
+                f.plan["audits"] = []
+                f.flush()
+                f.require_ok(f.init())
+                gate = load_gate(f.cli)
+                start = datetime.now(timezone.utc).replace(microsecond=0)
+                observed = start.isoformat().replace("+00:00", "Z")
+                self.clock(gate, start)
+                for check in REVIEWS:
+                    evidence = self.evidence(f, check)
+                    arguments = ("--observed-at", observed) if check == "advisories" else ()
+                    with mock.patch("sys.stdout", new=io.StringIO()):
+                        self.assertEqual(invoke_action(gate, f, "review", "--check", check, "--status", "pass",
+                                                       "--evidence", evidence, "--note", "initial proof", *arguments), 0)
+                original = f.state()["reviews"]
+                self.clock(gate, start + timedelta(hours=23))
+                for check in REVIEWS:
+                    with mock.patch("sys.stdout", new=io.StringIO()):
+                        self.assertEqual(invoke_action(gate, f, "review", "--check", check, "--status", "pass",
+                                                       "--evidence", original[check]["evidence"],
+                                                       "--note", "same proof reconfirmed"), 0)
+                repeated = f.state()["reviews"]
+                for check in REVIEWS:
+                    self.assertEqual(repeated[check]["checked_at"], original[check]["checked_at"])
+                self.assertEqual(repeated["advisories"]["observed_at"], observed)
+                with mock.patch("sys.stdout", new=io.StringIO()):
+                    self.assertEqual(invoke_action(gate, f, "check"), 0)
+                self.clock(gate, start + timedelta(hours=25))
+                with self.assertRaises(gate.GateError):
+                    invoke_gate(gate, f)
+                self.assertFalse((f.run_dir / "execution-output/static-result.json").exists())
+                self.assertFalse(f.marker.exists())
+
+    def test_advisories_first_pass_requires_a_fresh_nonfuture_observation_time(self):
+        for skill in (MINOR, MAJOR):
+            for observation in (None, timestamp(-timedelta(hours=25)), timestamp(timedelta(hours=1))):
+                with self.subTest(skill=skill, observation=observation), self.fixture(skill) as f:
+                    f.plan["audits"] = []
+                    f.flush()
+                    f.require_ok(f.init())
+                    evidence = self.evidence(f, "advisories")
+                    arguments = ("--observed-at", observation) if observation is not None else ()
+                    result = f.command("review", "--check", "advisories", "--status", "pass",
+                                       "--evidence", evidence, "--note", "fixture observation", *arguments)
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertEqual(f.state()["reviews"]["advisories"], {"status": "unknown"})
+                    self.assertFalse(f.marker.exists())
+
+    def test_observation_expiry_blocks_run_even_when_initial_approval_is_still_fresh(self):
+        for skill in (MINOR, MAJOR):
+            with self.subTest(skill=skill), self.fixture(skill) as f:
+                f.plan["audits"] = []
+                f.advisories_observed_at = timestamp(-timedelta(hours=23))
+                f.ready()
+                approval = f.state()["reviews"]["advisories"]
+                gate = load_gate(f.cli)
+                later = datetime.now(timezone.utc) + timedelta(hours=2)
+                approved_at = datetime.fromisoformat(approval["checked_at"].replace("Z", "+00:00"))
+                observed_at = datetime.fromisoformat(approval["observed_at"].replace("Z", "+00:00"))
+                self.assertLess(later - approved_at, timedelta(hours=24))
+                self.assertGreater(later - observed_at, timedelta(hours=24))
+                self.clock(gate, later)
+                with self.assertRaises(gate.GateError):
+                    invoke_gate(gate, f)
+                self.assertFalse((f.run_dir / "execution-output/static-result.json").exists())
+                self.assertFalse(f.marker.exists())
+
+    def test_pass_reconfirmation_inherits_or_reuses_but_never_replaces_observation_time(self):
+        for skill in (MINOR, MAJOR):
+            with self.subTest(skill=skill), self.fixture(skill) as f:
+                f.ready()
+                original = f.state()["reviews"]["advisories"]
+                shared = ("--check", "advisories", "--status", "pass", "--evidence", original["evidence"],
+                          "--note", "same observation")
+                f.require_ok(f.command("review", *shared))
+                self.assertEqual(f.state()["reviews"]["advisories"]["observed_at"], original["observed_at"])
+                f.require_ok(f.command("review", *shared, "--observed-at", original["observed_at"]))
+                repeated = f.state()["reviews"]["advisories"]
+                self.assertEqual(repeated["checked_at"], original["checked_at"])
+                self.assertEqual(repeated["observed_at"], original["observed_at"])
+                changed = (datetime.fromisoformat(original["observed_at"].replace("Z", "+00:00"))
+                           - timedelta(minutes=1)).isoformat().replace("+00:00", "Z")
+                self.assertNotEqual(f.command("review", *shared, "--observed-at", changed).returncode, 0)
+                self.assertEqual(f.state()["reviews"]["advisories"], repeated)
+                self.assertFalse(f.marker.exists())
+
+
+    def test_new_finding_can_replace_pass_with_fail_and_new_observation(self):
+        for skill in (MINOR, MAJOR):
+            with self.subTest(skill=skill), self.fixture(skill) as f:
+                f.plan["audits"] = []
+                f.ready()
+                original = f.state()["reviews"]["advisories"]
+                gate = load_gate(f.cli)
+                later = datetime.now(timezone.utc).replace(microsecond=0) + timedelta(hours=1)
+                self.clock(gate, later)
+                evidence = "evidence/new-advisory-finding.txt"
+                contents = b"fixture new advisory finding\n"
+                (f.run_dir / evidence).write_bytes(contents)
+                observed = later.isoformat().replace("+00:00", "Z")
+                with mock.patch("sys.stdout", new=io.StringIO()):
+                    self.assertEqual(invoke_action(gate, f, "review", "--check", "advisories", "--status", "fail",
+                                                   "--evidence", evidence, "--observed-at", observed,
+                                                   "--note", "new fixture finding"), 0)
+                failed = f.state()["reviews"]["advisories"]
+                self.assertEqual(failed["status"], "fail")
+                self.assertEqual(failed["evidence"], evidence)
+                self.assertEqual(failed["sha256"], sha256(contents))
+                self.assertEqual(failed["observed_at"], observed)
+                self.assertEqual(failed["checked_at"], observed)
+                self.assertNotEqual(failed["checked_at"], original["checked_at"])
+                self.assertNotEqual(failed["observed_at"], original["observed_at"])
+                for review in f.state()["reviews"].values():
+                    checked = datetime.fromisoformat(review["checked_at"].replace("Z", "+00:00"))
+                    self.assertLess(later - checked, timedelta(hours=24))
+                # 同じclockで実行し、未来日時や期限切れではなくfail状態が停止の理由になる。
+                with self.assertRaisesRegex(gate.GateError, "advisories"):
+                    invoke_gate(gate, f)
+                self.assertEqual(f.state()["reviews"]["advisories"], failed)
+                self.assertFalse((f.run_dir / "execution-output/static-result.json").exists())
+                self.assertFalse(f.marker.exists())
+
+    def test_observation_exactly_twenty_four_hours_old_passes_but_one_microsecond_more_does_not(self):
+        for skill in (MINOR, MAJOR):
+            for beyond_boundary in (False, True):
+                with self.subTest(skill=skill, beyond_boundary=beyond_boundary), self.fixture(skill) as f:
+                    f.plan["audits"] = []
+                    f.flush()
+                    f.require_ok(f.init())
+                    f.approve(except_checks=("advisories",))
+                    evidence = self.evidence(f, "advisories")
+                    gate = load_gate(f.cli)
+                    now = datetime.now(timezone.utc).replace(microsecond=0) + timedelta(hours=1)
+                    self.clock(gate, now)
+                    elapsed = timedelta(hours=24) + (timedelta(microseconds=1) if beyond_boundary else timedelta())
+                    observed = (now - elapsed).isoformat().replace("+00:00", "Z")
+                    arguments = ("--check", "advisories", "--status", "pass", "--evidence", evidence,
+                                 "--observed-at", observed, "--note", "boundary fixture observation")
+                    if beyond_boundary:
+                        with self.assertRaises(gate.GateError):
+                            invoke_action(gate, f, "review", *arguments)
+                        self.assertEqual(f.state()["reviews"]["advisories"], {"status": "unknown"})
+                    else:
+                        with mock.patch("sys.stdout", new=io.StringIO()):
+                            self.assertEqual(invoke_action(gate, f, "review", *arguments), 0)
+                            self.assertEqual(invoke_gate(gate, f), 0)
+                        self.assertEqual(f.state()["reviews"]["advisories"]["observed_at"], observed)
+                        self.assertTrue((f.run_dir / "execution-output/static-result.json").is_file())
+                    self.assertFalse(f.marker.exists())
+
+    def test_observation_expiring_during_snapshot_fails_without_extending_fresh_approval(self):
+        for skill in (MINOR, MAJOR):
+            with self.subTest(skill=skill), self.fixture(skill) as f:
+                f.plan["audits"] = []
+                f.advisories_observed_at = timestamp(-timedelta(hours=23))
+                f.ready()
+                review = f.state()["reviews"]["advisories"]
+                observed = datetime.fromisoformat(review["observed_at"].replace("Z", "+00:00"))
+                checked = datetime.fromisoformat(review["checked_at"].replace("Z", "+00:00"))
+                boundary = observed + timedelta(hours=24)
+                self.assertLess(boundary + timedelta(microseconds=1) - checked, timedelta(hours=24))
+                gate = load_gate(f.cli)
+                self.clock(gate, boundary)
+                saved = gate.prepare_execution
+                def expire_observation_after_copy(*arguments):
+                    snapshot = saved(*arguments)
+                    self.clock(gate, boundary + timedelta(microseconds=1))
+                    return snapshot
+                gate.prepare_execution = expire_observation_after_copy
+                with self.assertRaises(gate.GateError):
+                    invoke_gate(gate, f)
+                self.assertTrue((f.run_dir / "execution-inputs/candidate").is_dir())
+                self.assertEqual(f.state()["execution_status"], "failed")
+                self.assertEqual(f.state()["exit_code"], 1)
+                self.assertEqual(f.state()["reviews"]["advisories"]["checked_at"], review["checked_at"])
+                self.assertFalse((f.run_dir / "execution-output/static-result.json").exists())
+                with self.assertRaisesRegex(gate.GateError, "実行済み・失敗・実行中"):
+                    invoke_gate(gate, f)
+                self.assertFalse(f.marker.exists())
 
 
 class HelperTests(unittest.TestCase):

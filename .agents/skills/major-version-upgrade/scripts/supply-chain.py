@@ -404,7 +404,7 @@ def load_state(run):
             and type(state["reviews"]) is dict and set(state["reviews"]) == set(REVIEWS), "実行状態の形式・必須レビューが不正です。")
     require(state["execution_status"] in ("not_started", "running", "succeeded", "failed"), "実行状態が未対応です。")
     for review in state["reviews"].values():
-        object_keys(review, ("status",), ("evidence", "sha256", "checked_at", "binding", "note"))
+        object_keys(review, ("status",), ("evidence", "sha256", "checked_at", "observed_at", "binding", "note"))
         require(review["status"] in ("pass", "fail", "unknown"), "未対応のレビュー状態です。skipは使えません。")
     return state
 
@@ -423,9 +423,13 @@ def validate_reviews(run, state, require_all=False):
         if review == {"status": "unknown"}:
             require(not require_all, "必須レビューが失敗・未確認です: " + name)
             continue
-        object_keys(review, ("status", "checked_at", "binding", "note"), ("evidence", "sha256"))
+        object_keys(review, ("status", "checked_at", "binding", "note"), ("evidence", "sha256", "observed_at"))
         require(review["binding"] == state["binding"], "レビューが別の実行計画に対するものです。新しい実行記録で確認してください。")
         fresh(review["checked_at"], now)
+        require(name != "advisories" or review["status"] != "pass" or "observed_at" in review,
+                "advisoriesのpassには実際の照会取得日時が必要です。")
+        if "observed_at" in review:
+            fresh(review["observed_at"], now)
         text_value(review["note"], 2000)
         require(("evidence" in review) == ("sha256" in review), "レビュー証拠の固定が不完全です。")
         if "evidence" in review:
@@ -604,6 +608,7 @@ def main():
     review.add_argument("--check", choices=REVIEWS, required=True)
     review.add_argument("--status", choices=("pass", "fail", "unknown"), required=True)
     review.add_argument("--evidence")
+    review.add_argument("--observed-at", help="根拠を実際に取得した最古の日時（UTCのZ表記）。advisoriesの初回passは必須")
     review.add_argument("--note", required=True)
     for action in ("check", "run"):
         command = sub.add_parser(action)
@@ -641,11 +646,27 @@ def main():
                 entry["evidence"] = run_relative_path(args.evidence).as_posix()
                 entry["sha256"] = digest(safe_read(run / run_relative_path(args.evidence), MAX_JSON, True))
             previous = state["reviews"][args.check]
+            if args.observed_at is not None:
+                entry["observed_at"] = args.observed_at
             if previous["status"] == "pass":
                 require(args.status == "fail" or (args.status == "pass"
                         and entry.get("evidence") == previous["evidence"]
                         and entry.get("sha256") == previous["sha256"]),
                         "既存passの証拠は置換できません。新しい実行記録で確認してください。")
+                if args.status == "pass":
+                    require(args.observed_at is None or args.observed_at == previous.get("observed_at"),
+                            "既存passの取得日時は変更できません。新しい実行記録で確認してください。")
+                    if "observed_at" in previous:
+                        entry["observed_at"] = previous["observed_at"]
+                    # 同じ根拠の再登録で承認の24時間を延長しない。
+                    entry["checked_at"] = previous["checked_at"]
+                elif args.observed_at is None and "observed_at" in previous:
+                    # 取消しは新しい証拠・取得日時を記録できる。省略時だけ旧値を引き継ぐ。
+                    entry["observed_at"] = previous["observed_at"]
+            require(args.check != "advisories" or args.status != "pass" or "observed_at" in entry,
+                    "advisoriesの初回passには--observed-atで実際の照会取得日時を指定してください。")
+            if "observed_at" in entry:
+                fresh(entry["observed_at"], datetime.now(timezone.utc))
             state["reviews"][args.check] = entry
             atomic_write(run / STATE, state)
             print(json.dumps({"check": args.check, "status": args.status}, ensure_ascii=True))

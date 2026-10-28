@@ -13,11 +13,14 @@
 
 ```bash
 "$UPGRADE_PYTHON" -I -S "$UPGRADE_GATE" init --run "$RUN" --project "$PROJECT" --candidate "$CANDIDATE" --plan "$RUN/plan.json"
+"$UPGRADE_PYTHON" -I -S "$UPGRADE_GATE" check --run "$RUN"
 ```
+
+`init` 直後に事前の `check` を実行し、終了コード・停止理由と `automated-checks.json` を読む。必須レビューが `unknown` のため非ゼロになることは想定内だが、機械検査の異常、結果の未生成、固定計画に対応しない記録を無視して先へ進めない。停止原因を調査・解消し、現在の計画について生成された archive signal・`manual_advisory_components`・`inventory_after` を読んでから各根拠を確認する。`check` の非ゼロを一律に無視する `|| true` 等で代用しない。
 
 ## 2. 固定の6項目を証拠付きでレビューする
 
-初期状態はすべて `unknown`。実際の非空の根拠と説明を `RUN` 内へ保存し、一項目ずつ `review` する。URL だけ、空ファイル、未確認の文章を証拠にしない。機械検査や archive の signal だけで `pass` にしない。
+事前検査後も6項目はすべて `unknown`。実際の非空の根拠と説明を `RUN` 内へ保存し、一項目ずつ `review` する。URL だけ、空ファイル、未確認の文章を証拠にしない。機械検査や archive の signal だけで `pass` にしない。
 
 | check | 必要な確認 |
 | --- | --- |
@@ -32,7 +35,15 @@
 "$UPGRADE_PYTHON" -I -S "$UPGRADE_GATE" review --run "$RUN" --check coverage --status pass --evidence evidence/coverage.md --note "全依存と変更範囲を照合した根拠"
 ```
 
-残る5項目もそれぞれ実際の証拠で記録する。`isolation` の承認項目はなく、隔離環境の成功を静的レビューの代用にしない。静的根拠不足・明確な非互換・未解消の既知問題・実際に判明した更新由来の失敗があれば、該当項目を通さず修正または対象を保留する。
+`advisories` の初回 `pass` には `--observed-at` が必須。`ADVISORIES_OBSERVED_AT` は、根拠に使う公式セキュリティ告知・ランタイム告知・手動 advisory 照会を含む**全照会のうち、最古の実取得時刻**を UTC の `Z` 表記で設定する。根拠に個々の取得時刻も残し、承認時の現在時刻で代用しない。
+
+```bash
+"$UPGRADE_PYTHON" -I -S "$UPGRADE_GATE" review --run "$RUN" --check advisories --status pass --evidence evidence/advisories.md --observed-at "$ADVISORIES_OBSERVED_AT" --note "全対象への公式告知・advisory照会の実取得時刻と範囲を確認"
+```
+
+他のレビューの `--observed-at` は任意で、指定した時刻には同じ鮮度検査を適用する。
+
+残る項目もそれぞれ実際の証拠で記録する。`isolation` の承認項目はなく、隔離環境の成功を静的レビューの代用にしない。静的根拠不足・明確な非互換・未解消の既知問題・実際に判明した更新由来の失敗があれば、該当項目を通さず修正または対象を保留する。
 
 監査 JSON を用意できれば `audits` へ含める。提示した npm audit v2・pip-audit・bundler-audit JSON の finding・error・skip・未対応形式・期限切れ・同 component 内の対象版 coverage 不足は停止する。既に得た不都合な結果を除外・加工して通さない。JSON 未収集の component は `automated-checks.json` の `manual_advisory_components`、全更新後依存は `inventory_after` に出る。その全 ID・名前・版を公式告知・advisory DB と照合し、取得日時・URL・対象版・結果を `coverage` / `advisories` の根拠へ対応づける。変更していない依存も省かず、未確認の範囲が残れば保留する。
 
@@ -43,7 +54,9 @@
 "$UPGRADE_PYTHON" -I -S "$UPGRADE_GATE" run --run "$RUN"
 ```
 
-6項目の有効な `pass` と機械検査が揃うまで停止する。証拠・監査の有効期間は24時間。公開7日待機は `check` と snapshot 作成後の直前検査の双方で適用する。取得物・inventory・計画・候補ソース・根拠・検査コードの hash を固定し、承認後やコピー中の差替えを拒否する。既存の証拠変更・期限切れ・`pass` の差替えや `fail` からの復活、失敗/実行済みの RUN の再利用はせず、新しい記録で確認し直す。
+事前検査と根拠確認を経て6レビューを終えたら、上の最終 `check` を通してから `run` する。6項目の有効な `pass` と機械検査が揃うまで停止する。全 `pass` の `checked_at` は初回承認時刻を保持し、同じ `pass` の再登録で24時間の期限を延長しない。`observed_at` も同じ `pass` で更新できず、再登録時に省略すれば既存値を継承する。初回の `checked_at` と申告した実取得時刻 `observed_at` は、初回承認時・`check`・`run` の直前に24時間以内かつ未来でないことを確認する。新たな調査結果・取得時刻へ更新するときは、新 RUN で全レビューをやり直す。監査 JSON 自体の実測時刻・生成日時の24時間の期限も維持する。公開7日待機は `check` と snapshot 作成後の直前検査の双方で適用する。取得物・inventory・計画・候補ソース・根拠・検査コードの hash を固定し、承認後やコピー中の差替えを拒否する。既存の証拠変更・期限切れ・`pass` の差替えや `fail` からの復活、失敗/実行済みの RUN の再利用はせず、新しい記録で確認し直す。
+
+問題を発見して承認を取り消す `pass` → `fail` は、同じ `pass` の再登録とは区別する。新しい証拠と有効な実取得時刻を `--observed-at` で登録でき、`checked_at` は失敗を登録した時刻になる。取得時刻を省略した場合だけ既存値を継承する。`fail` があれば `run` は不可で、同じ RUN の `fail` → `pass` への復活も認めない。取消し時でも未来・24時間超の取得時刻は拒否するため、期限切れの古い RUN は新しい RUN で調査し直す。
 
 `run` はコードや子プロセスを起動せず、`execution-inputs/candidate` と `execution-output/static-result.json` を保存する。結果は `static_ready` / `runtime_verified: false` で、導入・テスト成功を意味しない。`source_manifest` は元候補の hash と mode、`not_performed` はこの静的 run 自体が実行していない工程を記録する。任意の追加検証の結果は別途報告する。
 

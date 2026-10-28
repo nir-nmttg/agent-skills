@@ -152,11 +152,11 @@ Sol / Astra のレビューと Opus の最終レビューは、推論レベル�
 
 Ruby・Python の `X.Y` ブランチ変更や機能リリース、Node の major 更新は個別移行として扱う。Node の同一 major 内の minor / patch、Ruby・Python の同一 `X.Y` 内の patch、各ライブラリの互換性を保つ更新は、公式方針と実際の変更を確認したうえでまとめる。ライブラリも番号だけで判断せず、`0.x` の minor 増加や非互換変更を含む版は個別に扱う。同版の ABI 別 wheel 等への切替も実際の `source` 変更として記録し、新旧配布物の差分・hash・公開日・出所・監査・互換性を確認する。同版を安全とせず、互換性不明なら個別移行へ回す。
 
-更新は [minor の静的ゲート](.agents/skills/minor-version-upgrade/references/gate.md) / [major の静的ゲート](.agents/skills/major-version-upgrade/references/gate.md) の静的確認に統一する。正しい manifest・lockfile・環境指定・必要な移行ソースを用意し、`coverage`・`sources`・`artifacts`・`advisories`・`authenticity`・`compatibility` の6項目を根拠付きで確認して反映する。`schema_version: 2` の計画はモード指定不要で、ゲートは executor や Docker を起動しない。
+更新は [minor の静的ゲート](.agents/skills/minor-version-upgrade/references/gate.md) / [major の静的ゲート](.agents/skills/major-version-upgrade/references/gate.md) の静的確認に統一する。正しい manifest・lockfile・環境指定・必要な移行ソースを用意し、`coverage`・`sources`・`artifacts`・`advisories`・`authenticity`・`compatibility` の6項目を根拠付きで確認して反映する。`schema_version: 2` の計画はモード指定不要で、ゲートは executor や Docker を起動しない。`init` 後の事前 `check` で機械検査の signal・手動監査範囲を読み、未確認レビューによる停止と機械異常を区別してから6レビューを行い、最終 `check` → `run` へ進む。
 
 候補版と全新規配布物（wheel・image 等）の最新の公式公開日時から **7日以上** を必須にする。同版の新規配布物を版の古い初回公開日で代用せず、7日未満・日時不明・未来は保留する。最新安定版が新しすぎれば経過済みの適切な安定版を選び、なければ再開可能日または不明の理由を報告する。緊急修正でも短縮せず、待機を外す override はない。
 
-更新後 inventory の全ライブラリ・ビルド依存とランタイムの既知情報を確認し、ランタイムだけの変更でも既存依存を省略しない。JSON 未収集分は全対象版への公式告知/advisory DB の照会を証拠化できるが、提示済み監査の finding・error・skip・期限切れ・coverage 不足は無視しない。静的根拠や正しい候補を用意できない対象、明確な非互換・更新由来のテスト失敗は修正または保留する。証拠・監査は24時間で期限切れとなり、入力・根拠の変更は新 RUN で確認し直す。
+更新後 inventory の全ライブラリ・ビルド依存とランタイムの既知情報を確認し、ランタイムだけの変更でも既存依存を省略しない。JSON 未収集分は全対象版への公式告知/advisory DB の照会を証拠化できるが、提示済み監査の finding・error・skip・期限切れ・coverage 不足は無視しない。静的根拠や正しい候補を用意できない対象、明確な非互換・更新由来のテスト失敗は修正または保留する。`advisories` 初回承認では公式/runtime/手動の全照会の最古の実取得時刻を `--observed-at` で固定する。各 `pass` の初回承認時刻と実取得時刻は24時間の期限・未来日時を検査し、同じ `pass` の再登録では延長できない。入力・根拠・取得時刻を変える場合や期限切れは、新 RUN で実際に再調査して全レビューを確認し直す。
 
 `run` は対象コードを実行せず、承認済み候補の readonly snapshot と元の hash/mode を保存する。[保存・反映契約](.agents/skills/minor-version-upgrade/references/isolation.md#6-検証した差分を保存して対象へ反映する)で元の全適用予定パスを照合し、競合がなければ追加・変更・削除・実行 bit を反映する。snapshot の権限を採用権限に使わない。反映前に元 bytes/逆差分も保存し、反映後の修正は自分の当該更新分だけを安全に取り下げ、実際の更新前グラフから修正済み候補を新 RUN で確認する。
 
