@@ -80,11 +80,11 @@ if has gh; then
   fi
 fi
 
-# --- サブエージェントのリンク（haiku-impl・haiku-test・opus-final-review に必須） ---------
+# --- サブエージェントのリンク（haiku-impl・haiku-check・opus-final-review に必須） ---------
 
 agents_src="$repo_root/.claude/agents"
 agents_dir="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/agents"
-agent_users="haiku-impl, haiku-test, opus-final-review"
+agent_users="haiku-impl, haiku-check, opus-final-review"
 unlinked_agents=()
 for f in "$agents_src"/*.md; do
   [[ -f $f ]] || continue
@@ -128,7 +128,7 @@ skill_needs() {
     codex-verify-prompt) echo "git jq" ;;
     codex-*) echo "git jq codex codex-login" ;;
     haiku-impl) echo "git jq perl agents-link haiku-impl-link" ;;
-    haiku-test) echo "git agents-link" ;;
+    haiku-check) echo "git agents-link" ;;
     opus-final-review) echo "git perl agents-link" ;;
     gh-todo) echo "jq gh gh-login" ;;
     gh-issue-overview) echo "jq gh gh-login python3 curl" ;;
