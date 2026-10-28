@@ -1,6 +1,6 @@
 interface:
-  short_description: "Ruby・Node・Pythonの非互換更新を一件ずつ移行し、静的確認で反映する"
-  default_prompt: "$major-version-upgrade を使って、このプロジェクトのRuby・Node・Pythonと依存を一件ずつ移行し、静的確認を通った差分を反映して次へ進んでください。実行できるテストは行い、未実施の検証と理由も報告してください。"
+  short_description: "Ruby・Node・Pythonの非互換更新を公開7日後に一件ずつ静的確認して反映する"
+  default_prompt: "$major-version-upgrade を使って、このプロジェクトのRuby・Node・Pythonと依存を一件ずつ移行し、候補版と全実配布物の公開から7日以上経過した更新を静的確認して反映し、実行できる検証と未実施の理由も報告してください。"
 
 policy:
   allow_implicit_invocation: false

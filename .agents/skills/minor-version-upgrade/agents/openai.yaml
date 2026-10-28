@@ -1,6 +1,6 @@
 interface:
-  short_description: "Ruby・Node・Pythonの互換更新を静的確認で反映し、可能な場合に実行検証する"
-  default_prompt: "$minor-version-upgrade を使って、このプロジェクトのRuby・Node・Pythonと依存を互換性を保つ範囲でまとめて更新し、静的確認を通った差分を反映してください。実行できるテストは行い、未実施の検証と理由も報告してください。"
+  short_description: "Ruby・Node・Pythonの互換更新を公開7日後に静的確認して反映する"
+  default_prompt: "$minor-version-upgrade を使って、このプロジェクトのRuby・Node・Pythonと依存を互換性を保つ範囲でまとめて更新し、候補版と全実配布物の公開から7日以上経過した更新を静的確認して反映し、実行できる検証と未実施の理由も報告してください。"
 
 policy:
   allow_implicit_invocation: false

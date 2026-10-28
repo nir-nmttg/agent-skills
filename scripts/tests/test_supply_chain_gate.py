@@ -2,7 +2,7 @@
 """供給網ゲートの拒否・固定・一度限り実行を外部取得なしで検証する。
 
 実行: python3 -I -S -m unittest discover -s scripts/tests -p 'test_supply_chain_gate.py' -v
-executor は marker を書くだけの信頼済み fixture。隔離機能自体は検証しない。
+候補と旧形式の executor は無害な fixture。静的ゲートが起動しないことを確認する。
 """
 
 from contextlib import contextmanager
@@ -21,6 +21,7 @@ import sys
 import tarfile
 import tempfile
 import unittest
+from unittest import mock
 import zipfile
 
 
@@ -29,8 +30,8 @@ SKILLS = REPO / ".agents" / "skills"
 MINOR = "minor-version-upgrade"
 MAJOR = "major-version-upgrade"
 TEMP_ROOT = str(Path(tempfile.gettempdir()).resolve())
-REVIEWS = ("coverage", "sources", "artifacts", "advisories", "authenticity", "isolation", "compatibility")
-STATIC_REVIEWS = tuple(name for name in REVIEWS if name != "isolation")
+REVIEWS = ("coverage", "sources", "artifacts", "advisories", "authenticity", "compatibility")
+STATIC_REVIEWS = REVIEWS
 
 
 def timestamp(delta=timedelta()):
@@ -195,8 +196,6 @@ class Fixture:
                             "artifacts": [{"path": self.artifact, "sha256": sha256(self.artifact_bytes)}]}],
             "audits": [{"ecosystem": "node", "component": "app", "format": "npm-v2", "path": "audit.json",
                         "exit_code": 0, "checked_at": timestamp()}],
-            "execution": {"argv": [str(self.launcher), "{output}/invocations.jsonl", "approved-argument", "0"],
-                          "config": "isolation.json", "inputs": [], "mechanism": "os-sandbox"},
         }
         self.flush()
 
@@ -233,7 +232,7 @@ class Fixture:
         return result
 
     def approve(self, except_checks=()):
-        reviews = STATIC_REVIEWS if self.plan.get("verification_mode") == "static" else REVIEWS
+        reviews = REVIEWS
         for check in reviews:
             if check not in except_checks:
                 evidence = "evidence/" + check + ".txt"
@@ -285,35 +284,43 @@ class GateTests(unittest.TestCase):
         finally:
             fixture.close()
 
-    def test_approved_plan_runs_exact_argv_once_and_check_never_executes(self):
+    def test_approved_plan_exports_snapshot_once_and_check_never_executes(self):
         for skill in (MINOR, MAJOR):
             with self.subTest(skill=skill), self.fixture(skill) as f:
                 f.ready()
                 f.require_ok(f.command("check"))
                 self.assertFalse(f.marker.exists())
-                f.require_ok(f.command("run"))
-                calls = f.invocations()
-                self.assertEqual(len(calls), 1)
-                self.assertEqual(calls[0]["argv"], ["approved-argument", "0"])
-                self.assertEqual(calls[0]["cwd"], str(f.run_dir / "execution-inputs" / "candidate"))
-                self.assertNotIn("HOME", calls[0]["environment"])
-                self.assertNotIn("SSH_AUTH_SOCK", calls[0]["environment"])
+                result = f.require_ok(f.command("run"))
+                self.assertEqual(json.loads(result.stdout)["status"], "static_ready")
+                report = json.loads((f.run_dir / "execution-output/static-result.json").read_text())
+                self.assertFalse(report["runtime_verified"])
+                self.assertEqual((f.run_dir / report["candidate_snapshot"] / "app/index.js").read_bytes(),
+                                 (f.candidate / "app/index.js").read_bytes())
+                self.assertEqual(f.invocations(), [])
                 self.assertEqual(f.state()["execution_status"], "succeeded")
                 self.assertEqual(f.state()["exit_code"], 0)
                 self.assertNotEqual(f.command("run").returncode, 0)
                 self.assertNotEqual(f.command("check").returncode, 0)
-                self.assertEqual(len(f.invocations()), 1)
 
-    def test_executor_failure_is_recorded_and_cannot_be_reused(self):
-        with self.fixture() as f:
-            f.plan["execution"]["argv"][-1] = "7"
-            f.ready()
-            self.assertNotEqual(f.command("run").returncode, 0)
-            self.assertEqual(f.state()["execution_status"], "failed")
-            self.assertEqual(f.state()["exit_code"], 7)
-            self.assertEqual(len(f.invocations()), 1)
-            self.assertNotEqual(f.command("run").returncode, 0)
-            self.assertEqual(len(f.invocations()), 1)
+
+    def test_legacy_execution_configuration_is_rejected_before_any_launch(self):
+        for skill in (MINOR, MAJOR):
+            for mutation in ("empty", "host-interpreter", "complete-legacy", "explicit-strict"):
+                with self.subTest(skill=skill, mutation=mutation), self.fixture(skill) as f:
+                    configuration = {"argv": [str(f.launcher), "{output}/invocations.jsonl", "approved-argument", "0"],
+                                     "config": "isolation.json", "inputs": [], "mechanism": "os-sandbox"}
+                    if mutation == "empty":
+                        configuration = {}
+                    elif mutation == "host-interpreter":
+                        configuration["argv"][0] = "/usr/bin/python3"
+                    elif mutation == "explicit-strict":
+                        f.plan["verification_mode"] = "strict"
+                    f.plan["execution"] = configuration
+                    f.flush()
+                    self.assertNotEqual(f.init().returncode, 0)
+                    self.assertFalse(f.marker.exists())
+
+
 
     def test_unreadable_candidate_directory_is_not_silently_skipped(self):
         with self.fixture() as f:
@@ -484,8 +491,7 @@ class GateTests(unittest.TestCase):
             f.blocked()
 
     def test_any_bound_input_change_prevents_execution(self):
-        for mutation in ("project-manifest", "candidate-manifest", "source", "inventory-source", "plan", "argv",
-                         "executor", "config", "audit", "artifact"):
+        for mutation in ("project-manifest", "candidate-manifest", "source", "inventory-source", "plan", "audit", "artifact"):
             with self.subTest(mutation=mutation), self.fixture() as f:
                 f.ready()
                 if mutation == "project-manifest":
@@ -497,17 +503,9 @@ class GateTests(unittest.TestCase):
                 elif mutation == "inventory-source":
                     f.inventory["after"][0]["source"] = "https://other.invalid/registry"
                     f.json(f.run_dir / "inventory.json", f.inventory)
-                elif mutation in ("plan", "argv"):
-                    if mutation == "plan":
-                        f.plan["unit"] = "different-unit"
-                    else:
-                        f.plan["execution"]["argv"].append("unapproved-argument")
+                elif mutation == "plan":
+                    f.plan["unit"] = "different-unit"
                     f.json(f.run_dir / "plan.json", f.plan)
-                elif mutation == "executor":
-                    with f.launcher.open("a", encoding="utf-8") as stream:
-                        stream.write("# changed launcher\n")
-                elif mutation == "config":
-                    f.json(f.run_dir / "isolation.json", {"fixture": "different isolation policy"})
                 elif mutation == "audit":
                     f.json(f.run_dir / "audit.json", npm_report(finding=True))
                 else:
@@ -516,7 +514,7 @@ class GateTests(unittest.TestCase):
 
     def test_symlink_hardlink_and_fifo_inputs_are_not_read_or_executed(self):
         for mutation in ("manifest-symlink", "source-symlink", "source-directory-symlink", "source-hardlink", "source-fifo",
-                         "artifact-symlink", "artifact-fifo", "audit-symlink", "config-symlink", "executor-symlink"):
+                         "artifact-symlink", "artifact-fifo", "audit-symlink"):
             with self.subTest(mutation=mutation), self.fixture() as f:
                 if mutation.startswith("manifest"):
                     target = f.candidate / "app" / "package.json"
@@ -532,10 +530,6 @@ class GateTests(unittest.TestCase):
                     target = f.run_dir / f.artifact
                 elif mutation.startswith("audit"):
                     target = f.run_dir / "audit.json"
-                elif mutation.startswith("config"):
-                    target = f.run_dir / "isolation.json"
-                else:
-                    target = f.launcher
                 copy = f.root / "trusted-copy"
                 copy.write_bytes(target.read_bytes())
                 copy.chmod(0o700)
@@ -564,7 +558,7 @@ class GateTests(unittest.TestCase):
                 self.assertFalse((f.root / "outside.rb").exists())
 
     def test_audit_failure_findings_and_invalid_reports_block(self):
-        for mutation in ("exit", "finding", "error", "skipped", "unsupported", "old-schema", "stale", "future", "missing"):
+        for mutation in ("exit", "finding", "error", "skipped", "unsupported", "old-schema", "stale", "future", "missing-report-file"):
             with self.subTest(mutation=mutation), self.fixture() as f:
                 audit = f.plan["audits"][0]
                 if mutation == "exit":
@@ -582,14 +576,14 @@ class GateTests(unittest.TestCase):
                 elif mutation in ("stale", "future"):
                     audit["checked_at"] = timestamp(timedelta(hours=-25 if mutation == "stale" else 1))
                 else:
-                    f.plan["audits"] = []
+                    audit["path"] = "missing-report.json"
                 f.flush()
                 initialized = f.init()
                 if initialized.returncode == 0:
                     f.approve()
                     f.blocked()
                 else:
-                    self.assertIn(mutation, ("unsupported", "missing"))
+                    self.assertIn(mutation, ("unsupported", "missing-report-file"))
                     self.assertFalse(f.marker.exists())
 
     def test_python_audit_requires_exact_normalized_name_and_version(self):
@@ -604,7 +598,7 @@ class GateTests(unittest.TestCase):
                 f.ready()
                 if succeeds:
                     f.require_ok(f.command("run"))
-                    self.assertEqual(len(f.invocations()), 1)
+                    self.assertEqual(f.invocations(), [])
                 else:
                     f.blocked()
 
@@ -620,12 +614,12 @@ class GateTests(unittest.TestCase):
                 f.ready()
                 if succeeds:
                     f.require_ok(f.command("run"))
-                    self.assertEqual(len(f.invocations()), 1)
+                    self.assertEqual(f.invocations(), [])
                 else:
                     f.blocked()
 
     def image_runtime(self, f, ecosystem="python", before="3.12.10", after="3.13.5"):
-        """imageの結合だけを検証する。fixture executorはDockerを起動しない。"""
+        """image参照の静的な結合だけを検証し、Dockerを使わない。"""
         f.runtime(ecosystem, before, after)
         reference = "docker.io/library/" + ecosystem + "@sha256:" + "a" * 64
         image_id = "sha256:" + "b" * 64
@@ -633,12 +627,9 @@ class GateTests(unittest.TestCase):
         f.inventory["after"][0]["source"] = reference
         f.plan["candidates"][0].update(compatibility="migration", artifacts=[],
                                       runtime_image={"reference": reference, "image_id": image_id})
-        f.plan["execution"]["mechanism"] = "container"
         f.flush()
-        f.json(f.run_dir / "isolation.json", {"image": ecosystem + "@sha256:" + "a" * 64,
-                                              "image_id": image_id})
 
-    def test_image_runtime_candidate_binds_source_config_and_exact_version(self):
+    def test_image_runtime_candidate_binds_declared_source_and_version_without_execution(self):
         for ecosystem, before, after in (("ruby", "3.3.7", "4.0.0"), ("python", "3.12.10", "3.13.5")):
             with self.subTest(ecosystem=ecosystem), self.fixture(MAJOR) as f:
                 self.image_runtime(f, ecosystem, before, after)
@@ -653,7 +644,7 @@ class GateTests(unittest.TestCase):
                     "image_id": "sha256:" + "b" * 64,
                 }])
                 f.require_ok(f.command("run"))
-                self.assertEqual(len(f.invocations()), 1)
+                self.assertEqual(f.invocations(), [])
                 self.assertNotEqual(f.command("run").returncode, 0)
 
     def test_empty_artifacts_require_an_image_backed_runtime(self):
@@ -689,31 +680,23 @@ class GateTests(unittest.TestCase):
                 self.assertNotEqual(f.init().returncode, 0)
                 self.assertFalse(f.marker.exists())
 
-    def test_runtime_image_rejects_config_mechanism_and_image_id_mismatch(self):
-        for mutation in ("mechanism", "config-image", "config-id", "candidate-id", "extra-field", "duplicate-json"):
+    def test_runtime_image_rejects_malformed_id_unknown_fields_and_duplicate_keys(self):
+        for mutation in ("candidate-id", "extra-field", "duplicate-json"):
             with self.subTest(mutation=mutation), self.fixture(MAJOR) as f:
                 self.image_runtime(f)
-                if mutation == "mechanism":
-                    f.plan["execution"]["mechanism"] = "vm"
-                    f.json(f.run_dir / "plan.json", f.plan)
-                elif mutation in ("config-image", "config-id"):
-                    key = "image" if mutation == "config-image" else "image_id"
-                    value = "other.example/python@sha256:" + "a" * 64 if key == "image" else "sha256:" + "e" * 64
-                    config = json.loads((f.run_dir / "isolation.json").read_text())
-                    config[key] = value
-                    f.json(f.run_dir / "isolation.json", config)
-                elif mutation == "candidate-id":
-                    f.plan["candidates"][0]["runtime_image"]["image_id"] = "latest"
-                    f.json(f.run_dir / "plan.json", f.plan)
+                image = f.plan["candidates"][0]["runtime_image"]
+                if mutation == "candidate-id":
+                    image["image_id"] = "latest"
                 elif mutation == "extra-field":
-                    f.plan["candidates"][0]["runtime_image"]["skip"] = True
-                    f.json(f.run_dir / "plan.json", f.plan)
-                else:
-                    (f.run_dir / "isolation.json").write_text(
-                        '{"image":"python@sha256:' + "a" * 64 + '","image_id":"sha256:'
-                        + "b" * 64 + '","image_id":"sha256:' + "b" * 64 + '"}')
+                    image["skip"] = True
+                f.flush()
+                if mutation == "duplicate-json":
+                    raw = (f.run_dir / "plan.json").read_text()
+                    raw = raw.replace('"runtime_image": {', '"runtime_image": {"reference":"duplicate",', 1)
+                    (f.run_dir / "plan.json").write_text(raw)
                 self.assertNotEqual(f.init().returncode, 0)
                 self.assertFalse(f.marker.exists())
+
 
     def test_runtime_image_keeps_release_review_and_minor_series_gates(self):
         for mutation in ("young", "unknown", "review", "minor-series"):
@@ -727,7 +710,7 @@ class GateTests(unittest.TestCase):
                     f.plan["candidates"][0]["compatibility"] = "compatible"
                 f.json(f.run_dir / "plan.json", f.plan)
                 f.require_ok(f.init())
-                f.approve(except_checks=("isolation",) if mutation == "review" else ())
+                f.approve(except_checks=("sources",) if mutation == "review" else ())
                 f.blocked()
 
     def test_runtime_image_can_bind_an_unchanged_native_dependency_source(self):
@@ -751,7 +734,7 @@ class GateTests(unittest.TestCase):
             self.assertEqual(len(report["runtime_images"]), 1)
             f.require_ok(f.command("run"))
 
-    def test_runtime_image_requires_audits_for_unchanged_after_dependencies(self):
+    def test_runtime_image_lists_manual_audits_for_unchanged_after_dependencies(self):
         for skill in (MINOR, MAJOR):
             for ecosystem, kind in (("ruby", "direct"), ("node", "transitive"), ("python", "build")):
                 with self.subTest(skill=skill, ecosystem=ecosystem, kind=kind), self.fixture(skill) as f:
@@ -761,10 +744,13 @@ class GateTests(unittest.TestCase):
                     existing["component"] = "worker"
                     f.inventory["before"].append(dict(existing))
                     f.inventory["after"].append(dict(existing))
-                    f.json(f.run_dir / "inventory.json", f.inventory)
-                    f.json(f.run_dir / "plan.json", f.plan)
-                    self.assertNotEqual(f.init().returncode, 0)
+                    f.ready()
+                    f.require_ok(f.command("check"))
+                    report = json.loads((f.run_dir / "automated-checks.json").read_text())
+                    self.assertEqual(report["manual_advisory_components"],
+                                     [{"ecosystem": ecosystem, "component": "worker"}])
                     self.assertFalse(f.marker.exists())
+
 
     def test_python_audit_covers_all_after_dependencies_and_excludes_removed(self):
         for skill in (MINOR, MAJOR):
@@ -789,7 +775,7 @@ class GateTests(unittest.TestCase):
                     f.approve()
                     if mutation == "complete":
                         f.require_ok(f.command("run"))
-                        self.assertEqual(len(f.invocations()), 1)
+                        self.assertEqual(f.invocations(), [])
                     else:
                         f.blocked()
 
@@ -811,7 +797,7 @@ class GateTests(unittest.TestCase):
             f.require_ok(f.init())
             f.approve()
             f.require_ok(f.command("run"))
-            self.assertEqual(len(f.invocations()), 1)
+            self.assertEqual(f.invocations(), [])
 
     def test_minor_rejects_same_version_same_source_metadata_drift(self):
         for field, value in (("name", "renamed"), ("kind", "transitive"), ("component", "worker")):
@@ -848,7 +834,7 @@ class GateTests(unittest.TestCase):
                 f.ready()
                 if succeeds:
                     f.require_ok(f.command("run"))
-                    self.assertEqual(len(f.invocations()), 1)
+                    self.assertEqual(f.invocations(), [])
                 else:
                     f.blocked()
 
@@ -869,7 +855,7 @@ class GateTests(unittest.TestCase):
                 f.ready()
                 if compatibility == "migration":
                     f.require_ok(f.command("run"))
-                    self.assertEqual(len(f.invocations()), 1)
+                    self.assertEqual(f.invocations(), [])
                 else:
                     f.blocked()
 
@@ -918,82 +904,28 @@ class GateTests(unittest.TestCase):
                 self.assertNotEqual(f.init().returncode, 0)
                 self.assertFalse(f.marker.exists())
 
-    def test_host_interpreter_and_path_escaping_cannot_be_authorized(self):
-        for mutation in ("host-interpreter", "artifact-traversal", "config-traversal", "duplicate-plan-key"):
+    def test_artifact_path_escaping_and_duplicate_plan_keys_are_rejected(self):
+        for mutation in ("artifact-traversal", "duplicate-plan-key"):
             with self.subTest(mutation=mutation), self.fixture() as f:
-                if mutation == "host-interpreter":
-                    f.plan["execution"]["argv"][0] = "/usr/bin/python3"
-                elif mutation == "artifact-traversal":
+                if mutation == "artifact-traversal":
                     f.plan["candidates"][0]["artifacts"][0]["path"] = "../outside.tgz"
-                elif mutation == "config-traversal":
-                    f.plan["execution"]["config"] = "../outside.json"
-                f.json(f.run_dir / "plan.json", f.plan)
+                f.flush()
                 if mutation == "duplicate-plan-key":
                     raw = (f.run_dir / "plan.json").read_text(encoding="utf-8")
                     (f.run_dir / "plan.json").write_text('{"unit":"duplicate",' + raw[1:], encoding="utf-8")
                 self.assertNotEqual(f.init().returncode, 0)
                 self.assertFalse(f.marker.exists())
 
-    def test_legacy_schema_and_missing_execution_inputs_are_rejected(self):
-        for mutation in ("schema", "inputs"):
-            with self.subTest(mutation=mutation), self.fixture() as f:
-                if mutation == "schema":
-                    f.plan["schema_version"] = 1
-                else:
-                    del f.plan["execution"]["inputs"]
-                f.flush()
-                self.assertNotEqual(f.init().returncode, 0)
 
-    def test_execution_inputs_must_be_declared_safe_unique_regular_files(self):
-        for mutation in ("missing", "duplicate", "config", "artifact", "reserved", "traversal", "symlink", "hardlink"):
-            with self.subTest(mutation=mutation), self.fixture() as f:
-                name = "executor/include.txt"
-                path = f.run_dir / name
-                path.parent.mkdir()
-                path.write_text("approved input\n", encoding="utf-8")
-                f.plan["execution"]["inputs"] = [name]
-                if mutation == "missing":
-                    path.unlink()
-                elif mutation == "duplicate":
-                    f.plan["execution"]["inputs"].append(name)
-                elif mutation in ("config", "artifact", "reserved", "traversal"):
-                    f.plan["execution"]["inputs"] = [{"config": "isolation.json", "artifact": f.artifact,
-                        "reserved": "execution-output/data", "traversal": "../include.txt"}[mutation]]
-                else:
-                    target = f.root / "include.txt"
-                    target.write_bytes(path.read_bytes())
-                    path.unlink()
-                    if mutation == "symlink":
-                        path.symlink_to(target)
-                    else:
-                        os.link(str(target), str(path))
-                f.flush()
-                self.assertNotEqual(f.init().returncode, 0)
-                self.assertFalse(f.marker.exists())
-
-    def test_undeclared_host_paths_and_unknown_tokens_are_rejected(self):
-        for argument in ("/unbound/include.json", "--config=/unbound/include.json", "-C/unbound", "--config@/unbound",
-                         "{candidate}/../outside", "{input:unlisted.txt}", "{artifact:packages/unlisted.tgz}",
-                         "{unknown}", "{candidate", "--mount={candidate},-C/unbound"):
-            with self.subTest(argument=argument), self.fixture() as f:
-                f.plan["execution"]["argv"].append(argument)
-                f.flush()
-                self.assertNotEqual(f.init().returncode, 0)
-                self.assertFalse(f.marker.exists())
+    def test_legacy_schema_is_rejected(self):
         with self.fixture() as f:
+            f.plan["schema_version"] = 1
             f.flush()
-            f.json(f.run_dir / "isolation.json", {"unreviewed_source": str(f.candidate)})
             self.assertNotEqual(f.init().returncode, 0)
 
-    def test_added_executor_input_is_bound_to_approval(self):
-        with self.fixture() as f:
-            path = f.run_dir / "include.txt"
-            path.write_text("approved", encoding="utf-8")
-            f.plan["execution"]["inputs"] = ["include.txt"]
-            f.plan["execution"]["argv"].append("{input:include.txt}")
-            f.ready()
-            path.write_text("unreviewed replacement", encoding="utf-8")
-            f.blocked()
+
+
+
 
     def test_inspection_result_is_bound_to_the_bytes_actually_parsed(self):
         for kind in ("archive", "audit"):
@@ -1089,44 +1021,23 @@ class GateTests(unittest.TestCase):
             f.require_ok(f.command("review", "--check", "sources", "--status", "pass", "--evidence", "evidence/sources.txt",
                                    "--note", "同じ根拠を再確認"))
             f.require_ok(f.command("run"))
-            self.assertEqual(len(f.invocations()), 1)
+            self.assertEqual(f.invocations(), [])
 
-    def test_executor_consumes_approved_snapshot_after_original_input_changes(self):
+    def test_exported_snapshot_preserves_approved_inputs_after_original_changes(self):
         with self.fixture() as f:
-            include = f.run_dir / "include.txt"
-            include.write_text("approved include", encoding="utf-8")
-            f.plan["execution"]["inputs"] = ["include.txt"]
-            f.plan["execution"]["argv"] += ["{config}", "{input:include.txt}", "{artifact:" + f.artifact + "}", "{candidate}/app"]
-            f.launcher.write_text(
-                "#!" + sys.executable + "\nimport json, pathlib, sys\n"
-                "record = {'source': pathlib.Path('app/index.js').read_text(), 'config': pathlib.Path(sys.argv[4]).read_text(),\n"
-                "          'include': pathlib.Path(sys.argv[5]).read_text(), 'artifact': pathlib.Path(sys.argv[6]).read_bytes().hex(),\n"
-                "          'candidate_arg': sys.argv[7]}\n"
-                "pathlib.Path(sys.argv[1]).write_text(json.dumps(record)+'\\n')\n", encoding="utf-8")
             f.ready()
-            config = (f.run_dir / "isolation.json").read_text(encoding="utf-8")
-            gate = load_gate(f.cli)
-            saved = gate.subprocess.run
-            def mutate_then_launch(*args, **kwargs):
-                (f.candidate / "app/index.js").write_text("unreviewed source", encoding="utf-8")
-                (f.run_dir / "isolation.json").write_text("unreviewed config", encoding="utf-8")
-                include.write_text("unreviewed include", encoding="utf-8")
-                (f.run_dir / f.artifact).write_bytes(b"unreviewed artifact")
-                return saved(*args, **kwargs)
-            gate.subprocess.run = mutate_then_launch
-            try:
-                self.assertEqual(invoke_gate(gate, f), 0)
-            finally:
-                gate.subprocess.run = saved
-            record = f.invocations()[0]
-            self.assertEqual(record["source"], "module.exports = 1;\n")
-            self.assertEqual(record["config"], config)
-            self.assertEqual(record["include"], "approved include")
-            self.assertEqual(record["artifact"], f.artifact_bytes.hex())
+            approved_source = (f.candidate / "app/index.js").read_bytes()
+            approved_artifact = f.artifact_bytes
+            f.require_ok(f.command("run"))
+            (f.candidate / "app/index.js").write_text("unreviewed source", encoding="utf-8")
+            (f.run_dir / f.artifact).write_bytes(b"unreviewed artifact")
             snapshot = f.run_dir / "execution-inputs"
-            self.assertEqual(record["candidate_arg"], str(snapshot / "candidate/app"))
-            for path in snapshot.rglob("*"):
-                self.assertFalse(path.stat().st_mode & 0o222)
+            self.assertEqual((snapshot / "candidate/app/index.js").read_bytes(), approved_source)
+            self.assertEqual((snapshot / "files" / f.artifact).read_bytes(), approved_artifact)
+            self.assertEqual(f.invocations(), [])
+            for item in snapshot.rglob("*"):
+                self.assertFalse(item.stat().st_mode & 0o222)
+
 
     def test_copy_time_change_and_preexisting_snapshot_consume_failed_run(self):
         for mutation in ("copy", "snapshot", "output"):
@@ -1211,7 +1122,7 @@ class StaticGateTests(unittest.TestCase):
                 f.launcher.unlink()
                 f.ready()
                 # 静的承認に隔離のpassを偽装しない。
-                self.assertEqual(f.state()["reviews"]["isolation"]["status"], "unknown")
+                self.assertNotIn("isolation", f.state()["reviews"])
                 result = f.require_ok(f.command("run"))
                 self.assertEqual(json.loads(result.stdout)["status"], "static_ready")
                 report = json.loads((f.run_dir / "execution-output/static-result.json").read_text())
@@ -1249,38 +1160,88 @@ class StaticGateTests(unittest.TestCase):
             self.assertNotEqual(isolation.returncode, 0)
             (f.run_dir / "evidence/sources.txt").write_text("changed evidence", encoding="utf-8")
             f.blocked()
+        with self.fixture() as f:
+            f.ready()
+            state = f.state()
+            state["reviews"]["isolation"] = {"status": "unknown"}
+            f.write_state(state)
+            f.blocked()
+            self.assertFalse((f.run_dir / "execution-output/static-result.json").exists())
 
-    def test_modes_are_explicit_and_static_rejects_execution_configuration(self):
+    def test_only_static_mode_is_supported_with_optional_legacy_static_marker(self):
         for skill in (MINOR, MAJOR):
-            for mutation in ("static-with-execution", "strict-without-execution", "unknown-mode"):
-                with self.subTest(skill=skill, mutation=mutation), self.fixture(skill) as f:
-                    f.plan["verification_mode"] = "static" if mutation == "static-with-execution" else "strict"
-                    if mutation == "strict-without-execution":
-                        del f.plan["execution"]
-                    elif mutation == "unknown-mode":
-                        f.plan["verification_mode"] = "skip-tests"
+            for marker in (None, "static"):
+                with self.subTest(skill=skill, marker=marker), self.fixture(skill) as f:
+                    if marker is not None:
+                        f.plan["verification_mode"] = marker
+                    f.ready()
+                    f.require_ok(f.command("run"))
+                    self.assertFalse(f.marker.exists())
+            for marker in ("strict", "skip-tests", None, 1):
+                with self.subTest(skill=skill, invalid_marker=marker), self.fixture(skill) as f:
+                    f.plan["verification_mode"] = marker
                     f.flush()
                     self.assertNotEqual(f.init().returncode, 0)
                     self.assertFalse(f.marker.exists())
-            with self.subTest(skill=skill, mode="explicit-strict"), self.fixture(skill) as f:
-                f.plan["verification_mode"] = "strict"
-                f.ready()
-                f.require_ok(f.command("run"))
-                self.assertEqual(len(f.invocations()), 1)
-                self.assertFalse((f.run_dir / "execution-output/static-result.json").exists())
 
-    def test_static_accepts_recent_release_but_not_unknown_or_future_publication(self):
+
+    def test_seven_day_wait_is_required_for_default_and_explicit_static_plans(self):
         for skill in (MINOR, MAJOR):
-            for published, succeeds in ((timestamp(-timedelta(days=1)), True),
-                                        (None, False), (timestamp(timedelta(days=1)), False)):
-                with self.subTest(skill=skill, published=published), self.fixture(skill) as f:
-                    self.static(f)
-                    f.plan["candidates"][0]["published_at"] = published
-                    f.ready()
-                    if succeeds:
-                        f.require_ok(f.command("run"))
-                    else:
+            for explicit in (False, True):
+                for age, succeeds in ((timedelta(days=7), True),
+                                      (timedelta(days=7) - timedelta(minutes=1), False),
+                                      (timedelta(days=1), False)):
+                    with self.subTest(skill=skill, explicit=explicit, age=age), self.fixture(skill) as f:
+                        if explicit:
+                            self.static(f)
+                        f.plan["candidates"][0]["published_at"] = timestamp(-age)
+                        f.ready()
+                        if succeeds:
+                            f.require_ok(f.command("run"))
+                        else:
+                            f.blocked("check")
+                            f.blocked()
+                        self.assertFalse(f.marker.exists())
+                for value in (None, timestamp(timedelta(days=1))):
+                    with self.subTest(skill=skill, explicit=explicit, published=value), self.fixture(skill) as f:
+                        if explicit:
+                            self.static(f)
+                        f.plan["candidates"][0]["published_at"] = value
+                        f.ready()
                         f.blocked()
+
+
+    def test_exact_seven_day_boundary_and_post_snapshot_recheck(self):
+        for skill in (MINOR, MAJOR):
+            for move_back_after_copy in (False, True):
+                with self.subTest(skill=skill, move_back_after_copy=move_back_after_copy), self.fixture(skill) as f:
+                    boundary = datetime.now(timezone.utc).replace(microsecond=0) + timedelta(hours=1)
+                    f.plan["candidates"][0]["published_at"] = (boundary - timedelta(days=7)).isoformat().replace("+00:00", "Z")
+                    f.ready()
+                    gate = load_gate(f.cli)
+                    class BoundaryDateTime(datetime):
+                        @classmethod
+                        def now(cls, tz=None):
+                            return boundary
+                    class JustBeforeBoundaryDateTime(datetime):
+                        @classmethod
+                        def now(cls, tz=None):
+                            return boundary - timedelta(microseconds=1)
+                    gate.datetime = BoundaryDateTime
+                    if move_back_after_copy:
+                        saved = gate.prepare_execution
+                        def move_clock_after_copy(*args):
+                            result = saved(*args)
+                            gate.datetime = JustBeforeBoundaryDateTime
+                            return result
+                        gate.prepare_execution = move_clock_after_copy
+                        with self.assertRaises(gate.GateError):
+                            invoke_gate(gate, f)
+                        self.assertEqual(f.state()["execution_status"], "failed")
+                        self.assertFalse((f.run_dir / "execution-output/static-result.json").exists())
+                    else:
+                        self.assertEqual(invoke_gate(gate, f), 0)
+                        self.assertTrue((f.run_dir / "execution-output/static-result.json").is_file())
                     self.assertFalse(f.marker.exists())
 
     def test_static_manual_advisories_include_unchanged_dependencies_and_all_versions(self):
@@ -1487,7 +1448,7 @@ class StaticGateTests(unittest.TestCase):
                     f.marker = f.run_dir / "execution-output/invocations.jsonl"
                     f.ready()
                     self.assertTrue(all(f.state()["reviews"][name]["status"] == "pass" for name in STATIC_REVIEWS))
-                    self.assertEqual(f.state()["reviews"]["isolation"]["status"], "unknown")
+                    self.assertNotIn("isolation", f.state()["reviews"])
                     result = f.require_ok(f.command("run"))
                     self.assertEqual(json.loads(result.stdout)["status"], "static_ready")
                     report = json.loads((f.run_dir / "execution-output/static-result.json").read_text())
@@ -1505,18 +1466,17 @@ class StaticGateTests(unittest.TestCase):
 
     def test_static_path_never_invokes_a_child_process(self):
         with self.fixture() as f:
-            self.static(f)
             f.ready()
             gate = load_gate(f.cli)
-            saved = gate.subprocess.run
             def unexpected_process(*_args, **_kwargs):
-                self.fail("静的な反映準備で子プロセスを起動した")
-            gate.subprocess.run = unexpected_process
-            try:
+                self.fail("static export invoked a child process")
+            with mock.patch.object(subprocess, "Popen", side_effect=unexpected_process), \
+                 mock.patch.object(os, "system", side_effect=unexpected_process), \
+                 mock.patch.object(os, "posix_spawn", side_effect=unexpected_process, create=True), \
+                 mock.patch.object(os, "posix_spawnp", side_effect=unexpected_process, create=True):
                 self.assertEqual(invoke_gate(gate, f), 0)
-            finally:
-                gate.subprocess.run = saved
             self.assertFalse(f.marker.exists())
+
 
     def test_static_copy_failure_or_changed_proof_cannot_produce_ready_result(self):
         for mutation in ("candidate-during-copy", "proof-after-copy", "stale-after-copy"):

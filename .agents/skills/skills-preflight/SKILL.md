@@ -15,16 +15,16 @@ description: このリポジトリの Codex スキルの定義・呼び出し設
 
 ## 対象プロジェクトの前提を確認する
 
-- 対象が指定されていればその場所、なければ現在のプロジェクトの指示・README・実行設定・CI を静的に読み、利用スキルに必要な構成を確認する。対象未指定ならプロジェクト固有の前提は未確認とする。
-- 整備スキルは対象文書・実装と影響範囲の既存検証手段を確認する。`codebase-cleanup-workflow` は組み合わせる5スキルの定義と前提を確認し、一部だけ実行可能ならその範囲を示す。
-- `minor-version-upgrade`・`major-version-upgrade` の標準は静的確認で更新差分を反映する。両本体と `references/gate.md`・`verification.md` を読み、信頼済み Python 3.9 以降を絶対パス・`-I -S` で使えること、公式情報・取得物・manifest/lockfile・全依存 inventory・証拠を確認できることを調べる。標準の計画は `verification_mode: static`、`execution` なし、`isolation` 以外の6レビューで、ゲートは対象・依存コードを起動せず snapshot を保存する。
-- Ruby/Bundler、Node/npm・pnpm・Yarn、Python/uv・pip・Poetry 等の採用方式と版を、存在する版指定・manifest・lockfile・CI から静的に特定する。プロジェクト内 wrapper・Gemfile/gemspec・backend・plugin を版確認のために実行しない。採用していない管理ツールの導入や管理方式の変更を要求しない。混在構成・直接/間接/build/platform 等の範囲を確認し、その他の言語へ更新範囲を広げない。
-- 正しい候補と lockfile を対象コードの評価なしに準備できる方法があるかを確認する。`lockfile-only`・`dry-run`・`ignore-scripts` の名前だけで判断しない。解決・生成にコード評価が不可欠なら `references/isolation.md` の隔離が必要で、その工程を実行できない対象は条件付きとする。候補作成に不要な Docker・導入・テスト・ブラウザの不足だけでは標準更新全体を利用不可としない。
-- 全更新後依存とランタイムの既知情報を確認する。監査 JSON を使う場合は対応形式・範囲・鮮度を確認し、提示済み JSON の finding・エラー・skip・期限切れ・coverage 不足を無視しない。標準では JSON 未収集の component を公式告知・advisory DB へ照会して証拠化できるかも確認する。厳格では従来どおり全範囲の監査 JSON が必要。秘密値・private な依存情報を無断送信しない。
-- コードを実行する準備・任意検証、または明示された厳格モードが必要な場合に、`references/isolation.md` と同梱 helper の既存 Docker CLI・daemon/context・固定 image・toolchain を調べる。読み取り専用の接続確認には正規の実行承認を利用でき、通常実行の拒否と承認後の結果を区別する。Docker 本体の導入・daemon 起動・`sudo`・socket 権限変更などは行わない。
-- 標準の追加検証は別 RUN のレビュー済み executor で選択したチェックを行う手順で、Docker・Web・DB・ネイティブ操作の未実施はその範囲の未確認として残す。厳格モードだけは全工程を一度のゲート `run` で完遂する能力、7レビュー、公開7日待機、必要なテスト・実操作までの環境を前提とする。より厳しい組織方針も確認する。
-- 反映前後の差分・hash・実行 bit・削除と元の全適用予定パスを照合し、ユーザー変更との競合で止められることを確認する。静的 snapshot の readonly mode を反映先の権限として使わず、実行確認済みと静的確認済みを区別できる手順を読む。
-- 事前確認は読み取り専用に限る。更新本体、`new-run.sh`、`prepare`・probe・worker、image 取得・build、ゲートの各工程、テストは起動しない。コマンドの存在・信頼済みツールのバージョン・接続状態以外を推測で確認済みとせず、未導入・未ログインと実行権限不足を区別する。秘密値は表示しない。
+- 対象が指定されていればその場所、なければ現在のプロジェクトの指示・README・実行設定・CI を静的に読み、利用スキルに必要な構成を確認する。対象未指定なら固有の前提は未確認とする。
+- 整備スキルは対象文書・実装と影響範囲の既存検証手段を確認する。`codebase-cleanup-workflow` は組み合わせる5スキルの定義と前提を確認し、一部だけ実行可能なら範囲を示す。
+- `minor-version-upgrade`・`major-version-upgrade` は静的確認で差分を反映する。両本体と `references/gate.md`・`verification.md` を読み、信頼済み Python 3.9 以降を絶対パス・`-I -S` で使え、公式情報・取得物・manifest/lockfile・全依存 inventory・根拠を確認できるか調べる。計画はモード指定不要、`execution` なし、6レビューで、ゲートは対象コードを起動せず snapshot を保存する。
+- 候補版と全新規配布物（image を含む）の最新の公式公開から7日以上を確認できることを調べる。7日未満・不明・未来は保留し、最新が新しすぎれば経過済みの適切な安定版を選ぶ。待機の短縮や override はなく、保留対象は再開可能日または不明の理由を報告できる手順を確認する。
+- Ruby/Bundler、Node/npm・pnpm・Yarn、Python/uv・pip・Poetry 等の採用方式・版を、版指定・manifest・lockfile・CI から特定する。wrapper・Gemfile/gemspec・backend・plugin を版確認のために実行せず、採用していないツールや方式変更を要求しない。混在構成・直接/間接/build/platform 等の範囲を確認し、他言語へ更新範囲を広げない。
+- 正しい候補と lockfile を対象コードの評価なしに作れるか確認する。`lockfile-only`・`dry-run`・`ignore-scripts` の名前だけで判断しない。解決・生成にコード評価が不可欠なら `references/isolation.md` の隔離が必要で、実行できない対象は条件付きとする。完成した候補の追加テストやブラウザの不足だけで更新全体を利用不可にしない。
+- 全更新後依存とランタイムの既知情報を確認できるか調べる。監査 JSON の範囲・形式・鮮度と finding・エラー・skip・coverage の停止条件を読む。JSON 未収集の component は全依存版を公式告知/advisory DB へ照会して証拠化できるかも確認する。秘密・private 情報を無断送信しない。
+- 必要な候補解決や任意検証に限り、既存 Docker CLI・daemon/context・固定 image・toolchain と helper を確認する。信頼済み CLI の読み取り専用接続確認は正規承認を利用でき、通常の拒否と承認後の結果を区別する。Docker 導入・daemon 起動・`sudo`・socket 権限変更は行わない。
+- 反映前後の全適用予定パス・hash・実行 bit・削除を照合し、競合なら止め、元 bytes/逆差分から自分の更新分だけを安全に取り下げて新しい静的計画を確認する手順を読む。readonly snapshot の権限を反映先に使わず、静的確認と実行確認を区別する。
+- 事前確認は読み取り専用に限る。更新本体、`new-run.sh`、`prepare`・probe・worker、image 取得・build、ゲート各工程、テストは起動しない。コマンドの存在・信頼済みツールの版・接続状態以外は推測で確認済みにせず、未導入・未ログインと権限不足を区別する。秘密値は表示しない。
 
 ## 結果を報告する
 
