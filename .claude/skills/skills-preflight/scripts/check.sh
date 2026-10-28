@@ -49,7 +49,7 @@ check_cmd() {
 check_cmd git "ほぼすべて" "\`xcode-select --install\`（または \`brew install git\`）" git --version
 check_cmd jq "ほぼすべて" "\`brew install jq\`" jq --version
 check_cmd codex "codex-*" "\`brew install --cask codex\` のあと \`codex login\`" codex --version
-check_cmd claude "opus-final-review" "\`brew install --cask claude-code\` のあと \`claude auth login\`" claude --version
+check_cmd perl "haiku-impl, opus-final-review" "\`brew install perl\`（macOS には標準で入っている）" perl -e 'print "perl $^V\n"'
 check_cmd gh "gh-todo, gh-issue-overview, gh-pr-precheck, codex-verify-prompt（PR を渡すとき）" "\`brew install gh\` のあと \`gh auth login\`" gh --version
 check_cmd python3 "gh-issue-overview" "\`xcode-select --install\`（または \`brew install python\`）" python3 --version
 check_cmd curl "gh-issue-overview, gh-pr-precheck" "\`brew install curl\`"
@@ -71,14 +71,6 @@ if has codex; then
   fi
 fi
 
-if has claude; then
-  if out=$(claude auth status 2>/dev/null) && [[ $(jq -r '.loggedIn // false' <<<"$out" 2>/dev/null) == true ]]; then
-    add claude-login ok "Claude のログイン" "$(jq -r '"\(.authMethod // "?")（\(.apiProvider // "?")）"' <<<"$out")" "opus-final-review"
-  else
-    add claude-login ng "Claude のログイン" "未ログイン" "opus-final-review" "\`claude auth login\`"
-  fi
-fi
-
 if has gh; then
   if gh auth status >/dev/null 2>&1; then
     user=$(gh api user --jq .login 2>/dev/null || true)
@@ -86,6 +78,31 @@ if has gh; then
   else
     add gh-login ng "GitHub（gh）のログイン" "未ログイン" "gh-todo, gh-issue-overview, gh-pr-precheck, codex-verify-prompt（PR を渡すとき）" "\`gh auth login\`"
   fi
+fi
+
+# --- サブエージェントのリンク（haiku-impl・haiku-test・opus-final-review に必須） ---------
+
+agents_src="$repo_root/.claude/agents"
+agents_dir="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/agents"
+agent_users="haiku-impl, haiku-test, opus-final-review"
+unlinked_agents=()
+for f in "$agents_src"/*.md; do
+  [[ -f $f ]] || continue
+  name=$(basename "$f")
+  [[ -L $agents_dir/$name && $(readlink "$agents_dir/$name") == "$f" ]] || unlinked_agents+=("${name%.md}")
+done
+if ((${#unlinked_agents[@]} == 0)); then
+  add agents-link ok "\`~/.claude/agents\` へのリンク" "すべてリンク済み" "$agent_users"
+else
+  add agents-link ng "\`~/.claude/agents\` へのリンク" "未リンク: ${unlinked_agents[*]}" "$agent_users" \
+    "\`$repo_root/scripts/link-skills.sh --claude\`（初めて \`~/.claude/agents\` を作ったときは、新しいセッションで使う）"
+fi
+# haiku-implementer の hook は、ユーザー用のスキルのリンクから guard.sh を呼ぶ
+if [[ -L $link_dir/haiku-impl && $(readlink "$link_dir/haiku-impl") == "$skills_dir/haiku-impl" ]]; then
+  add haiku-impl-link ok "\`~/.claude/skills/haiku-impl\` のリンク" "リンク済み" "haiku-impl（hook の guard.sh）"
+else
+  add haiku-impl-link ng "\`~/.claude/skills/haiku-impl\` のリンク" "未リンク" "haiku-impl（hook の guard.sh）" \
+    "\`$repo_root/scripts/link-skills.sh --claude\`"
 fi
 
 # --- 他のフォルダから使うためのリンク（任意） --------------------------------
@@ -110,7 +127,9 @@ skill_needs() {
   case $1 in
     codex-verify-prompt) echo "git jq" ;;
     codex-*) echo "git jq codex codex-login" ;;
-    opus-final-review) echo "git jq claude claude-login" ;;
+    haiku-impl) echo "git jq perl agents-link haiku-impl-link" ;;
+    haiku-test) echo "git agents-link" ;;
+    opus-final-review) echo "git perl agents-link" ;;
     gh-todo) echo "jq gh gh-login" ;;
     gh-issue-overview) echo "jq gh gh-login python3 curl" ;;
     gh-pr-precheck) echo "jq gh gh-login curl" ;;

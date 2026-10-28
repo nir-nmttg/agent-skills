@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# スキルの description の文字数を数え、上限を超えたものがないかを確かめる。
+# スキルとサブエージェントの description の文字数を数え、上限を超えたものがないかを確かめる。
 # Claude / Codex 別に、自動選択される description の文字数も出す。
 #
 # 使い方: scripts/check-descriptions.sh
-#   - 1 行に「種類（auto / manual） 文字数/上限 スキル名」を出力する
-#   - 上限: 自動で使う・確認されるスキルは 200 文字、明示的に呼び出すスキルは 120 文字
+#   - 1 行に「種類（auto / manual / agent） 文字数/上限 名前」を出力する
+#   - 上限: 自動で使う・確認されるスキルは 200 文字、明示的に呼び出すスキルと Claude のサブエージェントは 120 文字
+#   - サブエージェント（.claude/agents/*.md）は、frontmatter の name とファイル名の一致と、model がフルのモデル ID かも確かめる
 #   - Codex の agents/openai.yaml に short_description・default_prompt がないか、display_name があれば指摘する
 #   - 上限超えか openai.yaml の指摘があれば終了コード 1
 set -euo pipefail
@@ -69,6 +70,32 @@ for f in "$repo_root"/.claude/skills/*/SKILL.md "$repo_root"/.agents/skills/*/SK
   fi
   printf '%-6s %3d/%d  %s%s\n' "$kind" "${#desc}" "$limit" "$name" "$mark"
 done
-echo "自動選択用 description の合計: Claude ${claude_context} 文字 / Codex ${codex_context} 文字"
+
+# サブエージェントの description は Agent ツールの一覧として毎回読み込まれる。スキルから呼ぶ専用なので短くする
+agent_context=0
+for f in "$repo_root"/.claude/agents/*.md; do
+  [[ -f "$f" ]] || continue
+  file_name=$(basename "$f" .md)
+  frontmatter=$(awk '/^---$/ { n++; next } n == 1' "$f")
+  desc=$(sed -n 's/^description:[[:space:]]*//p' <<<"$frontmatter")
+  agent_name=$(sed -n 's/^name:[[:space:]]*//p' <<<"$frontmatter")
+  model=$(sed -n 's/^model:[[:space:]]*//p' <<<"$frontmatter")
+  agent_context=$((agent_context + ${#desc}))
+  mark=""
+  if (( ${#desc} > manual_limit )); then
+    mark+="  ← 上限超え"
+    over=1
+  fi
+  if [[ "$agent_name" != "$file_name" ]]; then
+    mark+="  ← name（${agent_name:-なし}）がファイル名と違う"
+    over=1
+  fi
+  if [[ ! "$model" =~ ^claude-[a-z0-9-]+$ ]]; then
+    mark+="  ← model がフルのモデル ID ではない（${model:-なし}）"
+    over=1
+  fi
+  printf '%-6s %3d/%d  %s%s\n' agent "${#desc}" "$manual_limit" "claude-agent/$file_name" "$mark"
+done
+echo "自動選択用 description の合計: Claude ${claude_context} 文字 / Codex ${codex_context} 文字 / Claude のサブエージェント ${agent_context} 文字"
 
 exit "$over"

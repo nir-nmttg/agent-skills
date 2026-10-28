@@ -5,7 +5,8 @@
 #   --effort  Codex の推論レベル。Claude の推論レベルをそのまま渡す（省略時は $CLAUDE_EFFORT、それもなければ high）
 #   --fast    Fast モード（service_tier=fast）で実行する。速いぶん使用量が増える
 #   --cd      Codex が既存コードを確かめるときの作業フォルダ（既定: 今のフォルダ）
-#   --focus   観点ごとに分けて、観点の数だけ Codex を並列に動かす。結果は review-<観点>.md に保存する
+#   --focus   全観点を見る総合の 1 本に加えて、指定した観点ごとの重点レビューを並列に動かす。
+#             結果は review-general.md（総合）と review-<観点>.md に保存する
 #             観点は assets/focus/ のファイル名（requirements / reliability / security / simplicity）
 #
 # 環境変数 CODEX_DESIGN_REVIEW_MODEL でモデルを、CODEX_DESIGN_REVIEW_PROMPT でレビューの指示書を、
@@ -66,19 +67,27 @@ args=(
   --cd "$workdir"
   --model "$model"
   -c "model_reasoning_effort=\"$effort\""
+  # 1M コンテキストで動かす（モデルの上限を超えた分は Codex が上限に合わせる）。--ignore-user-config で
+  # ユーザー設定を読まないので、ここで指定する
+  -c model_context_window=1000000
+  -c model_auto_compact_token_limit=900000
   --json
 )
 fast_label=off
 [[ -n $fast ]] && { args+=(-c 'service_tier="fast"'); fast_label=on; }
 
-# 1 つの観点（空なら全観点）についてプロンプトを組み立て、Codex を実行する。Codex の終了コードを返す
+# 1 つの観点についてプロンプトを組み立て、Codex を実行する。Codex の終了コードを返す。
+# 観点が空なら 1 本だけのレビュー、general なら並列のうちの総合（どちらも全観点を見る）
 run_review() {
   local focus=$1 sfx=${1:+-$1} status=0
   {
     cat "$prompt_file"
-    if [[ -n $focus ]]; then
+    if [[ $focus == general ]]; then
       printf '\n\n## 今回の担当\n\n'
-      echo 'このレビューは観点ごとに分けて、複数のレビュアーが並行して行っています。あなたの担当は次の観点だけです。上の「観点」のうち担当外のものはほかのレビュアーが見るので、深追いしないでください。担当外でも重要度「高」の問題に気づいたときは、「指摘」の最後に見出しへ「[担当外]」を付けて簡潔に挙げてください。出力形式は上と同じです。'
+      echo 'このレビューは複数のレビュアーが並行して行っています。あなたは総合の担当で、上の「観点」のすべてを見てください。ほかのレビュアーは特定の観点を重点的に見ますが、あなたが観点を絞る必要はありません。出力形式は上と同じです。'
+    elif [[ -n $focus ]]; then
+      printf '\n\n## 今回の担当\n\n'
+      echo 'このレビューは複数のレビュアーが並行して行っています。全観点を見る総合のレビュアーとは別に、あなたは次の観点を重点的に深く見る担当です。担当外の観点は総合のレビュアーが見るので、深追いしないでください。担当外でも重要度「高」の問題に気づいたときは、「指摘」の最後に見出しへ「[担当外]」を付けて簡潔に挙げてください。出力形式は上と同じです。'
       echo
       cat "$focus_dir/$focus.md"
     fi
@@ -121,7 +130,7 @@ if ((${#focuses[@]} == 0)); then
 
   echo "## $title"
   echo
-  echo "- 設定: $model / effort=$effort / fast=$fast_label"
+  echo "- 設定: $model / effort=$effort / fast=$fast_label / context=1M"
   echo "- 所要時間: $((SECONDS - started)) 秒、トークン: $(tokens_of "")"
   echo "- 保存先: $run_dir/review.md"
   echo "- 続きを Codex と話す: codex resume $(thread_of "")"
@@ -131,7 +140,9 @@ if ((${#focuses[@]} == 0)); then
   exit 0
 fi
 
-echo "Codex で観点ごとに並列レビュー中: ${focuses[*]} model=$model effort=$effort fast=$fast_label cwd=$workdir" >&2
+echo "Codex で総合と観点ごとに並列レビュー中: 総合 ${focuses[*]} model=$model effort=$effort fast=$fast_label cwd=$workdir" >&2
+# 総合の 1 本を先頭に足す（重点の担当は観点を絞るので、総合がないと担当外の観点が抜ける）
+focuses=(general "${focuses[@]}")
 pids=()
 for f in "${focuses[@]}"; do
   run_review "$f" &
@@ -146,17 +157,18 @@ done
 
 echo "## ${title}（観点ごとに並列）"
 echo
-echo "- 設定: $model / effort=$effort / fast=$fast_label"
-echo "- 観点: $(IFS=,; echo "${focuses[*]}")"
+echo "- 設定: $model / effort=$effort / fast=$fast_label / context=1M"
+echo "- 観点: 総合 + $(IFS=,; echo "${focuses[*]:1}")"
 echo "- 所要時間: $((SECONDS - started)) 秒（すべての観点が終わるまで）"
 echo
 failed=()
 for i in "${!focuses[@]}"; do
-  f=${focuses[$i]}
-  check_result "-$f" "${statuses[$i]}" "$f" || { failed+=("$f"); continue; }
+  f=${focuses[$i]} label=${focuses[$i]}
+  [[ $f != general ]] || label=総合
+  check_result "-$f" "${statuses[$i]}" "$label" || { failed+=("$label"); continue; }
   echo "---"
   echo
-  echo "## 観点: $f"
+  if [[ $f == general ]]; then echo "## 観点: 総合（全観点）"; else echo "## 観点: $f"; fi
   echo
   echo "- トークン: $(tokens_of "-$f")"
   echo "- 保存先: $run_dir/review-$f.md"
