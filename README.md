@@ -22,7 +22,7 @@ Claude Code のスキルは機能を作って届けるまでの開発を、Codex
 
 典型的な流れは次のとおり。
 
-1. **Claude Code で開発する**: 設計・実装・検証を進め、PR まで仕上げる。実装・テストの実行・最終レビューは Claude のサブエージェント（Haiku 5.5 / Opus 5.5）に、設計・実装のレビューは Codex CLI（GPT-6.1 Sol / GPT-6 Astra）に任せるが、指示・採否の判断・反映は Claude が行う。
+1. **Claude Code で開発する**: 設計・実装・検証を進め、PR まで仕上げる。実装・確認の実行・最終レビューは Claude のサブエージェント（Haiku 5.5 / Opus 5.5）に、設計・実装のレビューは Codex CLI（GPT-6.1 Sol / GPT-6 Astra）に任せるが、指示・採否の判断・反映は Claude が行う。
 2. **Codex で整備する**: 時間やトークンに余裕があるとき、プロジェクト全体の設計とのずれ・責務の混在や重複・冗長なテスト・宣言順・古いドキュメントを繰り返し整える。`$codebase-cleanup-workflow` でまとめて実行するか、目的ごとのスキルを指定する。ランタイム・依存の互換更新は別途 `$minor-version-upgrade` で依頼し、静的確認で反映し、利用可能な環境でテスト・画面操作を追加する。
 3. **整ったコードベースで、また Claude Code で次の開発に進む。**
 
@@ -72,7 +72,7 @@ Claude Code のリンク先は、`CLAUDE_CONFIG_DIR` 指定時はその配下の
 
 | 種類 | 呼び出し方 | 開発用 | 雑務用 |
 | --- | --- | --- | --- |
-| 自動で使われる | 条件に当たると Claude が使う。`/スキル名` や話しかけても使える | [codex-design-review・haiku-impl・haiku-test・codex-impl-review・opus-final-review](#自動で使われる開発用スキル) | [japanese-report・session-status-emoji](#自動で使われる雑務用スキル) |
+| 自動で使われる | 条件に当たると Claude が使う。`/スキル名` や話しかけても使える | [codex-design-review・haiku-impl・haiku-check・codex-impl-review・opus-final-review](#自動で使われる開発用スキル) | [japanese-report・session-status-emoji](#自動で使われる雑務用スキル) |
 | 使う前に確認される | 条件に当たると使うか確認する。`/スキル名` や話しかけても使える | [codex-risk-design-review・codex-risk-impl-review](#使う前に確認される開発用スキル) | なし |
 | 明示的に呼び出す | `/スキル名` で指定して使う。通常の依頼から自動で選ぶことはない | [gh-issue-overview・codex-verify-prompt・gh-pr-precheck・whats-next](#明示的に呼び出す開発用スキル) | [skills-preflight・gh-todo・browser-readonly-research](#明示的に呼び出す雑務用スキル) |
 
@@ -88,11 +88,11 @@ Claude Code のリンク先は、`CLAUDE_CONFIG_DIR` 指定時はその配下の
 | --- | --- | --- | --- | --- |
 | [codex-design-review](.claude/skills/codex-design-review/SKILL.md) | 設計を Codex CLI の GPT-6.1 Sol に読み取り専用・1M コンテキストでレビューさせ、Claude が指摘の採否を判断して修正案を出す。`--focus` で、総合の 1 本に観点ごとの重点レビューを並列に加えられる | 3 ファイル以上・新しい機能や API・複数案から選んだ設計、DB・公開 API・認証・課金などに触れる設計、外部のツールや API の挙動を前提にした設計、既存の規約から外れる設計、Haiku に任せる前の設計を提示する前（迷ったら使う。設計の判断を含まない変更だけ除く）。大きい設計、高リスク領域に 2 つ以上触れる設計、Haiku に並行で任せる前提の設計、外部の前提が設計を大きく左右するときは、総合と観点ごとの重点で並列にする（当たるか迷ったら並列） | `/codex-design-review`<br>`/codex-design-review --focus requirements,reliability docs/design.md`<br>「この設計を Codex にレビューしてもらって」 | `codex` にログイン済み、`jq` |
 | [haiku-impl](.claude/skills/haiku-impl/SKILL.md) | 実装を Haiku 5.5（推論レベル max）のサブエージェントに任せ、Claude は分割・指示・レビュー・反映を行う。独立したタスクは、未コミットの変更を含めて切った worktree で並行実装し、3-way マージで反映する。Haiku はメインと同じ権限モードで動き（auto モードが前提）、hook が worktree の外への書き込み・`cd` なしの Bash・git の状態の変更・依存パッケージのインストールを止める。DB や Docker のテストはロックで 1 本ずつ実行する。差し戻しは SendMessage。コミットはしない | 要件と完了の条件がはっきりした 250 行以上の部分（既存パターンに沿った機能追加、テスト追加など）に取りかかるとき（250 行以上なら迷ったら任せる。250 行未満は Claude が書く） | `/haiku-impl CSV エクスポートを追加して`<br>「この Issue の実装を Haiku に並列で任せて」<br>「Haiku に実装させてレビューして」 | `~/.claude/agents` と `~/.claude/skills/haiku-impl` のリンク、`jq`、`perl`、対象が git リポジトリ |
-| [haiku-test](.claude/skills/haiku-test/SKILL.md) | テスト・型チェック・lint・ビルドを Haiku 5.5（推論レベル max）のサブエージェントに実行させ、失敗の要点と原因を報告させる。DB や Docker のテストもそのまま実行でき、ログは保存先に残す。ファイルは変更せず、実行の前後で中身を比べて変わったファイルを知らせる。再実行は SendMessage | Claude がテスト・型チェック・リンター・ビルドを実行するときは原則すべて。実装の確認、レビューの前と指摘を直したあと、完了報告・コミット・PR の前、失敗の切り分けでは必ず任せる（迷ったら任せる。数行で済む 1〜数件のテストを編集のたびに細かく繰り返している最中だけは Claude が直接実行する） | `/haiku-test`<br>`/haiku-test npm test と型チェックを実行`<br>「テストして」 | `~/.claude/agents` のリンク |
+| [haiku-check](.claude/skills/haiku-check/SKILL.md) | テスト・型チェック・lint・ビルド・カバレッジ・依存の脆弱性検査・CI の失敗ログ・開発環境のログなど、出力が長く状態を変えない確認を Haiku 5.5（推論レベル max）のサブエージェントに任せ、失敗・指摘の要点と原因を報告させる。DB や Docker のテストもそのまま実行でき、ログと 10 件を超える指摘の一覧は保存先に残す。ファイルや外部の状態は変えず、実行の前後で中身を比べて変わったファイルを知らせる。再実行は SendMessage | Claude がこれらの確認を実行するときは原則すべて。実装の確認、レビューの前と指摘を直したあと、完了報告・コミット・PR の前、失敗の切り分け、CI が落ちたとき、依存を追加・更新したとき、開発環境のログからエラーを探すときは必ず任せる（迷ったら任せる。数行で済む 1〜数件のテストを編集のたびに細かく繰り返している最中と、状態を変えるコマンド・`terraform plan` など出力の細部で判断するもの・本番への接続は Claude が直接扱う） | `/haiku-check`<br>`/haiku-check CI が落ちた理由を調べて`<br>「テストして」 | `~/.claude/agents` のリンク（CI のログは `gh` にログイン済み） |
 | [codex-impl-review](.claude/skills/codex-impl-review/SKILL.md) | git の差分を GPT-6.1 Sol に読み取り専用・1M コンテキストでレビューさせ、Claude が指摘の採否を判断し、自分の実装なら修正する。既定は未コミットを含む既定ブランチとの差分。`--base` / `--commit` / `--uncommitted` で範囲を、`--focus` で総合に加える重点の観点を選べる | 2 ファイル以上か 30 行以上のロジック変更、DB・公開 API・認証・課金などに触れる変更、プロンプトや設定など文章が動作を決めるファイルの変更を終えたら、完了報告やコミットの前（迷ったら使う。意味や動作を変えない修正と、依存のバージョンだけの変更は除く。Haiku に書かせた変更には必ず使う）。15 ファイル以上か 500 行以上、高リスク領域に 2 つ以上、Haiku を並行させて組み合わせた変更、設計レビューで「高」の指摘があった設計の実装では、総合と観点ごとの重点で並列にする（当たるか迷ったら並列） | `/codex-impl-review`<br>`/codex-impl-review --fast --uncommitted`<br>「観点ごとに分けて Codex で並列に実装レビューして」 | `codex` にログイン済み、`jq`、対象が git リポジトリ |
 | [opus-final-review](.claude/skills/opus-final-review/SKILL.md) | 会話を共有しない Opus 5.5 のサブエージェントに、要件と git の差分だけで最終レビューさせ、要件とのずれを確かめる。レビュアーは Read / Grep / Glob だけを使い、ユーザー用の CLAUDE.md・MCP は読み込まない（作業場所のルートの CLAUDE.md・AGENTS.md だけを渡す）。Claude が指摘の採否を判断し、自分の実装なら修正する | 要件が 3 つ以上ある、会話の途中で要件が変わった、Haiku に実装させた、あいまいな要件を Claude が解釈した、15 ファイル以上か 500 行以上、高リスク領域に 2 つ以上触れる変更で、codex-impl-review などの指摘を直し終えたあとの最後の確認（迷ったら使う。意味や動作を変えない修正と、要件が 1 文で明確でほかの条件に当たらない変更だけ除く） | `/opus-final-review`<br>`/opus-final-review --uncommitted`<br>「仕上げにコンテキストなしの Opus で最終レビューして」 | `~/.claude/agents` のリンク、対象が git リポジトリ |
 
-Sol / Astra のレビューと Opus の最終レビューは、推論レベルを現在の Claude に揃える。Sol / Astra は 1M コンテキストで動き、`--fast` にも対応する。レビューとテストは見つける欠陥の種類が違う（Sol: コードや設計の欠陥、Astra: 壊れ方、Opus: 要件とのずれ、haiku-test: 回帰）ので、それぞれの条件に当たるものはすべて使う。順番は テスト → Sol（と Astra）→ 直す → テスト → Opus → 直す → テスト。再レビューは直した分の差分で判断し（重要度「高」を直したときなど）、同じ変更への再レビューは 2 回まで。並列化やレビュー範囲の詳しい指定は、各スキルを参照。
+Sol / Astra のレビューと Opus の最終レビューは、推論レベルを現在の Claude に揃える。Sol / Astra は 1M コンテキストで動き、`--fast` にも対応する。レビューとテストは見つける欠陥の種類が違う（Sol: コードや設計の欠陥、Astra: 壊れ方、Opus: 要件とのずれ、haiku-check: 回帰）ので、それぞれの条件に当たるものはすべて使う。順番は テスト → Sol（と Astra）→ 直す → テスト → Opus → 直す → テスト。再レビューは直した分の差分で判断し（重要度「高」を直したときなど）、同じ変更への再レビューは 2 回まで。並列化やレビュー範囲の詳しい指定は、各スキルを参照。
 
 #### 使う前に確認される開発用スキル
 
