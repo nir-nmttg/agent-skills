@@ -66,6 +66,10 @@ args=(
   --cd "$workdir"
   --model "$model"
   -c "model_reasoning_effort=\"$effort\""
+  # 1M コンテキストで動かす（モデルの上限を超えた分は Codex が上限に合わせる）。--ignore-user-config で
+  # ユーザー設定を読まないので、ここで指定する
+  -c model_context_window=1000000
+  -c model_auto_compact_token_limit=900000
   --json
 )
 fast_label=off
@@ -121,7 +125,7 @@ if ((${#focuses[@]} == 0)); then
 
   echo "## $title"
   echo
-  echo "- 設定: $model / effort=$effort / fast=$fast_label"
+  echo "- 設定: $model / effort=$effort / fast=$fast_label / context=1M"
   echo "- 所要時間: $((SECONDS - started)) 秒、トークン: $(tokens_of "")"
   echo "- 保存先: $run_dir/review.md"
   echo "- 続きを Codex と話す: codex resume $(thread_of "")"
@@ -146,7 +150,7 @@ done
 
 echo "## ${title}（観点ごとに並列）"
 echo
-echo "- 設定: $model / effort=$effort / fast=$fast_label"
+echo "- 設定: $model / effort=$effort / fast=$fast_label / context=1M"
 echo "- 観点: $(IFS=,; echo "${focuses[*]}")"
 echo "- 所要時間: $((SECONDS - started)) 秒（すべての観点が終わるまで）"
 echo

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# impl.sh --worktree で実装させた結果を、もとの作業フォルダに反映して worktree を片づける。
+# prepare.sh で作った worktree に Haiku が実装した結果を、もとの作業フォルダに反映して worktree を片づける。
 #
 # 使い方: apply.sh [--discard] <実行フォルダ>...
 #   --discard  反映せずに worktree を捨てる
@@ -42,7 +42,7 @@ for run_dir in "$@"; do
   wt=$run_dir/worktree
   echo "## $(basename "$run_dir")"
   if [[ ! -f $run_dir/repo || ! -d $wt ]]; then
-    echo "- worktree がありません（--worktree で実装していないか、反映・破棄済み）"
+    echo "- worktree がありません（prepare.sh で準備していないか、反映・破棄済み）"
     overall=1
     continue
   fi

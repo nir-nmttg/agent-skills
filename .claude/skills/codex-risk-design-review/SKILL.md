@@ -85,7 +85,7 @@ bash "${CLAUDE_SKILL_DIR}/scripts/review.sh" --effort ${CLAUDE_EFFORT} [--fast] 
 
 - `--effort` には上の「Claude の推論レベル」をそのまま渡す（Claude が high なら Codex も high）。空や `auto` のときは省略してよい（スクリプトが high にする）。
 - 設計が今のフォルダ以外のリポジトリについてのものなら、`--cd <そのリポジトリのパス>` をつける。
-- Codex は読み取り専用のサンドボックスで動き、個人設定（MCP サーバーやプラグイン）は読み込まない。
+- Codex は読み取り専用のサンドボックスと 1M コンテキストで動き、個人設定（MCP サーバーやプラグイン）は読み込まない。
 - エラーなら内容を伝えて終わる。`codex` が見つからない・ログインしていないときは、`brew install --cask codex` と `codex login` を案内する。Astra が使えない（プランの対象外など）ときは、そのことを伝え、codex-design-review（Sol）に切り替えるかを聞く。
 
 ### 5. 報告する

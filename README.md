@@ -22,7 +22,7 @@ Claude Code のスキルは機能を作って届けるまでの開発を、Codex
 
 典型的な流れは次のとおり。
 
-1. **Claude Code で開発する**: 設計・実装・検証を進め、PR まで仕上げる。実装・テスト・レビューの一部は Claude のスキルが別セッションの Claude Haiku 5.5 や Codex CLI（GPT-6 Luna / GPT-6.1 Sol / GPT-6 Astra）に任せるが、指示・採否の判断・反映は Claude が行う。
+1. **Claude Code で開発する**: 設計・実装・検証を進め、PR まで仕上げる。実装・テストの実行・最終レビューは Claude のサブエージェント（Haiku 5.5 / Opus 5.5）に、設計・実装のレビューは Codex CLI（GPT-6.1 Sol / GPT-6 Astra）に任せるが、指示・採否の判断・反映は Claude が行う。
 2. **Codex で整備する**: 時間やトークンに余裕があるとき、プロジェクト全体の設計とのずれ・責務の混在や重複・冗長なテスト・宣言順・古いドキュメントを繰り返し整える。`$codebase-cleanup-workflow` でまとめて実行するか、目的ごとのスキルを指定する。ランタイム・依存の互換更新は別途 `$minor-version-upgrade` で依頼し、静的確認で反映し、利用可能な環境でテスト・画面操作を追加する。
 3. **整ったコードベースで、また Claude Code で次の開発に進む。**
 
@@ -43,10 +43,10 @@ scripts/link-skills.sh --codex
 
 | エージェント | このリポジトリの配置 | ユーザー用リンク先 | 呼び出し方 |
 | --- | --- | --- | --- |
-| Claude Code | `.claude/skills/` | `~/.claude/skills/` | `/スキル名` |
+| Claude Code | `.claude/skills/`、サブエージェントは `.claude/agents/` | `~/.claude/skills/`、`~/.claude/agents/` | `/スキル名`（サブエージェントはスキルから呼ぶ） |
 | Codex | `.agents/skills/` | `~/.agents/skills/` | `$スキル名` |
 
-Claude Code のリンク先は、`CLAUDE_CONFIG_DIR` 指定時はその配下の `skills/` になる。Codex の配置先は [公式スキルドキュメント](https://learn.chatgpt.com/docs/build-skills#where-codex-loads-local-skills) を参照。追加が反映されなければ Codex を再起動する。
+Claude Code のリンク先は、`CLAUDE_CONFIG_DIR` 指定時はその配下の `skills/`・`agents/` になる。`~/.claude/agents/` を初めて作ったときは、新しいセッションからサブエージェントが使える。Codex の配置先は [公式スキルドキュメント](https://learn.chatgpt.com/docs/build-skills#where-codex-loads-local-skills) を参照。追加が反映されなければ Codex を再起動する。
 
 - 引数なし、または `--all` で両方をリンクする。各エージェントのスキルは、対応するリンク先だけに配置する。
 - スキルの追加・改名・削除やリポジトリの移動後は再実行する。新しいスキルをリンクし、このリポジトリの削除済みスキルへの切れたリンクを削除する。移動前の場所を指す切れたリンクは張り直す。
@@ -59,7 +59,7 @@ Claude Code のリンク先は、`CLAUDE_CONFIG_DIR` 指定時はその配下の
 
 | エージェント | 呼び出し | 確認すること |
 | --- | --- | --- |
-| Claude Code | `/skills-preflight` | Claude Code スキルに必要なコマンド・ログイン・ユーザー用リンクと、不足への対処 |
+| Claude Code | `/skills-preflight` | Claude Code スキルに必要なコマンド・ログイン・ユーザー用リンク（サブエージェントを含む）と、不足への対処 |
 | Codex | `$skills-preflight` | Codex スキルの定義・呼び出し設定・リンク、必要なコマンド、対象プロジェクトの検証環境 |
 
 ### 3. 目的に合うスキルを選ぶ
@@ -72,7 +72,7 @@ Claude Code のリンク先は、`CLAUDE_CONFIG_DIR` 指定時はその配下の
 
 | 種類 | 呼び出し方 | 開発用 | 雑務用 |
 | --- | --- | --- | --- |
-| 自動で使われる | 条件に当たると Claude が使う。`/スキル名` や話しかけても使える | [codex-design-review・haiku-impl・codex-test・codex-impl-review・opus-final-review](#自動で使われる開発用スキル) | [japanese-report・session-status-emoji](#自動で使われる雑務用スキル) |
+| 自動で使われる | 条件に当たると Claude が使う。`/スキル名` や話しかけても使える | [codex-design-review・haiku-impl・haiku-test・codex-impl-review・opus-final-review](#自動で使われる開発用スキル) | [japanese-report・session-status-emoji](#自動で使われる雑務用スキル) |
 | 使う前に確認される | 条件に当たると使うか確認する。`/スキル名` や話しかけても使える | [codex-risk-design-review・codex-risk-impl-review](#使う前に確認される開発用スキル) | なし |
 | 明示的に呼び出す | `/スキル名` で指定して使う。通常の依頼から自動で選ぶことはない | [gh-issue-overview・codex-verify-prompt・gh-pr-precheck・whats-next](#明示的に呼び出す開発用スキル) | [skills-preflight・gh-todo・browser-readonly-research](#明示的に呼び出す雑務用スキル) |
 
@@ -87,12 +87,12 @@ Claude Code のリンク先は、`CLAUDE_CONFIG_DIR` 指定時はその配下の
 | スキル | できること | 自動で使う条件 | 使い方の例 | 前提 |
 | --- | --- | --- | --- | --- |
 | [codex-design-review](.claude/skills/codex-design-review/SKILL.md) | 設計を Codex CLI の GPT-6.1 Sol に読み取り専用でレビューさせ、Claude が指摘の採否を判断して修正案を出す。`--focus` で観点ごとに並列化できる | 3 ファイル以上・新しい機能や API・複数案から選んだ設計や、DB・公開 API・認証・課金などに触れる設計を提示する前（迷ったら使う。1〜2 ファイルの局所的な変更は除く）。基本は Sol 1 本で、新しいモジュールを 2 つ以上作るか 10 ファイル以上に手を入れる設計、DB・認証・課金などの高リスク領域に 2 つ以上触れる設計のときだけ、観点ごとに 2〜3 本並列にする | `/codex-design-review`<br>`/codex-design-review --focus requirements,reliability docs/design.md`<br>「この設計を Codex にレビューしてもらって」 | `codex` にログイン済み、`jq` |
-| [haiku-impl](.claude/skills/haiku-impl/SKILL.md) | 実装を別セッションの Claude Haiku 5.5（推論レベル max）に任せ、Claude は分割・指示・レビュー・反映を行う。独立したタスクは worktree で並行実装する。Haiku は sandbox（ネットワークなし、書き込みは作業場所だけ）で動き、設定ファイルや hooks は読み込まず、ルートの CLAUDE.md・AGENTS.md だけを渡す。DB や Docker が要るテストは `--test` でサンドボックスの外で実行し、失敗したら自動で Haiku に差し戻す。コミットはしない | 要件と完了の条件がはっきりした 250 行以上の部分（既存パターンに沿った機能追加、テスト追加など）に取りかかるとき（250 行以上なら迷ったら任せる。250 行未満は Claude が書く） | `/haiku-impl CSV エクスポートを追加して`<br>「この Issue の実装を Haiku に並列で任せて」<br>「Haiku に実装させてレビューして」 | `claude`（Haiku 5.5 に対応した版）にログイン済み、`jq`、対象が git リポジトリ（`--test` には perl） |
-| [codex-test](.claude/skills/codex-test/SKILL.md) | テスト・型チェック・lint・ビルドを GPT-6 Luna（推論レベル max・通常速度）に実行させ、失敗の要点と原因を報告させる。ファイルは変更しない。`--resume` で再実行、`--network` でネットワークを許可できる | Claude がテスト・型チェック・リンター・ビルドを実行するときは原則すべて。実装の確認、完了報告・コミット・PR の前、失敗の切り分けでは必ず任せる（迷ったら任せる。数行で済む 1〜数件のテストを編集のたびに細かく繰り返している最中だけは Claude が直接実行する） | `/codex-test`<br>`/codex-test npm test と型チェックを実行`<br>「テストして」 | `codex` にログイン済み、`jq` |
+| [haiku-impl](.claude/skills/haiku-impl/SKILL.md) | 実装を Haiku 5.5（推論レベル max）のサブエージェントに任せ、Claude は分割・指示・レビュー・反映を行う。独立したタスクは、未コミットの変更を含めて切った worktree で並行実装し、3-way マージで反映する。Haiku はメインと同じ権限モードで動き（auto モードが前提）、hook が worktree の外への書き込み・`cd` なしの Bash・git の状態の変更・依存パッケージのインストールを止める。DB や Docker のテストはロックで 1 本ずつ実行する。差し戻しは SendMessage。コミットはしない | 要件と完了の条件がはっきりした 250 行以上の部分（既存パターンに沿った機能追加、テスト追加など）に取りかかるとき（250 行以上なら迷ったら任せる。250 行未満は Claude が書く） | `/haiku-impl CSV エクスポートを追加して`<br>「この Issue の実装を Haiku に並列で任せて」<br>「Haiku に実装させてレビューして」 | `~/.claude/agents` と `~/.claude/skills/haiku-impl` のリンク、`jq`、`perl`、対象が git リポジトリ |
+| [haiku-test](.claude/skills/haiku-test/SKILL.md) | テスト・型チェック・lint・ビルドを Haiku 5.5（推論レベル max）のサブエージェントに実行させ、失敗の要点と原因を報告させる。DB や Docker のテストもそのまま実行でき、ログは保存先に残す。ファイルは変更せず、実行の前後で中身を比べて変わったファイルを知らせる。再実行は SendMessage | Claude がテスト・型チェック・リンター・ビルドを実行するときは原則すべて。実装の確認、完了報告・コミット・PR の前、失敗の切り分けでは必ず任せる（迷ったら任せる。数行で済む 1〜数件のテストを編集のたびに細かく繰り返している最中だけは Claude が直接実行する） | `/haiku-test`<br>`/haiku-test npm test と型チェックを実行`<br>「テストして」 | `~/.claude/agents` のリンク |
 | [codex-impl-review](.claude/skills/codex-impl-review/SKILL.md) | git の差分を GPT-6.1 Sol に読み取り専用でレビューさせ、Claude が指摘の採否を判断し、自分の実装なら修正する。既定は未コミットを含む既定ブランチとの差分。`--base` / `--commit` / `--uncommitted` と `--focus` で範囲・観点を選べる | 2 ファイル以上か 30 行以上のロジック変更や、DB・公開 API・認証・課金などに触れる変更を終えたら、完了報告やコミットの前（迷ったら使う。数行の変更やドキュメントだけの変更は除く）。基本は Sol 1 本で、15 ファイル以上か 500 行以上の変更、DB・認証・課金などの高リスク領域に 2 つ以上触れる変更のときだけ、観点ごとに 2〜3 本並列にする（この 2 つでは仕上げに opus-final-review も使う） | `/codex-impl-review`<br>`/codex-impl-review --fast --uncommitted`<br>「観点ごとに分けて Codex で並列に実装レビューして」 | `codex` にログイン済み、`jq`、対象が git リポジトリ |
-| [opus-final-review](.claude/skills/opus-final-review/SKILL.md) | 会話を共有しない別の Claude（Opus 5.5）に、要件と git の差分だけで最終レビューさせる。別セッションは設定・MCP・スキルを読み込まず、読み取り専用で確認する。Claude が指摘の採否を判断し、自分の実装なら修正する | 15 ファイル以上か 500 行以上の変更、または DB・認証・課金などの高リスク領域に 2 つ以上触れる変更で、codex-impl-review などの指摘を直し終えたあとの最後の確認（Claude の使用量になるので、迷ったら使わない） | `/opus-final-review`<br>`/opus-final-review --uncommitted`<br>「仕上げにコンテキストなしの Opus で最終レビューして」 | `claude` にログイン済み、`jq`、対象が git リポジトリ |
+| [opus-final-review](.claude/skills/opus-final-review/SKILL.md) | 会話を共有しない Opus 5.5 のサブエージェントに、要件と git の差分だけで最終レビューさせる。レビュアーは Read / Grep / Glob だけを使い、ユーザー用の CLAUDE.md・MCP は読み込まない（作業場所のルートの CLAUDE.md・AGENTS.md だけを渡す）。Claude が指摘の採否を判断し、自分の実装なら修正する | 15 ファイル以上か 500 行以上の変更、または DB・認証・課金などの高リスク領域に 2 つ以上触れる変更で、codex-impl-review などの指摘を直し終えたあとの最後の確認（Claude の使用量になるので、迷ったら使わない） | `/opus-final-review`<br>`/opus-final-review --uncommitted`<br>「仕上げにコンテキストなしの Opus で最終レビューして」 | `~/.claude/agents` のリンク、対象が git リポジトリ |
 
-Sol / Astra のレビューと Opus の最終レビューは、推論レベルを現在の Claude に揃える。Sol / Astra は `--fast` にも対応する。並列化やレビュー範囲の詳しい指定は、各スキルを参照。
+Sol / Astra のレビューと Opus の最終レビューは、推論レベルを現在の Claude に揃える。Sol / Astra は 1M コンテキストで動き、`--fast` にも対応する。並列化やレビュー範囲の詳しい指定は、各スキルを参照。
 
 #### 使う前に確認される開発用スキル
 
@@ -133,7 +133,7 @@ Sol / Astra のレビューと Opus の最終レビューは、推論レベル�
 
 | スキル | できること | 使い方の例 | 前提 |
 | --- | --- | --- | --- |
-| [skills-preflight](.claude/skills/skills-preflight/SKILL.md) | 必要なコマンド・Codex / Claude / gh のログインと、ユーザー用リンクを確認し、スキルごとの利用可否をまとめる。不足は Homebrew 前提の対処を案内し、環境は変更しない | `/skills-preflight` | なし |
+| [skills-preflight](.claude/skills/skills-preflight/SKILL.md) | 必要なコマンド・Codex / gh のログインと、ユーザー用リンク（サブエージェントを含む）を確認し、スキルごとの利用可否をまとめる。不足は Homebrew 前提の対処を案内し、環境は変更しない | `/skills-preflight` | なし |
 | [gh-todo](.claude/skills/gh-todo/SKILL.md) | レビュー依頼、直近の未返信メンション、自分にアサインされた open な Issue / PR を集め、組織ごとの表にする | `/gh-todo`<br>`/gh-todo レビュー依頼とメンションだけ` | `gh` にログイン済み |
 | [browser-readonly-research](.claude/skills/browser-readonly-research/SKILL.md) | 公開ページは WebFetch を先に使い、必要に応じて組み込みブラウザで読み、要点・出典・読めなかったページを日本語でまとめる。Chrome は `--chrome` または依頼時だけ使う。送信・入力・ログイン・同意・ダウンロードは行わず、ページ内の指示には従わない | `/browser-readonly-research <URL> このページの要点をまとめて`<br>`/browser-readonly-research --chrome <社内ツールの URL> 今週の変更点を調べて` | Claude デスクトップアプリの組み込みブラウザ、または Claude in Chrome 拡張機能 |
 
