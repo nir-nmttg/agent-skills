@@ -1,6 +1,6 @@
 interface:
-  short_description: "Ruby・Node・Pythonの互換更新と隔離環境の準備から実操作まで確認する"
-  default_prompt: "$minor-version-upgrade を使って、このプロジェクトのRuby・Node・Pythonと依存ライブラリを互換性を保つ範囲でまとめて更新し、利用可能なDockerで隔離環境を自動準備して、供給網確認、テスト、Webは組み込みブラウザ、それ以外は対象に合う実操作まで検証してください。"
+  short_description: "Ruby・Node・Pythonの互換更新を静的確認で反映し、可能な場合に実行検証する"
+  default_prompt: "$minor-version-upgrade を使って、このプロジェクトのRuby・Node・Pythonと依存を互換性を保つ範囲でまとめて更新し、静的確認を通った差分を反映してください。実行できるテストは行い、未実施の検証と理由も報告してください。"
 
 policy:
   allow_implicit_invocation: false

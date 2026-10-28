@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""供給網の必須検査を通過した計画だけを一度実行する。Python 3.9標準ライブラリ。"""
+"""静的確認した更新候補を固定し、厳格モードだけ隔離実行する。Python 3.9標準ライブラリ。"""
 
 import sys
 
@@ -45,6 +45,24 @@ TOKEN = re.compile(r"\{([^{}]*)\}")
 
 class GateError(ValueError):
     pass
+
+
+def verification_mode(plan):
+    # schema_version 2の既存計画は、従来の隔離実行契約を維持する。
+    return plan.get("verification_mode", "strict")
+
+
+def required_reviews(plan):
+    return tuple(name for name in REVIEWS
+                 if verification_mode(plan) == "strict" or name != "isolation")
+
+
+def manual_advisory_components(plan, after):
+    provided = {(entry["ecosystem"], entry["component"]) for entry in plan["audits"]}
+    needed = {(entry["ecosystem"], entry["component"])
+              for entry in after.values() if entry["kind"] != "runtime"}
+    return [{"ecosystem": ecosystem, "component": component}
+            for ecosystem, component in sorted(needed - provided)]
 
 
 def require(condition, message):
@@ -309,6 +327,9 @@ def validate_runtime_images(plan, changed, config):
     images = [item for item in plan["candidates"] if "runtime_image" in item]
     if not images:
         return []
+    if verification_mode(plan) == "static":
+        return [{"id": item["id"], "version": changed[item["id"]]["version"],
+                 **item["runtime_image"]} for item in images]
     require(plan["execution"]["mechanism"] == "container",
             "imageを使うランタイム候補にはcontainer executorが必要です。")
     settings = parse_json(config)
@@ -327,8 +348,13 @@ def validate_runtime_images(plan, changed, config):
 
 def read_plan(run, filename):
     plan, plan_sha256 = load_json_bound(run / run_relative_path(filename))
-    object_keys(plan, ("schema_version", "unit", "files", "inventory", "candidates", "audits", "execution"))
+    object_keys(plan, ("schema_version", "unit", "files", "inventory", "candidates", "audits"),
+                ("verification_mode", "execution"))
     require(type(plan["schema_version"]) is int and plan["schema_version"] == 2, "未対応の計画形式です。")
+    mode = verification_mode(plan)
+    require(mode in ("static", "strict"), "検証モードはstaticまたはstrictにしてください。")
+    require(("execution" in plan) == (mode == "strict"),
+            "strictには隔離executionが必要で、staticにはexecutionを指定できません。")
     text_value(plan["unit"])
     paths = [str(relative_path(p)) for p in array(plan["files"], True)]
     require(len(paths) == len(set(paths)), "監視ファイルが重複しています。")
@@ -347,12 +373,14 @@ def read_plan(run, filename):
             utc_time(candidate["published_at"])
         if "runtime_image" in candidate:
             image = candidate["runtime_image"]
-            object_keys(image, ("reference", "image_id"))
+            object_keys(image, ("reference",), ("image_id",))
+            require(mode == "static" or "image_id" in image, "strictのランタイム候補にはimage IDが必要です。")
             require(changed[key]["kind"] == "runtime", "runtime_imageは本体ランタイムだけに指定できます。")
             require(runtime_image_reference(image["reference"]) == runtime_image_reference(changed[key]["source"]),
                     "ランタイムのinventoryと候補のimage参照が一致しません。")
-            require(re.fullmatch(r"sha256:[0-9a-f]{64}", text_value(image["image_id"])),
-                    "ランタイム候補のimage IDが未固定です。")
+            if "image_id" in image:
+                require(re.fullmatch(r"sha256:[0-9a-f]{64}", text_value(image["image_id"])),
+                        "ランタイム候補のimage IDが未固定です。")
         declared_paths = set()
         for artifact in array(candidate["artifacts"], "runtime_image" not in candidate):
             object_keys(artifact, ("path", "sha256"))
@@ -372,7 +400,9 @@ def read_plan(run, filename):
         require(type(audit["exit_code"]) is int, "監査の終了コードが未確認です。")
         utc_time(audit["checked_at"])
     needed = {(p["ecosystem"], p["component"]) for p in after.values() if p["kind"] != "runtime"}
-    require(needed <= audits, "更新後の系統・サブプロジェクトの監査JSONが不足しています。")
+    require(mode == "static" or needed <= audits, "更新後の系統・サブプロジェクトの監査JSONが不足しています。")
+    if mode == "static":
+        return plan, before, after, changed, plan_sha256, inventory_sha256
     execution = plan["execution"]
     object_keys(execution, ("argv", "config", "mechanism", "inputs"))
     config = str(run_relative_path(execution["config"]))
@@ -448,37 +478,41 @@ def bindings(run, state):
             snapshot_files[artifact["path"]] = {"sha256": artifacts[artifact["path"]],
                                                 "mode": stat.S_IMODE(path.stat().st_mode), "limit": MAX_FILE}
     audits = {a["path"]: file_digest(run / run_relative_path(a["path"]), MAX_JSON) for a in plan["audits"]}
-    config_path = run / run_relative_path(plan["execution"]["config"])
-    config = safe_read(config_path, MAX_JSON, True)
-    forbid_source_paths(config, run, state)
-    runtime_images = validate_runtime_images(plan, changed, config)
-    snapshot_files[plan["execution"]["config"]] = {
-        "sha256": digest(config), "mode": stat.S_IMODE(config_path.stat().st_mode), "limit": MAX_JSON}
     inputs = {}
-    input_total = 0
-    for name in plan["execution"]["inputs"]:
-        path = run / run_relative_path(name)
-        data = safe_read(path, MAX_FILE, True)
-        forbid_source_paths(data, run, state)
-        input_total += len(data)
-        require(input_total <= MAX_INPUT_TOTAL, "追加実行入力が合計128MiBを超えています。")
-        inputs[name] = {"sha256": digest(data), "mode": stat.S_IMODE(path.stat().st_mode), "limit": MAX_FILE}
-        snapshot_files[name] = inputs[name]
-    for argument in plan["execution"]["argv"][1:]:
-        forbid_source_paths(argument.encode("utf-8"), run, state)
-    executor = Path(plan["execution"]["argv"][0])
-    require(executor == executor.resolve() and os.access(str(executor), os.X_OK)
-            and not within(executor, candidate), "隔離executorが実体パス・実行可能ではないか、候補コード内にあります。")
-    require(executor.stat().st_uid in (0, os.getuid()) and not (executor.stat().st_mode & 0o022),
-            "隔離executorはrootまたは現在の所有者の実体とし、group/other書込み権限を除いてください。")
+    execution_bound = {}
+    config = None
+    if verification_mode(plan) == "strict":
+        config_path = run / run_relative_path(plan["execution"]["config"])
+        config = safe_read(config_path, MAX_JSON, True)
+        forbid_source_paths(config, run, state)
+        snapshot_files[plan["execution"]["config"]] = {
+            "sha256": digest(config), "mode": stat.S_IMODE(config_path.stat().st_mode), "limit": MAX_JSON}
+        input_total = 0
+        for name in plan["execution"]["inputs"]:
+            path = run / run_relative_path(name)
+            data = safe_read(path, MAX_FILE, True)
+            forbid_source_paths(data, run, state)
+            input_total += len(data)
+            require(input_total <= MAX_INPUT_TOTAL, "追加実行入力が合計128MiBを超えています。")
+            inputs[name] = {"sha256": digest(data), "mode": stat.S_IMODE(path.stat().st_mode), "limit": MAX_FILE}
+            snapshot_files[name] = inputs[name]
+        for argument in plan["execution"]["argv"][1:]:
+            forbid_source_paths(argument.encode("utf-8"), run, state)
+        executor = Path(plan["execution"]["argv"][0])
+        require(executor == executor.resolve() and os.access(str(executor), os.X_OK)
+                and not within(executor, candidate), "隔離executorが実体パス・実行可能ではないか、候補コード内にあります。")
+        require(executor.stat().st_uid in (0, os.getuid()) and not (executor.stat().st_mode & 0o022),
+                "隔離executorはrootまたは現在の所有者の実体とし、group/other書込み権限を除いてください。")
+        execution_bound = {"executor_sha256": file_digest(executor),
+                           "executor_mode": stat.S_IMODE(executor.stat().st_mode),
+                           "executor_uid": executor.stat().st_uid, "config_sha256": digest(config)}
+    runtime_images = validate_runtime_images(plan, changed, config)
     bound = {"run": str(run), "skill": SCRIPT_DIR.parent.name,
              "plan": plan, "plan_sha256": plan_sha256, "inventory_sha256": inventory_sha256,
              "project": str(project), "candidate": str(candidate), "watched": watched,
              "candidate_tree": candidate_tree(candidate), "artifacts": artifacts, "audits": audits,
              "runtime_images": runtime_images,
-             "executor_sha256": file_digest(executor), "executor_mode": stat.S_IMODE(executor.stat().st_mode),
-             "executor_uid": executor.stat().st_uid,
-             "config_sha256": digest(config), "inputs": inputs, "snapshot_files": snapshot_files,
+             **execution_bound, "inputs": inputs, "snapshot_files": snapshot_files,
              "tools": {name: file_digest(SCRIPT_DIR / name) for name in ("supply-chain.py", "archive_inspector.py", "audit_report.py")},
              "environment": CHILD_ENV}
     return digest(canonical(bound)), plan, before, after, changed, bound
@@ -502,11 +536,15 @@ def assert_binding(run, state):
     return current
 
 
-def validate_reviews(run, state, require_all=False):
+def validate_reviews(run, state, plan, require_all=False):
     """古いproofの更新で他のpassを流用しない。初期unknownだけは証拠を持たない。"""
     now = datetime.now(timezone.utc)
+    required = set(required_reviews(plan))
     for name in REVIEWS:
         review = state["reviews"][name]
+        if name not in required:
+            require(review == {"status": "unknown"}, "staticのisolationは未実施のunknownを維持してください。")
+            continue
         if review == {"status": "unknown"}:
             require(not require_all, "必須レビューが失敗・未確認です: " + name)
             continue
@@ -589,6 +627,9 @@ def prepare_execution(run, state, plan, bound):
     for path in sorted(directories, key=lambda item: len(item.parts), reverse=True):
         path.chmod(0o500)
 
+    if verification_mode(plan) == "static":
+        return {"candidate": str(candidate), "output": str(output)}
+
     def substitute(match):
         token = match.group(1)
         if token == "candidate":
@@ -622,10 +663,11 @@ def validate_executor(bound, plan):
 
 def validate_freshness(plan, generated_times=()):
     now = datetime.now(timezone.utc)
+    minimum_age = MIN_RELEASE_AGE if verification_mode(plan) == "strict" else timedelta(0)
     for candidate in plan["candidates"]:
         require(candidate["published_at"] is not None
-                and now - utc_time(candidate["published_at"]) >= MIN_RELEASE_AGE,
-                "実行直前の公開日時・7日間の待機を確認できません。")
+                and now - utc_time(candidate["published_at"]) >= minimum_age,
+                "直前の公開日時またはstrictの7日間の待機を確認できません。")
     for audit in plan["audits"]:
         fresh(audit["checked_at"], now)
     for generated in generated_times:
@@ -653,7 +695,8 @@ def checks(run, state):
     for item in plan["candidates"]:
         package = changed[item["id"]]
         require(item["stability"] == "stable" and item["published_at"] is not None, "安定版・公開日時が未確認です。")
-        require(now - utc_time(item["published_at"]) >= MIN_RELEASE_AGE, "公開から7日未満、または未来日時です。")
+        minimum_age = MIN_RELEASE_AGE if verification_mode(plan) == "strict" else timedelta(0)
+        require(now - utc_time(item["published_at"]) >= minimum_age, "strictの公開7日待機、または未来日時の条件に違反しています。")
         if SCRIPT_DIR.parent.name == "minor-version-upgrade":
             require(item["compatibility"] == "compatible", "互換性未確認・個別移行の候補は一括更新できません。")
             previous = before.get(item["id"])
@@ -696,11 +739,17 @@ def checks(run, state):
             require(required <= covered, "Python監査の対象版に抜けがあります。")
     # 未確認レビューで停止する場合も、先に静的検査の根拠を保存する。
     # 同じ入力では同じ内容とし、レビュー時には別の証拠ファイルに根拠を残す。
+    static_context = {}
+    if verification_mode(plan) == "static":
+        static_context = {"verification_mode": "static", "runtime_verified": False,
+                          "manual_advisory_components": manual_advisory_components(plan, after),
+                          "inventory_after": [after[key] for key in sorted(after)]}
     atomic_write(run / "automated-checks.json", {"binding": binding, "artifacts": signals,
-                                               "runtime_images": bound["runtime_images"]})
-    validate_reviews(run, state, require_all=True)
+                                               "runtime_images": bound["runtime_images"], **static_context})
+    validate_reviews(run, state, require_all=True, plan=plan)
     validate_freshness(plan, generated_times)
     bound["audit_generated_times"] = generated_times
+    bound["inventory_after"] = [after[key] for key in sorted(after)]
     return plan, signals, bound
 
 
@@ -731,15 +780,19 @@ def main():
                      "candidate": str(Path(args.candidate).resolve(strict=True)),
                      "binding": "", "created_at": now_string(),
                      "reviews": {name: {"status": "unknown"} for name in REVIEWS}, "execution_status": "not_started"}
-            state["binding"] = bindings(run, state)[0]
+            initial = bindings(run, state)
+            state["binding"] = initial[0]
             atomic_write(run / STATE, state, exclusive=True)
-            print(json.dumps({"status": "blocked", "required_reviews": list(REVIEWS)}, ensure_ascii=True))
+            mode_context = {"verification_mode": "static"} if verification_mode(initial[1]) == "static" else {}
+            print(json.dumps({"status": "blocked", "required_reviews": list(required_reviews(initial[1])),
+                              **mode_context}, ensure_ascii=True))
             return 0
         state = load_state(run)
         if args.action == "review":
-            assert_binding(run, state)
+            plan = assert_binding(run, state)[1]
+            require(args.check in required_reviews(plan), "staticにはisolationの承認を付けられません。")
             require(state["execution_status"] == "not_started", "実行後のレビューは変更できません。")
-            validate_reviews(run, state)
+            validate_reviews(run, state, plan=plan)
             require(all(item["status"] != "fail" for item in state["reviews"].values()),
                     "失敗したレビューを復活できません。新しい実行記録で確認してください。")
             text_value(args.note, 2000)
@@ -761,19 +814,34 @@ def main():
             return 0
         plan, signals, bound = checks(run, state)
         if args.action == "check":
-            print(json.dumps({"status": "passed", "binding": state["binding"]}, ensure_ascii=True))
+            mode_context = {"verification_mode": "static"} if verification_mode(plan) == "static" else {}
+            print(json.dumps({"status": "passed", "binding": state["binding"], **mode_context}, ensure_ascii=True))
             return 0
         # 準備の失敗も一度の実行として消費し、承認snapshotだけを起動する。
         state["execution_status"] = "running"
         atomic_write(run / STATE, state)
         try:
             execution = prepare_execution(run, state, plan, bound)
-            validate_executor(bound, plan)
-            validate_reviews(run, state, require_all=True)
+            validate_reviews(run, state, require_all=True, plan=plan)
             validate_freshness(plan, bound["audit_generated_times"])
-            result = subprocess.run(execution["argv"], cwd=execution["cwd"], env=dict(CHILD_ENV),
-                                    shell=False, check=False, timeout=1800)
-            code = result.returncode
+            if verification_mode(plan) == "static":
+                require(all(file_digest(SCRIPT_DIR / name) == expected for name, expected in bound["tools"].items()),
+                        "固定直前にゲートの検査コードが変更されています。")
+                static_result = {"status": "static_ready", "verification_mode": "static",
+                                 "runtime_verified": False,
+                                 "not_performed": ["installation", "runtime_version", "tests", "interaction"],
+                                 "candidate_snapshot": "execution-inputs/candidate",
+                                 "source_manifest": bound["candidate_tree"],
+                                 "inventory_after": bound["inventory_after"],
+                                 "manual_advisory_components": manual_advisory_components(
+                                     plan, {entry["id"]: entry for entry in bound["inventory_after"]})}
+                atomic_write(Path(execution["output"]) / "static-result.json", static_result, exclusive=True)
+                code = 0
+            else:
+                validate_executor(bound, plan)
+                result = subprocess.run(execution["argv"], cwd=execution["cwd"], env=dict(CHILD_ENV),
+                                        shell=False, check=False, timeout=1800)
+                code = result.returncode
         except BaseException:
             state["execution_status"] = "failed"
             state["exit_code"] = 1
@@ -782,7 +850,11 @@ def main():
         state["execution_status"] = "succeeded" if code == 0 else "failed"
         state["exit_code"] = code
         atomic_write(run / STATE, state)
-        print(json.dumps({"status": state["execution_status"], "exit_code": code}, ensure_ascii=True))
+        result = {"status": state["execution_status"], "exit_code": code}
+        if verification_mode(plan) == "static":
+            result.update({"status": "static_ready" if code == 0 else state["execution_status"],
+                           "verification_mode": "static", "runtime_verified": False})
+        print(json.dumps(result, ensure_ascii=True))
         return 0 if code == 0 else 1
 
 

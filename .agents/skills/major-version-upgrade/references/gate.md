@@ -1,4 +1,66 @@
-# 供給網の確認を実行ゲートに結びつける
+# 静的確認と厳格検証のゲート
+
+`scripts/supply-chain.py` は Python 3.9 以降の標準ライブラリで動く。スキルの標準は静的確認で更新差分を反映する手順で、全工程の実行検証を明示依頼されたときだけ厳格モードを使う。mode は計画に固定し、途中で切り替えない。
+
+| 計画の `verification_mode` | 必須レビュー | `run` の処理 | 完了の意味 |
+| --- | --- | --- | --- |
+| `static`（新規の標準計画） | `isolation` を除く6項目 | 候補を再照合して読み取り専用 snapshot と反映用 metadata を保存。対象・依存コードは実行しない | 静的確認済みの更新を反映できる。実行時の互換性は未確認 |
+| `strict` | 従来の7項目 | snapshot から隔離 executor を一度起動し、導入・テスト・必要な実操作を完了 | 実際に完了した検証範囲を確認して反映 |
+| 省略 | 既存計画との互換のため `strict` | 従来どおり | 新規の標準計画では省略しない |
+
+## 標準の静的計画を準備する
+
+`scripts/new-run.sh` で `RUN` を作り、元プロジェクトから分離した秘密・依存ディレクトリを除く最小の候補コピーを準備する。候補編集前に [保存・反映契約](isolation.md#6-検証した差分を保存して対象へ反映する)の初期状態を親側に記録する。manifest・lockfile・ランタイム指定・必要な移行ソースを正しく更新し、全依存 inventory と候補を固定する。lockfile を推測で書き換えず、対象コードを評価する解決・生成には [隔離条件](isolation.md)を適用する。その工程が不可欠で実行できなければ、その対象は保留する。
+
+静的計画は `schema_version: 2` と `verification_mode: "static"` を指定し、`execution` を含めない。Docker・image の取得や probe・基準テスト・Web 実操作は静的ゲートの前提ではない。以下は形式の例で、版・日時・hash・パスを実際に確認した値へ置き換える。
+
+```json
+{
+  "schema_version": 2,
+  "verification_mode": "static",
+  "unit": "互換更新の静的確認",
+  "files": ["package.json", "package-lock.json"],
+  "inventory": "inventory.json",
+  "candidates": [
+    {
+      "id": "node:app:widget",
+      "published_at": "2026-01-01T00:00:00Z",
+      "stability": "stable",
+      "compatibility": "compatible",
+      "artifacts": [
+        {"path": "packages/widget-1.1.0.tgz", "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
+      ]
+    }
+  ],
+  "audits": []
+}
+```
+
+inventory・候補・取得物の形式は下の厳格計画と共通。変更された全依存の coverage、取得物 hash/archive、minor の互換境界、安定版と公開日時を検査する。静的モードの公開後7日待機は不要だが、日時不明・未来・撤回・既知の悪性版を確認済みとはしない。より厳しい組織方針は守る。image 供給のランタイムは `runtime_image.reference` と更新後 inventory の `source` を同じ digest 固定参照にし、`image_id` は任意。Docker 内での実版測定・実行設定との結合は静的モードでは要求せず、指定版と実測版を区別する。
+
+## 標準の6項目を確認して反映用 snapshot を作る
+
+`coverage`・`sources`・`artifacts`・`advisories`・`authenticity`・`compatibility` を、実際の非空の証拠と説明付きで `review` する。内容は下の表と共通だが、`compatibility` は公式の版条件・移行ガイド・利用箇所・manifest/lockfile の静的な整合を根拠にし、実行テストの成功を要求しない。`isolation` の架空の `pass` は作らない。実行して判明した更新由来の失敗や明確な非互換が未解消なら `compatibility` を通さず、その対象を修正・保留する。
+
+監査 JSON が用意できれば `audits` に含める。提示した JSON の finding・error・skip・期限切れ・対応 component 内の版 coverage 不足は静的モードでも停止する。JSON を用意できない系統・component は `manual_advisory_components`、全更新後依存は `inventory_after` として `automated-checks.json` に出る。その全 ID・名前・版を公式セキュリティ告知・advisory DB と照合し、取得日時・URL・対象版・確認結果を `coverage` / `advisories` の証拠に対応づける。既存依存・ビルド依存も省かず、JSON 未提供だけで監査済みとしない。既に得た不都合な監査結果を計画から外して通さない。確認不能な範囲が残れば保留する。
+
+`UPGRADE_PYTHON` と `UPGRADE_GATE` は下記と同じ信頼済みの絶対パスを使い、`-I -S` を付ける。
+
+```bash
+"$UPGRADE_PYTHON" -I -S "$UPGRADE_GATE" init --run "$RUN" --project "$PROJECT" --candidate "$CANDIDATE" --plan "$RUN/plan.json"
+"$UPGRADE_PYTHON" -I -S "$UPGRADE_GATE" review --run "$RUN" --check coverage --status pass --evidence evidence/coverage.md --note "全依存と変更範囲を照合"
+# 残る5項目もそれぞれの実際の根拠で review する。
+"$UPGRADE_PYTHON" -I -S "$UPGRADE_GATE" check --run "$RUN"
+"$UPGRADE_PYTHON" -I -S "$UPGRADE_GATE" run --run "$RUN"
+```
+
+証拠・監査の24時間の期限、入力差替え検出、失敗した RUN の再利用禁止は両モードで維持する。`run` は再照合した候補を `execution-inputs/candidate` に保存し、`execution-output/static-result.json` を出す。結果は `static_ready` / `runtime_verified: false` で、導入・テスト成功を意味しない。同ファイルの `source_manifest` に元の候補の hash と mode がある。snapshot の `0400` / `0500` を反映先の mode にせず、[保存・反映契約](isolation.md#6-検証した差分を保存して対象へ反映する)で全適用パスの初期状態を照合し、許可差分・実行 bit・削除だけを反映する。
+
+任意のテストは [標準モードの追加検証](isolation.md#標準モードの追加検証)で行える。実行できない場合も静的確認済みの更新を完了でき、未実施の範囲と理由を報告する。検証で反映後のコードや lockfile を修正するなら、[再確認手順](isolation.md#反映後に修正が必要になった場合)で当該更新分を安全に取り下げ、実際の更新前グラフから修正済み候補を新しい静的計画で確認し直す。
+
+## 厳格モードの詳細
+
+**以下の既存手順は `verification_mode: "strict"` 専用。** ユーザーが全工程検証を必須にした場合に適用し、標準の静的手順へ必須条件として持ち込まない。厳格モードは [strict.md](strict.md) から進める。
 
 `scripts/supply-chain.py` は Python 3.9 以降の標準ライブラリで動く。更新計画・取得物・監査結果と、根拠付きの手動レビューを結びつけ、条件が揃わない導入を停止する。スクリプトへのパスは対象プロジェクトではなく、このスキルの実体から解決する。`archive_inspector.py`・`audit_report.py` は内部の補助で、これらだけの成功を実行許可に使わない。
 
@@ -78,6 +140,7 @@ executor の cwd と入力引数はこの読み取り専用 snapshot を参照�
 ```json
 {
   "schema_version": 2,
+  "verification_mode": "strict",
   "unit": "web-widget-update",
   "files": ["package.json", "package-lock.json", ".npmrc"],
   "inventory": "inventory.json",

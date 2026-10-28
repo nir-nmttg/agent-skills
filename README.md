@@ -23,7 +23,7 @@ Claude Code のスキルは機能を作って届けるまでの開発を、Codex
 典型的な流れは次のとおり。
 
 1. **Claude Code で開発する**: 設計・実装・検証を進め、PR まで仕上げる。実装・テスト・レビューの一部は Claude のスキルが Codex CLI（GPT-6 Luna / GPT-6.1 Sol / GPT-6 Astra）に任せるが、指示・採否の判断・反映は Claude が行う。
-2. **Codex で整備する**: 時間やトークンに余裕があるとき、プロジェクト全体の設計とのずれ・責務の混在や重複・冗長なテスト・宣言順・古いドキュメントを繰り返し整える。`$codebase-cleanup-workflow` でまとめて実行するか、目的ごとのスキルを指定する。ランタイム・依存の更新は別途 `$minor-version-upgrade` / `$major-version-upgrade` で依頼し、供給網の確認・テスト・画面操作まで検証する。
+2. **Codex で整備する**: 時間やトークンに余裕があるとき、プロジェクト全体の設計とのずれ・責務の混在や重複・冗長なテスト・宣言順・古いドキュメントを繰り返し整える。`$codebase-cleanup-workflow` でまとめて実行するか、目的ごとのスキルを指定する。ランタイム・依存の更新は別途 `$minor-version-upgrade` / `$major-version-upgrade` で依頼し、静的確認で反映し、利用可能な環境でテスト・画面操作を追加する。
 3. **整ったコードベースで、また Claude Code で次の開発に進む。**
 
 ## はじめに
@@ -148,26 +148,26 @@ Sol / Astra のレビューと Opus の最終レビューは、推論レベル�
 
 ### Codex の開発用スキル
 
-`minor-version-upgrade` / `major-version-upgrade` は、Ruby・Node・Python のランタイムと依存ライブラリの更新に最適化し、`codebase-cleanup-workflow` には含めない。Ruby / Bundler、Node / npm・pnpm・Yarn、Python / uv・pip・Poetry など、採用中の管理方法を設定と lockfile から静的に確認し、管理ツールを勝手に変更しない。対象の管理ツールは採用されたものだけを使い、すべての導入は要求しない。共通の実行ゲートには `bash` と Python 3.9 以降の標準ライブラリが必要。Rails・Node のフロントエンド・Python worker など3言語が混在する構成も一覧化し、言語間の連携まで検証する。その他の言語は影響・依存境界を記録し、更新対象を広げない。グローバル環境の更新は依頼範囲に含まれる場合だけ行う。
+`minor-version-upgrade` / `major-version-upgrade` は、Ruby・Node・Python のランタイムと依存ライブラリの更新に最適化し、`codebase-cleanup-workflow` には含めない。Ruby / Bundler、Node / npm・pnpm・Yarn、Python / uv・pip・Poetry など、採用中の管理方法を設定と lockfile から静的に確認し、管理ツールを勝手に変更しない。対象の管理ツールは採用されたものだけを使い、すべての導入は要求しない。共通の実行ゲートには `bash` と Python 3.9 以降の標準ライブラリが必要。Rails・Node のフロントエンド・Python worker など3言語が混在する構成も一覧化し、言語間の連携を静的に確認して、利用可能なら実行検証する。その他の言語は影響・依存境界を記録し、更新対象を広げない。グローバル環境の更新は依頼範囲に含まれる場合だけ行う。
 
 Ruby・Python の `X.Y` ブランチ変更や機能リリース、Node の major 更新は個別移行として扱う。Node の同一 major 内の minor / patch、Ruby・Python の同一 `X.Y` 内の patch、各ライブラリの互換性を保つ更新は、公式方針と実際の変更を確認したうえでまとめる。ライブラリも番号だけで判断せず、`0.x` の minor 増加や非互換変更を含む版は個別に扱う。同版の ABI 別 wheel 等への切替も実際の `source` 変更として記録し、新旧配布物の差分・hash・公開日・出所・監査・互換性を確認する。同版を安全とせず、互換性不明なら個別移行へ回す。
 
-供給網の調査は [minor の実行ゲート](.agents/skills/minor-version-upgrade/references/gate.md) / [major の実行ゲート](.agents/skills/major-version-upgrade/references/gate.md) に根拠付きで記録する。固定7項目は `unknown` から始まり、全項目の有効な `pass` と、全依存 coverage・取得物 SHA256 / archive・候補版・実配布物の最新公開から7日以上・監査 JSON などの機械検査が揃うまで導入を停止する。更新後 inventory の全ライブラリ・ビルド依存を監査し、ランタイムだけの変更でも既存依存を省略しない。更新後がランタイムのみの場合だけ package 監査 JSON を不要とし、公式告知は確認する。証拠・監査は24時間で期限切れとなり、監査の finding・skip・非対応や範囲不足も停止する。証拠変更・期限切れ・既存 `pass` の別証拠への置換や `fail` からの復活は同じ `RUN` で再承認せず、新しい実行記録で全レビューをやり直す。
+標準の更新は [minor の静的ゲート](.agents/skills/minor-version-upgrade/references/gate.md) / [major の静的ゲート](.agents/skills/major-version-upgrade/references/gate.md) で確認し、manifest・正しい lockfile・環境指定・必要な移行ソースを反映して完了する。`schema_version: 2` と `verification_mode: "static"` を指定し、executor や Docker は不要。`coverage`・`sources`・`artifacts`・`advisories`・`authenticity`・`compatibility` の6項目を根拠付きで確認し、全依存差分、取得物の hash/archive、版・取得元・公式移行情報を照合する。公開日時は確認するが、標準では7日未満だけを理由に停止しない。
 
-隔離環境は [minor の準備手順](.agents/skills/minor-version-upgrade/references/isolation.md) / [major の準備手順](.agents/skills/major-version-upgrade/references/isolation.md) に従い、同梱の `docker-sandbox.py prepare` が利用可能なローカル Docker 上に設定と executor を自動生成し、probe する。スキルが対象のランタイム・OS・管理ツールに合う公認 image を調べて digest を固定し、同梱コード・生成物・worker と結果をレビューする。条件を満たす既存のコンテナ・VM・OS sandbox も使える。Docker 本体の導入・daemon 起動、`sudo`・root 実行・socket の権限変更などのホスト設定変更は行わない。信頼済みの制御処理が既存 Docker へ接続するための Codex の実行承認は利用できる。通常実行の接続拒否と承認後の結果を切り分け、worker の隔離を維持し、承認不可などの不足があれば確認結果と再開条件を示す。
+更新後 inventory の全ライブラリ・ビルド依存を監査し、ランタイムだけの変更でも既存依存を省略しない。監査 JSON がない component は公式告知・advisory DB の全対象版への照会を証拠化できる。提示した監査 JSON の finding・error・skip・期限切れ・coverage 不足は無視しない。静的根拠や正しい候補を用意できない対象、明確な非互換・更新由来のテスト失敗は修正または保留する。証拠・監査は24時間で期限切れとなり、入力・証拠を変更したら新しい実行記録で確認し直す。
 
-計画は `schema_version: 2` とし、executor・設定・候補外ファイル入力・取得物を固定する。自動準備が生成した `sandbox/execution.json` を `plan.execution` へ統合し、worker・追加ファイル・配布物を token で列挙する。最終採用候補の導入・更新は `supply-chain.py run` が読み取り専用 snapshot を作り、直前に再検査した executor を一度だけ起動する。最終 worker は導入 → 実版・全グラフ・digest の照合 → テスト・lint・ビルド等 → CLI/consumer 等の実操作 → 許可差分と証拠の保存まで完了し、必須処理の失敗を終了コードへ伝える。同梱 sandbox は終了時に環境を削除するため、`run` 後は出力を確認し、検証済みの許可差分だけを対象へ反映する。追加検証・修正・部分除外は新しい `RUN` と計画で全レビュー・導入・検証をやり直す。元の候補や未固定のホスト入力を実行に使わず、`RUN` 全体を渡さない。`check` 後の任意コマンドや skip・force・待機短縮は使わない。
+静的 `run` は対象コードを実行せず、承認済み候補の読み取り専用 snapshot と元の hash/mode を保存する。親側は [保存・反映契約](.agents/skills/minor-version-upgrade/references/isolation.md#6-検証した差分を保存して対象へ反映する)に従い、元の全適用予定パスの初期状態と許可差分を照合して、追加・変更・削除・実行 bit を反映する。snapshot の readonly 権限を反映先へ流用せず、ユーザー変更との競合があれば開始しない。
 
-差分の保存・反映は [minor の契約](.agents/skills/minor-version-upgrade/references/isolation.md#6-検証した差分を保存して対象へ反映する) / [major の契約](.agents/skills/major-version-upgrade/references/isolation.md#6-検証した差分を保存して対象へ反映する)に従う。候補編集前の元プロジェクトと最後に検証した scratch の間について、追加・変更・削除・rename、変更前後の有無・hash・実行 bit を patch または変更 manifest と最終内容へ保存する。反映前に全予定パスの初期状態を再照合し、競合なら開始しない。保存ファイルの `0600` を反映先へ流用せず、既存権限を保って許可差分だけを適用し、更新後 hash・実行 bit・削除を確認する。
+導入・テスト・lint・ビルド・Web/CLI 等の実操作は、標準では利用可能な環境で行う追加検証とし、未実施の工程・理由と実際の成功/失敗を明示する。コードを評価する解決・生成や追加検証は、[隔離手順](.agents/skills/minor-version-upgrade/references/isolation.md)でレビューした環境を使う。Docker は同梱 helper で自動準備でき、既存 daemon への接続には正規の Codex 実行承認を利用できる。worker の通信・権限・資源・秘密の制限は維持し、ホストでの対象コード代行や Docker 本体導入・daemon 起動・socket 権限変更は行わない。正しい候補作成に実行が不要なら、Docker・テスト・ブラウザの不足だけで反映を止めない。
 
-同梱 sandbox は外部通信を禁止するオフライン処理向けで、調査用 scratch の依存解決、固定した更新前グラフの基準環境再現・テストもこの制限内で行う。基準用・候補解決用・最終採用用は worker・入力・出力を分け、基準用の実版と旧グラフを照合し、準備環境を対象へ反映しない。ランタイム更新で旧版・採用版の image が異なる場合は別の `RUN` で準備する。公認元からの固定した配布物と、条件を満たす監査専用の照会は、対象コードを実行しない取得プロセスで揃える。監査専用プロセスは信頼済みツール・データ専用作業場・空からの環境と設定を使い、送信内容を確認して無加工 JSON と実測結果を残す。コード評価と通信の両方が必要、またはコード評価の有無が不明な取得・監査には条件を満たす既存隔離を確認する。DB・ブラウザ・ネイティブ操作が必要なら `init` 前に導入済み環境を実操作の完了まで維持し、一度の `run` で全工程を完遂できる既存 executor を選ぶ。なければ該当工程を未検証とし、適用を保留する。ブラウザが適用されない対象は理由と対象別の実行検証を記録する。ゲート自体は OS の隔離境界ではなく、準備や probe の成功も供給網レビューの自動承認ではない。同じ UID の意図的な偽造や直接コマンドの迂回まで防ぐものでもない。攻撃の不存在を保証できないため、確認結果と残る不確実性も報告する。
+「厳格モード」「全工程検証を必須」と明示した場合は [minor の厳格手順](.agents/skills/minor-version-upgrade/references/strict.md) / [major の厳格手順](.agents/skills/major-version-upgrade/references/strict.md) を使う。`verification_mode: "strict"` の7レビュー、公開7日待機、全対象の監査 JSON、固定入力と隔離 executor による一度の導入・全チェック・必要な実操作を従来どおり必須にする。既存の mode 省略計画は互換のため厳格扱い。標準の任意検証を理由に自動で厳格へ切り替えない。標準・厳格とも、静的確認と実行時の動作確認を区別し、未確認を成功扱いにしない。ゲートは OS の強制境界や攻撃の不存在の保証ではない。
 
 整備スキルは、気が向いたときや時間・トークンに余裕があるときに、既存の振る舞いを保ってプロジェクト全体を繰り返し整えるために使う。対象を省略すると全体を探索し、指定した場合はその範囲を扱う。有益な変更がなければそのまま終え、未探索・保留・未検証の範囲を報告する。
 
 | スキル | できること | 使い方の例 | 前提 |
 | --- | --- | --- | --- |
-| [minor-version-upgrade](.agents/skills/minor-version-upgrade/SKILL.md) | Ruby・Node・Python の互換更新をまとめる。既存 Docker 上に隔離環境を準備し、image 固定・全ライブラリ監査・テスト・実操作を通し、削除・実行 bit を含む許可差分を初期状態の照合後に反映する。個別移行が必要な版は major 側へ回す | `$minor-version-upgrade`<br>`$minor-version-upgrade Ruby・Node・Python と依存を互換性を保つ範囲でまとめて更新して` | `bash`、Python 3.9 以降、利用可能なローカル Docker と公認の digest 固定 image、または条件を満たす既存隔離環境。対象の管理ツール、公式情報へのネットワーク、監査・テスト環境、Web には隔離したローカルアプリと組み込みブラウザ |
-| [major-version-upgrade](.agents/skills/major-version-upgrade/SKILL.md) | Ruby・Python の X.Y ブランチ変更、Node や依存の major 更新などを1対象ずつ移行する。隔離環境を準備し、image 固定・全ライブラリ監査・native 拡張再ビルド・テスト・実操作と、削除・実行 bit を含む許可差分の反映まで完了して次へ進む | `$major-version-upgrade`<br>`$major-version-upgrade Ruby・Node・Python のランタイムと依存を1対象ずつ検証して移行して` | `bash`、Python 3.9 以降、利用可能なローカル Docker と公認の digest 固定 image、または条件を満たす既存隔離環境。対象の管理ツール、公式の移行・供給網情報へのネットワーク、監査・テスト環境、Web には隔離したローカルアプリと組み込みブラウザ |
+| [minor-version-upgrade](.agents/skills/minor-version-upgrade/SKILL.md) | Ruby・Node・Python の互換更新をまとめ、取得元・配布物・既知情報・全依存差分を静的に確認して反映する。実行可能ならテスト・実操作を追加し、全工程必須は厳格モードで指定する | `$minor-version-upgrade`<br>`$minor-version-upgrade Ruby・Node・Python と依存を互換性を保つ範囲でまとめて更新して`<br>`$minor-version-upgrade 厳格モードで更新して` | `bash`、Python 3.9 以降、公式情報・配布物の取得と正しい候補・lockfile を確認できること。コード評価が必要な候補作成・追加検証・厳格モードには条件を満たす隔離環境 |
+| [major-version-upgrade](.agents/skills/major-version-upgrade/SKILL.md) | Ruby・Python の系列変更、Node や依存の major 更新などを1対象ずつ移行し、公式移行手順・取得物・全依存差分を静的に確認して反映する。テスト・実操作は可能な場合に追加、全工程必須は厳格モードで指定する | `$major-version-upgrade`<br>`$major-version-upgrade Ruby・Node・Python のランタイムと依存を1対象ずつ移行して`<br>`$major-version-upgrade 全工程検証を必須にして更新して` | `bash`、Python 3.9 以降、公式の移行・供給網情報と正しい候補・lockfile を確認できること。コード評価が必要な候補作成・追加検証・厳格モードには条件を満たす隔離環境 |
 | [codebase-cleanup-workflow](.agents/skills/codebase-cleanup-workflow/SKILL.md) | 全体探索と検証結果を共有し、設計整合 → 責務分割・共通化 → テスト整理 → 宣言順整理 → 文書同期を一巡する。各スキルの判断基準で必要な改善を実施する | `$codebase-cleanup-workflow`<br>`$codebase-cleanup-workflow 今回は src/billing のみ整備して` | 下記5つの整備スキルを参照でき、対象の実装・文書と検証環境を利用できること |
 | [design-alignment-refactor](.agents/skills/design-alignment-refactor/SKILL.md) | 文書とコードからプロジェクトの設計方針を読み取り、責務分担や依存関係の逸脱を修正する。意図的な例外を尊重し、既存の振る舞いを保って検証する | `$design-alignment-refactor`<br>`$design-alignment-refactor src/billing をプロジェクトの設計に合わせてリファクタリングして` | 対象の設計・実装を参照でき、関連する検証を実行できること |
 | [code-structure-refactor](.agents/skills/code-structure-refactor/SKILL.md) | 責務の混在や重複を探索し、責務分割・共通化で保守性・可読性・拡張性を改善する。既存の振る舞いを保ち、効果のない抽象化を避ける | `$code-structure-refactor`<br>`$code-structure-refactor src/billing の責務分割と共通化を進めて` | 対象の実装を参照でき、関連する検証を実行できること |
@@ -181,7 +181,7 @@ Ruby・Python の `X.Y` ブランチ変更や機能リリース、Node の major
 
 | スキル | できること | 使い方の例 | 前提 |
 | --- | --- | --- | --- |
-| [skills-preflight](.agents/skills/skills-preflight/SKILL.md) | スキルの定義・呼び出し設定・リンク、必要なコマンドや検証環境、更新スキルの Docker 自動準備の前提を確認する。利用可否と対処をまとめ、環境は変更しない | `$skills-preflight`<br>`$skills-preflight このプロジェクトで使う準備を確認して` | `bash`。各スキルの実行環境は確認対象 |
+| [skills-preflight](.agents/skills/skills-preflight/SKILL.md) | スキルの定義・呼び出し設定・リンク、必要なコマンドや検証環境、更新スキルの標準静的確認・任意検証・厳格モードの前提を確認する。利用可否と対処をまとめ、環境は変更しない | `$skills-preflight`<br>`$skills-preflight このプロジェクトで使う準備を確認して` | `bash`。各スキルの実行環境は確認対象 |
 | [rename-files-by-content](.agents/skills/rename-files-by-content/SKILL.md) | 指定フォルダ直下の通常ファイルを内容から `YYYY-MM-DD_名前.拡張子` に改名する。隠しファイルと、隠しフォルダを含むサブフォルダ内は対象外。請求書・領収書・契約書などに応じて日付と名称を選び、名称の空白は `-` に置き換える。同名は連番、不明なものは元名を保って記録する | `$rename-files-by-content /絶対パス/対象フォルダ`<br>`$rename-files-by-content /絶対パス/対象フォルダ 候補だけ見せて` | `bash`、Python 3.9 以降、対象の読み書き・ハードリンク作成、形式に合う読取・必要に応じた表示や OCR の手段 |
 
 ## 実行結果の保存先
