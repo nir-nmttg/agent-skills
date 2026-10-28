@@ -4,7 +4,7 @@
 # 使い方: new-run.sh <slug>
 #   slug  タスクの短い名前（英数字・ハイフン）。フォルダ名に使う
 #
-# 保存先は $CODEX_IMPL_DIR（既定: このリポジトリ直下の artifacts/codex-impl）/<日時>-<slug>/。
+# 保存先は $HAIKU_IMPL_DIR（既定: このリポジトリ直下の artifacts/haiku-impl）/<日時>-<slug>/。
 set -euo pipefail
 
 slug=${1:-}
@@ -12,7 +12,7 @@ slug=${1:-}
 
 # ~/.claude/skills のシンボリックリンク経由で呼ばれても、リンク先のリポジトリに保存する
 repo_root=$(cd -P "$(dirname "$0")/../../../.." && pwd)
-root=${CODEX_IMPL_DIR:-$repo_root/artifacts/codex-impl}
+root=${HAIKU_IMPL_DIR:-$repo_root/artifacts/haiku-impl}
 dir="$root/$(date +%Y%m%d-%H%M%S)-$slug"
 mkdir -p "$dir"
 

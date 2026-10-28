@@ -28,7 +28,7 @@ same() {
   if [[ -e $1 || -L $1 ]]; then [[ -e $2 || -L $2 ]] && cmp -s "$1" "$2"; else [[ ! -e $2 && ! -L $2 ]]; fi
 }
 
-# put <src> <dst> <mode>  Codex 側の内容をそのまま書く（mode は ls-tree のもの）
+# put <src> <dst> <mode>  Haiku 側の内容をそのまま書く（mode は ls-tree のもの）
 put() {
   mkdir -p "$(dirname "$2")"
   rm -f "$2"
@@ -66,7 +66,7 @@ for run_dir in "$@"; do
     if [[ $st == D ]]; then
       if [[ ! -e $ours && ! -L $ours ]]; then skipped+=("$path")
       elif same "$ours" "$b"; then rm -f "$ours"; taken+=("${path}（削除）")
-      else conflicts+=("$path: Codex は削除したが、作業フォルダでも変更されている（作業フォルダの内容を残した）")
+      else conflicts+=("$path: Haiku は削除したが、作業フォルダでも変更されている（作業フォルダの内容を残した）")
       fi
       continue
     fi
@@ -75,20 +75,20 @@ for run_dir in "$@"; do
     if same "$ours" "$t"; then skipped+=("$path")
     elif same "$ours" "$b"; then put "$t" "$ours" "$mode"; taken+=("$path")
     elif [[ ! -e $ours && ! -L $ours ]]; then
-      conflicts+=("$path: 作業フォルダで削除されている（Codex 版を $path.codex に置いた）")
-      put "$t" "$ours.codex" "$mode"
+      conflicts+=("$path: 作業フォルダで削除されている（Haiku 版を $path.haiku に置いた）")
+      put "$t" "$ours.haiku" "$mode"
     elif [[ $mode == 120000 || -L $ours || $(git -C "$wt" diff --numstat "$base" "$final" -- "$path" | cut -f1) == - ]]; then
-      conflicts+=("$path: マージできない種類のファイル（Codex 版を $path.codex に置いた）")
-      put "$t" "$ours.codex" "$mode"
+      conflicts+=("$path: マージできない種類のファイル（Haiku 版を $path.haiku に置いた）")
+      put "$t" "$ours.haiku" "$mode"
     else
       [[ -f $b ]] || : >"$b"
       rc=0
-      git merge-file -L 作業フォルダ -L ベース -L Codex "$ours" "$b" "$t" || rc=$?
+      git merge-file -L 作業フォルダ -L ベース -L Haiku "$ours" "$b" "$t" || rc=$?
       if ((rc == 0)); then merged+=("$path")
       elif ((rc > 0 && rc < 128)); then conflicts+=("$path: $rc か所の競合（マーカーを残した）")
       else
-        conflicts+=("$path: マージできない（Codex 版を $path.codex に置いた）")
-        put "$t" "$ours.codex" "$mode"
+        conflicts+=("$path: マージできない（Haiku 版を $path.haiku に置いた）")
+        put "$t" "$ours.haiku" "$mode"
       fi
     fi
   done < <(git -C "$wt" diff -z --name-status --no-renames "$base" "$final")
