@@ -1,6 +1,6 @@
 ---
 name: codex-design-review
-description: Claude が考えた設計（会話中の案や設計書）を Codex CLI の GPT-6.1 Sol にセカンドオピニオンとしてレビューさせる。「この設計を Codex にレビューしてもらって」などの依頼で使う。依頼がなくても、作り方の判断を含む設計や実装計画は規模を問わず、提示や実装の前に使い、迷ったら使う（除外は本文）。
+description: Claude が考えた設計（会話中の案や設計書）を Codex CLI の GPT-6.1 Sol にセカンドオピニオンとしてレビューさせる。「この設計を Codex にレビューしてもらって」などの依頼で使う。依頼がなくても、作り方の判断を含む設計や実装計画は、提示や実装の前に使い、迷ったら使う（除外は本文）。
 argument-hint: "[--focus <観点>,...] [設計書のパス] [補足]"
 allowed-tools: Bash(bash *codex-design-review/scripts/new-run.sh*), Bash(bash *codex-design-review/scripts/review.sh*), Read, Grep, Glob, Write(//**/artifacts/codex-design-review/**), Edit(//**/artifacts/codex-design-review/**)
 ---
@@ -16,7 +16,7 @@ Claude が考えた設計を、別のモデル（Codex CLI の GPT-6.1 Sol）に
 
 ユーザーに頼まれていなくても、積極的に使う。Claude が設計や実装計画をまとめ、ユーザーに提示する（または実装を始める）前に、次の基準で判断する。**迷ったら使う。**
 
-**使う**: 作り方の判断を含む設計や実装計画は、規模にかかわらずすべて。たとえば次のもの。
+**使う**: 作り方の判断を含む設計や実装計画すべて。たとえば次のもの。
 
 - 新しい機能・画面・API・モジュールを作る、新しいライブラリやアーキテクチャ上の仕組みを持ち込む
 - 複数の案を比べて 1 つを選ぶ（選ばなかった案との比較を独立に確かめる）
