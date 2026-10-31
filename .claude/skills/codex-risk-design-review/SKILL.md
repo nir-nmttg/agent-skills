@@ -2,7 +2,7 @@
 name: codex-risk-design-review
 description: リスクの高い設計を、実装に入る前に Codex CLI の GPT-6 Astra に「どう壊れるか」の観点でレビューさせる。「この設計を Astra にレビューしてもらって」「実装前に Astra で設計を確認して」などの依頼で使う。重いので自分の判断では実行せず、DB 移行・認可・課金・外部への送信など戻しにくい設計のときだけ、使うかをユーザーに聞く（詳しい基準は本文）。
 argument-hint: "[設計書のパス] [補足]"
-allowed-tools: Bash(bash *codex-risk-design-review/scripts/new-run.sh*), Bash(bash *codex-risk-design-review/scripts/review.sh*), Read, Grep, Glob, Write(//**/artifacts/codex-risk-design-review/**), Edit(//**/artifacts/codex-risk-design-review/**)
+allowed-tools: Bash(bash *codex-risk-design-review/scripts/new-run.sh*), Bash(bash *codex-risk-design-review/scripts/prepare.sh*), Bash(bash *codex-risk-design-review/scripts/review.sh*), Read, Grep, Glob, Write(//**/artifacts/codex-risk-design-review/**), Edit(//**/artifacts/codex-risk-design-review/**)
 ---
 
 # Codex Astra による設計のリスクレビュー
@@ -14,7 +14,7 @@ Claude の推論レベル: ${CLAUDE_EFFORT}
 
 ## 使うかどうかをユーザーに聞くとき
 
-Astra は重いので、**ユーザーに頼まれていなければ、自分の判断では実行しない。** 代わりに、次の条件に当たるときに使うかどうかを聞く。**当たるか迷ったら聞く。** Astra は異常系・壊れ方を重点的に見る。正常系の正しさや要件との一致は Sol（codex-design-review）が見るので、Astra は Sol と並べて使う。
+Astra は重いので、**ユーザーに頼まれていなければ、自分の判断では実行しない。** 代わりに、次の条件に当たるときに使うかどうかを聞く。**当たるか迷ったら聞く。** Astra は異常系・壊れ方を重点的に見る。正常系の正しさや要件との一致は Sol と Opus（codex-design-review）が見るので、Astra はそれらと並べて使う。
 
 **聞く**（Claude が設計や実装計画をまとめ、ユーザーに提示する（または実装を始める）前に、設計が次のどれかに触れる）
 
@@ -35,9 +35,9 @@ Astra は重いので、**ユーザーに頼まれていなければ、自分の
 
 **聞き方**
 
-- AskUserQuestion で 1 問だけ聞く。質問には、どのリスクに当たるか（例: 「既存の注文テーブルを分割する移行がある」）を 1 行で添える。選択肢は「Sol に Astra を加えてレビューする（推奨）」「Sol だけでレビューする」「レビューしない」。
-- Astra を加えると選ばれたら、このスキルの手順を進める（4. で codex-design-review も並べて実行する）。両方が終わったら、指摘をまとめて判断する（重複は 1 つにし、食い違いは根拠で確かめる）。
-- それ以外を選ばれたら、このスキルは使わず、その答えに従う（「Sol だけ」なら codex-design-review を使う）。
+- AskUserQuestion で 1 問だけ聞く。質問には、どのリスクに当たるか（例: 「既存の注文テーブルを分割する移行がある」）を 1 行で添える。選択肢は「通常のレビュー（Sol と Opus）に Astra を加える（推奨）」「通常のレビューだけ」「レビューしない」。
+- Astra を加えると選ばれたら、このスキルの手順を進める（4. で codex-design-review の Sol と Opus も並べて実行する）。すべて終わったら、指摘をまとめて判断する（重複は 1 つにし、食い違いは根拠で確かめる）。
+- それ以外を選ばれたら、このスキルは使わず、その答えに従う（「通常のレビューだけ」なら codex-design-review を使う）。
 - 聞いている間は設計を提示しない。答えを待ってから、レビューの結果とあわせて提示する（「レビューしない」なら、そのまま提示する）。
 
 ## 手順
@@ -76,17 +76,22 @@ Codex はこの会話を見られないので、設計書だけで判断でき�
 
 ### 4. Codex にレビューさせる
 
-Bash ツールを **`run_in_background: true`** で実行する（Astra は推論レベルが高いと数十分かかることがある）。終わると通知が来るので、それまで待つ。ポーリングはしない。
+まず、Astra への依頼（`prompt.md`）を作る。設計が今のフォルダ以外のリポジトリについてのものなら、`--cd <そのリポジトリのパス>` をつける。
 
 ```bash
-bash "${CLAUDE_SKILL_DIR}/scripts/review.sh" --effort ${CLAUDE_EFFORT} [--cd <dir>] <実行フォルダ>
+bash "${CLAUDE_SKILL_DIR}/scripts/prepare.sh" [--cd <dir>] <実行フォルダ>
 ```
 
-- codex-design-review（Sol）も、同じ設計書で並べて実行する。聞いて選ばれたときも、`/codex-risk-design-review` で直接頼まれたときも同じで、ユーザーが「Astra だけ」と言ったときだけ省く。設計書は両方のスキルの 3. の項目をすべて含めて書き、同じ内容を両方の実行フォルダに置き、2 つの review.sh を同時に background で動かす。両方が終わるまで設計を変えない。
+続けて、Bash ツールを **`run_in_background: true`** で実行する（Astra は推論レベルが高いと数十分かかることがある）。終わると通知が来るので、それまで待つ。ポーリングはしない。
+
+```bash
+bash "${CLAUDE_SKILL_DIR}/scripts/review.sh" --effort ${CLAUDE_EFFORT} <実行フォルダ>
+```
+
+- codex-design-review の Sol と Opus も、同じ設計書で並べて実行する。聞いて選ばれたときも、`/codex-risk-design-review` で直接頼まれたときも同じで、ユーザーが「Astra だけ」と言ったときだけ省く（「Sol と Astra だけ」なら Opus を省く）。設計書は両方のスキルの 3. の項目をすべて含めて書き、同じ内容を両方の実行フォルダに置く（再レビューの「前回レビューへの対応」の節だけは Astra の設計書にしか書かない）。Sol と Opus は codex-design-review の手順どおりに動かす。それぞれ `prepare.sh` を実行してから、Astra・Sol・Opus を同じメッセージで動かす。**すべて終わるまで、設計書と読み先のコードを編集しない。**
 - `--effort` には上の「Claude の推論レベル」をそのまま渡す（Claude が high なら Codex も high）。空や `auto` のときは省略してよい（スクリプトが high にする）。
-- 設計が今のフォルダ以外のリポジトリについてのものなら、`--cd <そのリポジトリのパス>` をつける。
 - Codex は読み取り専用のサンドボックスと 1M コンテキストで動き、個人設定（MCP サーバーやプラグイン）は読み込まない。
-- エラーなら内容を伝えて終わる。`codex` が見つからない・ログインしていないときは、`brew install --cask codex` と `codex login` を案内する。Astra だけが失敗した（プランの対象外など）ときは、そのことを伝え、並べて実行した codex-design-review（Sol）の結果で判断を進める（Sol を並べていなかったときは、Sol で実行するかを聞く）。
+- エラーなら内容を伝えて終わる。`codex` が見つからない・ログインしていないときは、`brew install --cask codex` と `codex login` を案内する。並べて動かしているときは、どれかが失敗しても全部の結果が出揃うまで待ち、成功した分で判断を進めて失敗を報告で伝える。どれも結果を返さなかったら、そのことを伝えてレビューなしで設計を提示する。Astra だけが失敗した（プランの対象外など）のに Sol を並べていなかったときは、Sol で実行するかを聞く。
 
 ### 5. 報告する
 
@@ -112,7 +117,7 @@ bash "${CLAUDE_SKILL_DIR}/scripts/review.sh" --effort ${CLAUDE_EFFORT} [--cd <di
 ```
 
 - 指摘はうのみにしない。必要なら指摘されたファイルを Read / Grep で確かめ、根拠をもって判断する。Codex の指摘が誤っていれば「不採用」とし、理由を書く。本番の状態に左右されて判断できないものは「要確認」にする。
-- codex-design-review と並べたときは、両方の指摘を 1 つの表にまとめる（「指摘」の列の頭に `[Astra]`・`[Sol]` を書く）。報告はこのスキルの形式にそろえる。
+- Sol と Opus を並べたときは、すべての指摘を 1 つの表にまとめる（「指摘」の列の頭に `[Astra]`・`[Sol]`・`[Opus]`・`[Sol・Opus]` を書く）。報告はこのスキルの形式にそろえ、Sol と Opus の内訳（両方 n 件、Sol だけ n 件、Opus だけ n 件）を加える。内訳は両方が成功した回だけ書き、それ以外は「比較なし」と書く。判断の表、実行状態、内訳は codex-design-review の実行フォルダの `decisions.md` に保存する（「Astra だけ」のときは Astra の実行フォルダに保存する）。
 - まだユーザーに見せていない Claude 自身の設計案なら、「採用」とした指摘を設計に反映してから提示してよい。その場合も、表で何を採用し何を変えたかを示す。それ以外（ユーザーが書いた設計書など）は修正案の提示にとどめ、了承なしに書き換えない。
 - 「実装・リリースで守ること」は、実装に入ったら守り、実装後に codex-risk-impl-review を使うときは実装の説明の「リスクのある箇所」に書き写す。
-- 修正後にもう一度レビューする場合は、新しい実行フォルダを作り、設計書に「前回レビューへの対応」の節を加えてから 2. からやり直す（重要度「高」を直したときは、もう一度 Astra にかけるかをユーザーに聞く）。
+- 修正後にもう一度 Astra にかける場合は、新しい実行フォルダを作り、設計書に「前回レビューへの対応」の節を加えてから 2. からやり直す（重要度「高」を直したときは、もう一度 Astra にかけるかをユーザーに聞く）。Sol と Opus には前回の指摘や対応を渡さない。
