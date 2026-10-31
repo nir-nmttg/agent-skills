@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
 # 作業フォルダの git の変更を Codex CLI（GPT-6.1 Sol）に読み取り専用でレビューさせ、review.md に保存する。
 #
-# 使い方: review.sh --effort <low|medium|high|xhigh|max> [--fast] [--cd <dir>] [--base <ref> | --commit <sha> | --uncommitted] [--focus <観点>[,<観点>...]] <実行フォルダ>
+# 使い方: review.sh --effort <low|medium|high|xhigh|max> [--cd <dir>] [--base <ref> | --commit <sha> | --uncommitted] [--focus <観点>[,<観点>...]] <実行フォルダ>
 #   --effort       Codex の推論レベル。Claude の推論レベルをそのまま渡す（省略時は $CLAUDE_EFFORT、それもなければ high）
-#   --fast         Fast モード（service_tier=fast）で実行する。速いぶん使用量が増える
 #   --cd           レビューするリポジトリ（既定: 今のフォルダ）
 #   --base         <ref> から分岐して以降の変更（コミット済み＋未コミット）をレビューする
 #   --commit       1 つのコミットだけをレビューする
@@ -18,13 +17,12 @@
 # 観点の定義は指示書と同じフォルダの focus/ から読む。
 set -euo pipefail
 
-usage() { sed -n '4,14p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 1; }
+usage() { sed -n '4,13p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 1; }
 
-effort="" fast="" workdir=$PWD run_dir="" mode=auto target="" focus_arg=""
+effort="" workdir=$PWD run_dir="" mode=auto target="" focus_arg=""
 while (($#)); do
   case $1 in
     --effort) effort=${2:-}; shift 2 || usage ;;
-    --fast) fast=1; shift ;;
     --cd) workdir=${2:-}; shift 2 || usage ;;
     --focus) focus_arg=${2:-}; [[ -n $focus_arg ]] || usage; shift 2 ;;
     --base | --commit)
@@ -157,8 +155,6 @@ args=(
   -c model_auto_compact_token_limit=900000
   --json
 )
-fast_label=off
-[[ -n $fast ]] && { args+=(-c 'service_tier="fast"'); fast_label=on; }
 
 # 1 つの観点についてプロンプトを組み立て、Codex を実行する。Codex の終了コードを返す。
 # 観点が空なら 1 本だけのレビュー、general なら並列のうちの総合（どちらも全観点を見る）
@@ -191,7 +187,7 @@ check_result() {
     tail -20 "$run_dir/codex$sfx.log" >&2
     return 1
   fi
-  # Codex が警告として返したエラー（未対応の service tier など）を表示する
+  # Codex が警告として返したエラーを表示する
   jq -r 'select(.item.type == "error") | "警告: \(.item.message)"' "$run_dir/events$sfx.jsonl" >&2 || true
 }
 
@@ -205,14 +201,14 @@ tokens_of() {
 started=$SECONDS
 
 if ((${#focuses[@]} == 0)); then
-  echo "Codex でレビュー中: model=$model effort=$effort fast=$fast_label 範囲=${scope}（$files ファイル、$lines 行）" >&2
+  echo "Codex でレビュー中: model=$model effort=$effort 範囲=${scope}（$files ファイル、$lines 行）" >&2
   status=0
   run_review "" || status=$?
   check_result "" "$status" || exit 1
 
   echo "## $title"
   echo
-  echo "- 設定: $model / effort=$effort / fast=$fast_label / context=1M"
+  echo "- 設定: $model / effort=$effort / context=1M"
   echo "- 範囲: ${scope}（$files ファイル、$lines 行）"
   echo "- 所要時間: $((SECONDS - started)) 秒、トークン: $(tokens_of "")"
   echo "- 保存先: $run_dir/review.md"
@@ -223,7 +219,7 @@ if ((${#focuses[@]} == 0)); then
   exit 0
 fi
 
-echo "Codex で総合と観点ごとに並列レビュー中: 総合 ${focuses[*]} model=$model effort=$effort fast=$fast_label 範囲=${scope}（$files ファイル、$lines 行）" >&2
+echo "Codex で総合と観点ごとに並列レビュー中: 総合 ${focuses[*]} model=$model effort=$effort 範囲=${scope}（$files ファイル、$lines 行）" >&2
 # 総合の 1 本を先頭に足す（重点の担当は観点を絞るので、総合がないと担当外の観点が抜ける）
 focuses=(general "${focuses[@]}")
 pids=()
@@ -240,7 +236,7 @@ done
 
 echo "## ${title}（観点ごとに並列）"
 echo
-echo "- 設定: $model / effort=$effort / fast=$fast_label / context=1M"
+echo "- 設定: $model / effort=$effort / context=1M"
 echo "- 範囲: ${scope}（$files ファイル、$lines 行）"
 echo "- 観点: 総合 + $(IFS=,; echo "${focuses[*]:1}")"
 echo "- 所要時間: $((SECONDS - started)) 秒（すべての観点が終わるまで）"
