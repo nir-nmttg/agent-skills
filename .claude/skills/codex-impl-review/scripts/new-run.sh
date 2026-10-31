@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 実装レビューの実行フォルダを作り、実装の説明を書き込むパスを出力する。
+# 実装レビューの実行フォルダを作り、要件を書き込むパスを出力する。
 #
 # 使い方: new-run.sh <slug>
 #   slug  変更の短い名前（英数字・ハイフン）。フォルダ名に使う
@@ -17,4 +17,4 @@ dir="$root/$(date +%Y%m%d-%H%M%S)-$slug"
 mkdir -p "$dir"
 
 echo "実行フォルダ: $dir"
-echo "実装の説明: $dir/context.md"
+echo "要件: $dir/requirements.md"

@@ -2,7 +2,7 @@
 name: codex-risk-impl-review
 description: リスクの高い実装（git の差分）を Codex CLI の GPT-6 Astra に「どう壊れるか」の観点でレビューさせて直す。「実装を Astra にレビューしてもらって」「本番に出す前に Astra で確認して」などの依頼で使う。重いので自分の判断では実行せず、DB 移行・認可・課金・外部への送信など戻しにくい変更のときだけ、使うかをユーザーに聞く（詳しい基準は本文）。
 argument-hint: "[--base <ref> | --commit <sha> | --uncommitted] [補足]"
-allowed-tools: Bash(bash *codex-risk-impl-review/scripts/new-run.sh*), Bash(bash *codex-risk-impl-review/scripts/review.sh*), Read, Grep, Glob, Write(//**/artifacts/codex-risk-impl-review/**), Edit(//**/artifacts/codex-risk-impl-review/**)
+allowed-tools: Bash(bash *codex-risk-impl-review/scripts/new-run.sh*), Bash(bash *codex-risk-impl-review/scripts/prepare.sh*), Bash(bash *codex-risk-impl-review/scripts/review.sh*), Read, Grep, Glob, Write(//**/artifacts/codex-risk-impl-review/**), Edit(//**/artifacts/codex-risk-impl-review/**)
 ---
 
 # Codex Astra による実装のリスクレビュー
@@ -10,11 +10,11 @@ allowed-tools: Bash(bash *codex-risk-impl-review/scripts/new-run.sh*), Bash(bash
 引数: $ARGUMENTS
 Claude の推論レベル: ${CLAUDE_EFFORT}
 
-壊れると影響の大きい変更を、最も強いモデル（Codex CLI の GPT-6 Astra）に「どう壊れるか」の観点で独立してレビューさせ、その指摘を Claude が吟味する。差分の取り出し・Codex の呼び出し・保存はスクリプトに任せ（codex-impl-review のスクリプトを、モデルとレビューの指示書だけ差し替えて使う）、Claude は「実装の説明をまとめる」「指摘を判断する」「採用した指摘を直す」だけを行う。結果は `artifacts/codex-risk-impl-review/` に保存される。
+壊れると影響の大きい変更を、最も強いモデル（Codex CLI の GPT-6 Astra）に「どう壊れるか」の観点で独立してレビューさせ、その指摘を Claude が吟味する。差分の取り出し・Codex の呼び出し・保存はスクリプトに任せ（codex-impl-review のスクリプトを、モデルと指示書と入力だけ差し替えて使う）、Claude は「実装の説明をまとめる」「指摘を判断する」「採用した指摘を直す」だけを行う。結果は `artifacts/codex-risk-impl-review/` に保存される。
 
 ## 使うかどうかをユーザーに聞くとき
 
-Astra は重いので、**ユーザーに頼まれていなければ、自分の判断では実行しない。** 代わりに、次の条件に当たるときに使うかどうかを聞く。**当たるか迷ったら聞く。** Astra は異常系・壊れ方を重点的に見る。正常系の正しさや要件との一致は Sol（codex-impl-review）が見るので、Astra は Sol と並べて使う。
+Astra は重いので、**ユーザーに頼まれていなければ、自分の判断では実行しない。** 代わりに、次の条件に当たるときに使うかどうかを聞く。**当たるか迷ったら聞く。** Astra は異常系・壊れ方を重点的に見る。正常系の正しさや要件との一致は Sol と Opus（codex-impl-review）が見るので、Astra はそれらと並べて使う。
 
 **聞く**（Claude が実装を終えて完了を報告する前、またはまだレビューしていない変更のコミット・PR を頼まれたときに、変更が次のどれかに触れる）
 
@@ -37,15 +37,15 @@ Astra は重いので、**ユーザーに頼まれていなければ、自分の
 **聞き方**
 
 - AskUserQuestion で 1 問だけ聞く。質問には、どのリスクに当たるか（例: 「マイグレーションで既存データを変換している」）を 1 行で添える。選択肢は「通常のレビュー（Sol と Opus）に Astra を加える（推奨）」「通常のレビューだけ」「レビューしない」。
-- Astra を加えると選ばれたら、このスキルの手順を進める（4. で codex-impl-review と opus-final-review も並べて実行する）。
+- Astra を加えると選ばれたら、このスキルの手順を進める（4. で codex-impl-review の Sol と Opus も並べて実行する）。
 - それ以外を選ばれたら、このスキルは使わず、その答えに従う（「通常のレビューだけ」なら codex-impl-review を使う）。
 
 ## 手順
 
 ### 1. 引数を読む
 
-- 範囲の指定があればそのまま 4. に渡す。「未コミットだけ」→ `--uncommitted`、「このコミット」→ `--commit <sha>`、「develop との差分」→ `--base develop`。指定がなければ渡さない（既定ブランチから分岐して以降の変更を、未コミットも含めてすべてレビューする）。
-- 対象が今のフォルダ以外のリポジトリなら、4. で `--cd <そのリポジトリのパス>` をつける。
+- 範囲の指定があればそのまま 4. の `prepare.sh` に渡す。「未コミットだけ」→ `--uncommitted`、「このコミット」→ `--commit <sha>`、「develop との差分」→ `--base develop`。指定がなければ渡さない（既定ブランチから分岐して以降の変更を、未コミットも含めてすべてレビューする）。
+- 対象が今のフォルダ以外のリポジトリなら、4. の `prepare.sh` に `--cd <そのリポジトリのパス>` をつける。
 
 ### 2. 実行フォルダを作る
 
@@ -72,13 +72,19 @@ bash "${CLAUDE_SKILL_DIR}/scripts/new-run.sh" <slug>
 
 ### 4. Codex にレビューさせる
 
-Bash ツールを **`run_in_background: true`** で実行する（Astra は推論レベルが高いと数十分かかることがある）。終わると通知が来るので、それまで待つ。ポーリングはしない。
+まず、Astra への依頼（`prompt.md`）を作る。
 
 ```bash
-bash "${CLAUDE_SKILL_DIR}/scripts/review.sh" --effort ${CLAUDE_EFFORT} [--cd <dir>] [--base <ref> | --commit <sha> | --uncommitted] <実行フォルダ>
+bash "${CLAUDE_SKILL_DIR}/scripts/prepare.sh" [--cd <dir>] [--base <ref> | --commit <sha> | --uncommitted] <実行フォルダ>
 ```
 
-- codex-impl-review（Sol）も、同じ範囲・同じ変更の状態で並べて実行する。聞いて選ばれたときも、`/codex-risk-impl-review` で直接頼まれたときも同じで、ユーザーが「Astra だけ」と言ったときだけ省く。実装の説明は両方のスキルの 3. の項目をすべて含めて書き、同じ内容を両方の実行フォルダに置き、2 つの review.sh を同じ範囲の指定で同時に background で動かす。opus-final-review の「使わない」に当たらなければ、そのスキルの手順で要件を書いて、同じ範囲の指定で prompt.md を作り、同じメッセージで Agent ツールも動かす（「Astra だけ」「Sol と Astra だけ」と言われたら省く）。**すべて終わるまでファイルを編集しない。** 終わったら、指摘をまとめて判断する（重複は 1 つにし、食い違いはコードで確かめる）。
+続けて、Bash ツールを **`run_in_background: true`** で実行する（Astra は推論レベルが高いと数十分かかることがある）。終わると通知が来るので、それまで待つ。ポーリングはしない。
+
+```bash
+bash "${CLAUDE_SKILL_DIR}/scripts/review.sh" --effort ${CLAUDE_EFFORT} <実行フォルダ>
+```
+
+- codex-impl-review の Sol と Opus も、同じ範囲・同じ変更の状態で並べて実行する。聞いて選ばれたときも、`/codex-risk-impl-review` で直接頼まれたときも同じで、ユーザーが「Astra だけ」と言ったときだけ省く（「Sol と Astra だけ」なら Opus を省く）。Astra の実装の説明は Sol と Opus に渡さず、codex-impl-review の手順で別の実行フォルダに要件を書いて `prompt.md` を作る。範囲の指定は 2 つの `prepare.sh` に同じものを渡し、Astra・Sol・Opus を同じメッセージで動かす。**すべて終わるまでファイルを編集しない。** 終わったら、指摘をまとめて判断する（重複は 1 つにし、食い違いはコードで確かめる）。
 - `--effort` には上の「Claude の推論レベル」をそのまま渡す（Claude が high なら Codex も high）。空や `auto` のときは省略してよい（スクリプトが high にする）。
 - Codex は読み取り専用のサンドボックスと 1M コンテキストで動き、個人設定（MCP サーバーやプラグイン）は読み込まない。コードを書き換えることはない。
 - 待っている間に、テストの実行など、レビュー結果に左右されない作業を進めてよい（ファイルは編集しない）。
@@ -89,7 +95,7 @@ bash "${CLAUDE_SKILL_DIR}/scripts/review.sh" --effort ${CLAUDE_EFFORT} [--cd <di
 
 指摘はうのみにしない。指摘ごとに、該当のファイルを Read / Grep で確かめ、「再現」に書かれた条件で本当に問題が起きるかを根拠をもって判断する。Codex の指摘が誤っていれば「不採用」とし、理由を書く。本番の状態に左右されて判断できないものは「要確認」にする。
 
-codex-impl-review や opus-final-review と並べたときは、すべての指摘をまとめてから判断する（7. の表では「指摘」の列の頭に `[Astra]`・`[Sol]`・`[Opus]` を書く。報告はこのスキルの形式にそろえ、Opus を並べたときは「要件の充足」の節を加える）。Opus の「要件ごとの判定」「要件にない変更」は、そのスキルの 5. のとおり判断する。
+Sol と Opus を並べたときは、すべての指摘をまとめてから判断する（7. の表では「指摘」の列の頭に `[Astra]`・`[Sol]`・`[Opus]`・`[Sol・Opus]` を書く。報告はこのスキルの形式にそろえ、「要件の充足」の節と、Sol と Opus の内訳（両方 n 件、Sol だけ n 件、Opus だけ n 件）を加える）。Sol と Opus の「要件ごとの判定」「要件にない変更」は、codex-impl-review の 5. のとおり判断し、判断の表はその実行フォルダの `decisions.md` に保存する。
 
 ### 6. 直す
 
@@ -120,4 +126,4 @@ codex-impl-review や opus-final-review と並べたときは、すべての指�
 （Codex の「確認したい点」や「要確認」のうち、ユーザーにしか決められないもの。なければ省く）
 ```
 
-- 修正後にもう一度レビューする場合は、新しい実行フォルダを作り、実装の説明に「前回レビューへの対応」の節を加えてから 2. からやり直す（重要度「高」を直したときは、もう一度 Astra にかけるかをユーザーに聞く）。
+- 修正後にもう一度 Astra にかける場合は、新しい実行フォルダを作り、実装の説明に「前回レビューへの対応」の節を加えてから 2. からやり直す（重要度「高」を直したときは、もう一度 Astra にかけるかをユーザーに聞く）。Sol と Opus には前回の指摘や対応を渡さない。
