@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 設計レビューの実行フォルダを作り、設計書を書き込むパスを出力する。
+# 設計レビューの実行フォルダを作り、要件と設計書を書き込むパスを出力する。
 #
 # 使い方: new-run.sh <slug>
 #   slug  設計の短い名前（英数字・ハイフン）。フォルダ名に使う
@@ -17,4 +17,5 @@ dir="$root/$(date +%Y%m%d-%H%M%S)-$slug"
 mkdir -p "$dir"
 
 echo "実行フォルダ: $dir"
+echo "要件: $dir/requirements.md"
 echo "設計書: $dir/design.md"

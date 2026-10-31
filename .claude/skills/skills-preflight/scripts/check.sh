@@ -49,7 +49,7 @@ check_cmd() {
 check_cmd git "ほぼすべて" "\`xcode-select --install\`（または \`brew install git\`）" git --version
 check_cmd jq "ほぼすべて" "\`brew install jq\`" jq --version
 check_cmd codex "codex-*" "\`brew install --cask codex\` のあと \`codex login\`" codex --version
-check_cmd perl "haiku-impl, codex-design-review, codex-impl-review, codex-risk-design-review, codex-risk-impl-review, opus-final-review" "\`brew install perl\`（macOS には標準で入っている）" perl -e 'print "perl $^V\n"'
+check_cmd perl "haiku-impl, codex-design-review, codex-impl-review, codex-risk-design-review, codex-risk-impl-review, opus-design-review, opus-impl-review" "\`brew install perl\`（macOS には標準で入っている）" perl -e 'print "perl $^V\n"'
 check_cmd gh "gh-todo, gh-issue-overview, gh-pr-precheck, codex-verify-prompt（PR を渡すとき）" "\`brew install gh\` のあと \`gh auth login\`" gh --version
 check_cmd python3 "gh-issue-overview" "\`xcode-select --install\`（または \`brew install python\`）" python3 --version
 check_cmd curl "gh-issue-overview, gh-pr-precheck" "\`brew install curl\`"
@@ -80,11 +80,11 @@ if has gh; then
   fi
 fi
 
-# --- サブエージェントのリンク（haiku-impl・haiku-check・Codex のレビュー 4 スキル・opus-final-review に必須） ---------
+# --- サブエージェントのリンク（haiku-impl・haiku-check・Codex のレビュー 4 スキル・Opus のレビュー 2 スキルに必須） ---------
 
 agents_src="$repo_root/.claude/agents"
 agents_dir="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/agents"
-agent_users="haiku-impl, haiku-check, codex-design-review, codex-impl-review, codex-risk-design-review, codex-risk-impl-review, opus-final-review"
+agent_users="haiku-impl, haiku-check, codex-design-review, codex-impl-review, codex-risk-design-review, codex-risk-impl-review, opus-design-review, opus-impl-review"
 unlinked_agents=()
 for f in "$agents_src"/*.md; do
   [[ -f $f ]] || continue
@@ -130,7 +130,8 @@ skill_needs() {
     codex-*) echo "git jq codex codex-login" ;;
     haiku-impl) echo "git jq perl agents-link haiku-impl-link" ;;
     haiku-check) echo "git agents-link" ;;
-    opus-final-review) echo "git perl agents-link" ;;
+    opus-design-review) echo "perl agents-link" ;;
+    opus-impl-review) echo "git perl agents-link" ;;
     gh-todo) echo "jq gh gh-login" ;;
     gh-issue-overview) echo "jq gh gh-login python3 curl" ;;
     gh-pr-precheck) echo "jq gh gh-login curl" ;;

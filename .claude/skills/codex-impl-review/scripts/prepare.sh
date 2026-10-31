@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # 作業フォルダの git の変更を取り出し、要件と合わせて、レビュアーに読ませる prompt.md を作る。
-# Sol（review.sh）と Opus（opus-final-reviewer）は、ここで作った同じ prompt.md を読む。
+# Sol（review.sh）と Opus（opus-reviewer）は、ここで作った同じ prompt.md を読む。
 #
 # 使い方: prepare.sh [--cd <dir>] [--base <ref> | --commit <sha> | --uncommitted] <実行フォルダ>
 #   --cd           レビューするリポジトリ（既定: 今のフォルダ）
