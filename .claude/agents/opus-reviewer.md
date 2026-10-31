@@ -1,6 +1,6 @@
 ---
 name: opus-reviewer
-description: codex-impl-review・codex-design-review・opus-impl-review・opus-design-review から呼ぶ専用。読み取り専用で実装や設計をレビューする
+description: implementation-cross-review・design-cross-review から呼ぶ専用。読み取り専用で実装や設計をレビューする
 model: claude-opus-5-5
 effort: high
 tools: Read, Grep, Glob

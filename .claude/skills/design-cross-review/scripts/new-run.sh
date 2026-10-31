@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Opus の設計レビューの実行フォルダを作り、要件と設計書を書き込むパスを出力する。
+# 設計レビューの実行フォルダを作り、要件と設計書を書き込むパスを出力する。
 #
 # 使い方: new-run.sh <slug>
 #   slug  設計の短い名前（英数字・ハイフン）。フォルダ名に使う
 #
-# 保存先は $OPUS_DESIGN_REVIEW_DIR（既定: このリポジトリ直下の artifacts/opus-design-review）/<日時>-<slug>/。
+# 保存先は $DESIGN_CROSS_REVIEW_DIR（既定: このリポジトリ直下の artifacts/design-cross-review）/<日時>-<slug>.<乱数>/。
 set -euo pipefail
 
 slug=${1:-}
@@ -12,9 +12,10 @@ slug=${1:-}
 
 # ~/.claude/skills のシンボリックリンク経由で呼ばれても、リンク先のリポジトリに保存する
 repo_root=$(cd -P "$(dirname "$0")/../../../.." && pwd)
-root=${OPUS_DESIGN_REVIEW_DIR:-$repo_root/artifacts/opus-design-review}
-dir="$root/$(date +%Y%m%d-%H%M%S)-$slug"
-mkdir -p "$dir"
+root=${DESIGN_CROSS_REVIEW_DIR:-$repo_root/artifacts/design-cross-review}
+mkdir -p "$root"
+# 同時に動かしても別のフォルダになるよう、原子的に作る
+dir=$(mktemp -d "$root/$(date +%Y%m%d-%H%M%S)-$slug.XXXXXX")
 
 echo "実行フォルダ: $dir"
 echo "要件: $dir/requirements.md"

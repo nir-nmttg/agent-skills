@@ -4,7 +4,7 @@
 # 使い方: new-run.sh <slug>
 #   slug  変更の短い名前（英数字・ハイフン）。フォルダ名に使う
 #
-# 保存先は $CODEX_IMPL_REVIEW_DIR（既定: このリポジトリ直下の artifacts/codex-impl-review）/<日時>-<slug>/。
+# 保存先は $IMPLEMENTATION_CROSS_REVIEW_DIR（既定: このリポジトリ直下の artifacts/implementation-cross-review）/<日時>-<slug>.<乱数>/。
 set -euo pipefail
 
 slug=${1:-}
@@ -12,9 +12,10 @@ slug=${1:-}
 
 # ~/.claude/skills のシンボリックリンク経由で呼ばれても、リンク先のリポジトリに保存する
 repo_root=$(cd -P "$(dirname "$0")/../../../.." && pwd)
-root=${CODEX_IMPL_REVIEW_DIR:-$repo_root/artifacts/codex-impl-review}
-dir="$root/$(date +%Y%m%d-%H%M%S)-$slug"
-mkdir -p "$dir"
+root=${IMPLEMENTATION_CROSS_REVIEW_DIR:-$repo_root/artifacts/implementation-cross-review}
+mkdir -p "$root"
+# 同時に動かしても別のフォルダになるよう、原子的に作る
+dir=$(mktemp -d "$root/$(date +%Y%m%d-%H%M%S)-$slug.XXXXXX")
 
 echo "実行フォルダ: $dir"
 echo "要件: $dir/requirements.md"

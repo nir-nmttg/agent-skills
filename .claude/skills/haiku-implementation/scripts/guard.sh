@@ -3,7 +3,7 @@
 # 悪意のある回避（sh -c で包むなど）は想定しない。監視はメインのセッションの権限（auto モードの分類器など）に任せる。
 #
 # 標準入力に hook の JSON を受け取り、許可なら終了コード 0、止めるなら理由を標準エラーに出して終了コード 2 で終わる。
-# 作業場所として認めるのは、実行フォルダの置き場所（このリポジトリ直下の artifacts/haiku-impl）のうち、
+# 作業場所として認めるのは、実行フォルダの置き場所（このリポジトリ直下の artifacts/haiku-implementation）のうち、
 # prepare.sh で準備済み（repo と worktree がある）の実行フォルダだけ。
 # - Edit / Write: 実体のパスが worktree の中（.git を除く）でなければ止める。リンクした依存フォルダは実体がもとのリポジトリなので止まる
 # - Grep / Glob: path が実行フォルダの中でなければ止める（省略するとメインの作業フォルダが対象になるので止める）。
@@ -15,17 +15,17 @@ set -uo pipefail
 
 deny() { printf '%s\n' "$*" >&2; exit 2; }
 
-source "$(dirname "$0")/lib.sh" || deny "haiku-impl の guard.sh: lib.sh を読み込めないため止めました"
-command -v jq >/dev/null || deny "haiku-impl の guard.sh: jq がないため止めました（brew install jq）"
-command -v perl >/dev/null || deny "haiku-impl の guard.sh: perl がないため止めました"
+source "$(dirname "$0")/lib.sh" || deny "haiku-implementation の guard.sh: lib.sh を読み込めないため止めました"
+command -v jq >/dev/null || deny "haiku-implementation の guard.sh: jq がないため止めました（brew install jq）"
+command -v perl >/dev/null || deny "haiku-implementation の guard.sh: perl がないため止めました"
 
 input=$(cat)
-field() { jq -r "$1 // \"\"" <<<"$input" 2>/dev/null || deny "haiku-impl の guard.sh: hook の入力を読めないため止めました"; }
+field() { jq -r "$1 // \"\"" <<<"$input" 2>/dev/null || deny "haiku-implementation の guard.sh: hook の入力を読めないため止めました"; }
 # field はサブシェルで動くので、失敗したらここで止める
 tool=$(field .tool_name) || exit 2
 cwd=$(field .cwd) || exit 2
 
-root=$(runs_root) || deny "haiku-impl の guard.sh: 実行フォルダの置き場所を決められないため止めました"
+root=$(runs_root) || deny "haiku-implementation の guard.sh: 実行フォルダの置き場所を決められないため止めました"
 root_real=$(cd -P "$root" 2>/dev/null && pwd) || deny "実行フォルダの置き場所 $root がありません。prepare.sh で準備した worktree で作業してください"
 
 # real <path>  実体のパスを出力する（相対パスは hook の cwd から）

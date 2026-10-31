@@ -4,7 +4,7 @@
 # 使い方: new-run.sh <slug>
 #   slug  タスクの短い名前（英数字・ハイフン）。フォルダ名に使う
 #
-# 保存先はこのリポジトリ直下の artifacts/haiku-impl/<日時>-<slug>/。
+# 保存先はこのリポジトリ直下の artifacts/haiku-implementation/<日時>-<slug>/。
 set -euo pipefail
 
 slug=${1:-}
