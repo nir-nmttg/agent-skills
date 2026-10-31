@@ -46,6 +46,9 @@ run_dir=$(cd -P "$run_dir" && pwd)
 # 途中で失敗したときに、前回の入力でレビューしないよう先に消す
 rm -rf "$run_dir/prompt.md" "$run_dir/prompt.md.tmp" "$run_dir/source.txt" "$run_dir/scope.txt" "$run_dir/tree"
 
+# shellcheck source=/dev/null
+. "$(dirname "$0")/lib.sh"
+
 [[ -f $prompt_file ]] || { echo "エラー: レビューの指示書 $prompt_file がありません" >&2; exit 1; }
 [[ -s $run_dir/$input.md ]] || { echo "エラー: $run_dir/$input.md がないか空です" >&2; exit 1; }
 [[ -d $workdir ]] || { echo "エラー: 作業フォルダ $workdir がありません" >&2; exit 1; }
@@ -132,20 +135,7 @@ size=$(wc -c <"$run_dir/diff.patch" | tr -d ' ')
   if [[ -n $stat ]]; then printf '\n変更ファイル:\n%s\n' "$stat"; fi
   if ((${#untracked[@]})); then printf '\n未追跡の新規ファイル:\n'; printf '%s\n' "${untracked[@]}"; fi
   printf '</scope>\n'
-  # 同じ内容（CLAUDE.md が AGENTS.md へのリンクのときなど）は 1 回だけ渡す
-  seen=" " source_real=$(cd -P "$source" && pwd)
-  for f in CLAUDE.md .claude/CLAUDE.md AGENTS.md; do
-    [[ -f $source/$f ]] || continue
-    # リンクでリポジトリの外のファイル（秘密情報など）を取り込まないよう、実体がリポジトリの中のものだけを渡す
-    real=$(perl -MCwd=realpath -e 'my $r = realpath($ARGV[0]); defined $r or exit 1; print $r' "$source/$f") &&
-      [[ $real == "$source_real"/* ]] || { echo "注意: $f はリポジトリの外を指しているので渡しません" >&2; continue; }
-    sum=$(cksum <"$source/$f" | tr ' ' -)
-    [[ $seen != *" $sum "* ]] || continue
-    seen+="$sum "
-    printf '\n<project-instructions file="%s">\n' "$f"
-    cat "$source/$f"
-    printf '\n</project-instructions>\n'
-  done
+  print_project_instructions "$source"
   printf '\n<%s>\n' "$input"
   cat "$run_dir/$input.md"
   printf '\n</%s>\n\n<diff>\n' "$input"
