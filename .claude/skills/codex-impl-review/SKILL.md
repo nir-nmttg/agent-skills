@@ -10,7 +10,7 @@ allowed-tools: Bash(bash *codex-impl-review/scripts/new-run.sh*), Bash(bash *cod
 引数: $ARGUMENTS
 Claude の推論レベル: ${CLAUDE_EFFORT}
 
-Claude が実装した変更を、Sol（Codex CLI の GPT-6.1 Sol）と Opus（`opus-final-reviewer`）に**同じ依頼で**レビューさせ、その指摘を Claude が吟味する。同じ観点を別のモデルで見て、単一モデルの見落としを補う。どちらも要件と差分から実際の動きを読み解くので、実装者の先入観が入らない。差分の取り出し・プロンプトの組み立て・Codex の呼び出しはスクリプトに任せ、Claude は「要件をまとめる」「指摘を判断する」「採用した指摘を直す」だけを行う。結果は `artifacts/codex-impl-review/` に保存される。
+Claude が実装した変更を、Sol（Codex CLI の GPT-6.1 Sol）と Opus（`opus-reviewer`）に**同じ依頼で**レビューさせ、その指摘を Claude が吟味する。同じ観点を別のモデルで見て、単一モデルの見落としを補う。どちらも要件と差分から実際の動きを読み解くので、実装者の先入観が入らない。差分の取り出し・プロンプトの組み立て・Codex の呼び出しはスクリプトに任せ、Claude は「要件をまとめる」「指摘を判断する」「採用した指摘を直す」だけを行う。結果は `artifacts/codex-impl-review/` に保存される。
 
 ## 自分の判断で使うとき
 
@@ -82,7 +82,7 @@ bash "${CLAUDE_SKILL_DIR}/scripts/prepare.sh" [--cd <dir>] [--base <ref> | --com
 - 「レビューする変更がありません」と出たら、範囲を確かめてユーザーに伝える（例: すでに既定ブランチにコミット・プッシュ済みなら `--commit` で指定してもらう）。その他のエラーなら内容を伝えて終わる。
 - `--commit` では当時のソースを `<実行フォルダ>/tree` に展開して読ませる。
 
-続けて、**同じメッセージで** 2 つを動かす。自分の判断で使うときも、`/codex-impl-review` で直接頼まれたときも同じで、opus-final-review の「使わない」に当たるときと、ユーザーが「Sol だけ」と言ったときだけ Opus を省く。**すべて終わるまでファイルを編集しない。**
+続けて、**同じメッセージで** 2 つを動かす。自分の判断で使うときも、`/codex-impl-review` で直接頼まれたときも同じで、opus-impl-review の「使わない」に当たるときと、ユーザーが「Sol だけ」と言ったときだけ Opus を省く。**すべて終わるまでファイルを編集しない。**
 
 Sol は Bash ツールを **`run_in_background: true`** で実行する（推論レベルが高いと 10 分以上かかる）。
 
@@ -92,7 +92,7 @@ bash "${CLAUDE_SKILL_DIR}/scripts/review.sh" --effort ${CLAUDE_EFFORT} <実行�
 
 Opus は Agent ツールで呼ぶ。
 
-- `subagent_type`: `opus-final-reviewer`（必ず指定する。`fork` や省略で会話を引き継ぐ形にしない）
+- `subagent_type`: `opus-reviewer`（必ず指定する。`fork` や省略で会話を引き継ぐ形にしない）
 - `effort`: 上の「Claude の推論レベル」。空や `auto` のときは `high`
 - `model`: **渡さない**（引数は別名しか受け付けず、親と同じ系統なら親のモデルになって、定義の `claude-opus-5-5` の固定が外れる）
 - `prompt`: 次の 1 行だけにする
@@ -105,7 +105,7 @@ Opus は Agent ツールで呼ぶ。
 - Opus の返答は、そのまま `<実行フォルダ>/review-opus.md` に Write で保存する。Sol の結果は `<実行フォルダ>/review.md` に保存される。
 - `--effort` には上の「Claude の推論レベル」をそのまま渡す。空や `auto` のときは省略してよい（スクリプトが high にする）。
 - Sol は読み取り専用のサンドボックスと 1M コンテキストで動き、個人設定（MCP サーバーやプラグイン）は読み込まない。Opus は Read / Grep / Glob しか使えず、この会話・auto memory・ユーザー用の CLAUDE.md・MCP は読み込まない。どちらもコードを書き換えない。
-- `codex` や `opus-final-reviewer` が失敗しても、全部の結果が出揃ってから、成功した分で判断して失敗を報告で伝える。`codex` が見つからない・ログインしていないときは、`brew install --cask codex` と `codex login` を案内する。`opus-final-reviewer` が見つからないときは、エージェントがリンクされていない（このスキル集の `scripts/link-skills.sh --claude` で `~/.claude/agents` にリンクする）か、リンクする前に始めたセッション。Haiku に書かせた変更で、動かしたレビューがどれも結果を返さなかったら、未レビューと明記し、完了を保留してユーザーに確認する。
+- `codex` や `opus-reviewer` が失敗しても、全部の結果が出揃ってから、成功した分で判断して失敗を報告で伝える。`codex` が見つからない・ログインしていないときは、`brew install --cask codex` と `codex login` を案内する。`opus-reviewer` が見つからないときは、エージェントがリンクされていない（このスキル集の `scripts/link-skills.sh --claude` で `~/.claude/agents` にリンクする）か、リンクする前に始めたセッション。Haiku に書かせた変更で、動かしたレビューがどれも結果を返さなかったら、未レビューと明記し、完了を保留してユーザーに確認する。
 
 ### 5. 指摘を判断する
 
@@ -129,7 +129,7 @@ Opus は Agent ツールで呼ぶ。
 
 ### 7. 報告する
 
-スクリプトの出力の先頭（設定・範囲・所要時間・保存先・`codex resume` の行）をそのまま表示し、Opus の設定（`opus-final-reviewer` / effort）・所要時間とトークン（完了の通知）・保存先を短く添える。続けて次を日本語で簡潔に書く。レビューの全文は貼らない（保存先にある）。
+スクリプトの出力の先頭（設定・範囲・所要時間・保存先・`codex resume` の行）をそのまま表示し、Opus の設定（`opus-reviewer` / effort）・所要時間とトークン（完了の通知）・保存先を短く添える。続けて次を日本語で簡潔に書く。レビューの全文は貼らない（保存先にある）。
 
 ```markdown
 ## レビューの総評

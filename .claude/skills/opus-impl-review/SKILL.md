@@ -1,16 +1,16 @@
 ---
-name: opus-final-review
+name: opus-impl-review
 description: 会話を共有しない Opus 5.5 のサブエージェントに、Sol と同じ依頼（要件と git の差分だけ）を渡してレビューさせて直す。「仕上げに Opus でレビューして」「コンテキストなしの Claude にチェックさせて」などの依頼で使う。依頼がなくても、動作が変わりうる変更と文書の変更は、完了報告・コミット・PR の前に Sol と並べて使い、迷ったら使う（除外は本文）。
 argument-hint: "[--base <ref> | --commit <sha> | --uncommitted] [補足]"
-allowed-tools: Bash(bash *opus-final-review/scripts/new-run.sh*), Bash(bash *opus-final-review/scripts/prepare.sh*), Read, Grep, Glob, Write(//**/artifacts/opus-final-review/**), Edit(//**/artifacts/opus-final-review/**)
+allowed-tools: Bash(bash *opus-impl-review/scripts/new-run.sh*), Bash(bash *opus-impl-review/scripts/prepare.sh*), Read, Grep, Glob, Write(//**/artifacts/opus-impl-review/**), Edit(//**/artifacts/opus-impl-review/**)
 ---
 
-# Opus によるレビュー
+# Opus による実装レビュー
 
 引数: $ARGUMENTS
 Claude の推論レベル: ${CLAUDE_EFFORT}
 
-実装を終えた変更を、この会話を共有しない Opus 5.5 のサブエージェント（`opus-final-reviewer`）にレビューさせ、その指摘を Claude が吟味する。Sol（codex-impl-review）と**同じ依頼**を渡して、別のモデルの目で見落としを補う。渡すのは要件と差分だけなので、差分が実際に何をしていて、要件を本当に満たしているかを先入観なしに確かめられる。
+実装を終えた変更を、この会話を共有しない Opus 5.5 のサブエージェント（`opus-reviewer`）にレビューさせ、その指摘を Claude が吟味する。Sol（codex-impl-review）と**同じ依頼**を渡して、別のモデルの目で見落としを補う。渡すのは要件と差分だけなので、差分が実際に何をしていて、要件を本当に満たしているかを先入観なしに確かめられる。
 
 ## 自分の判断で使うとき
 
@@ -30,7 +30,7 @@ Claude の推論レベル: ${CLAUDE_EFFORT}
 
 **ほかのレビューとの関係**
 
-- **Sol と並べるとき**: codex-impl-review スキルを起動して、その手順で進める。実行フォルダと `prompt.md` を共有し、Sol と同じメッセージで動かす。同じ変更の状態をまだ Sol でレビューしていないなら、`/opus-final-review` で直接頼まれたときも同じで、ユーザーが「Opus だけ」と言ったときだけ省く。
+- **Sol と並べるとき**: codex-impl-review スキルを起動して、その手順で進める。実行フォルダと `prompt.md` を共有し、Sol と同じメッセージで動かす。同じ変更の状態をまだ Sol でレビューしていないなら、`/opus-impl-review` で直接頼まれたときも同じで、ユーザーが「Opus だけ」と言ったときだけ省く。
 - **Opus だけのとき**（文書だけの変更、Sol でレビュー済みの状態、「Opus だけ」と言われたとき）: 下の手順で進める。
 - **すべて終わるまでファイルを編集しない**（どのレビュアーも作業ツリーを読むため）。片方が失敗しても、全部の結果が出揃ってから、成功した分で判断して失敗を報告で伝える。
 - テストは先に済ませておく（haiku-check）。Opus はテストを実行しない。指摘を直したあとも、もう一度テストを実行する。
@@ -39,7 +39,7 @@ Claude の推論レベル: ${CLAUDE_EFFORT}
 
 - 始める前に「完了を報告する前に、会話を共有しない Opus に要件と差分だけでレビューさせます（effort=<レベル>）」と 1 行だけ伝え、確認は待たずに進める。Sol と同時に動かすときは、この案内も 1 行にまとめる。
 - Opus が動いている間に、完了報告の下書きなど、レビュー結果に左右されない作業を進めてよい（ファイルは編集しない）。
-- Opus が動かなかったら（`opus-final-reviewer` が見つからない、エラーや停止で結果が返らない）、そのことを 1 行伝えて、Opus のレビューなしで完了を報告する。ただし、Haiku に書かせた変更で、動かしたレビューがどれも結果を返さなかったら、未レビューと明記し、完了を保留してユーザーに確認する。
+- Opus が動かなかったら（`opus-reviewer` が見つからない、エラーや停止で結果が返らない）、そのことを 1 行伝えて、Opus のレビューなしで完了を報告する。ただし、Haiku に書かせた変更で、動かしたレビューがどれも結果を返さなかったら、未レビューと明記し、完了を保留してユーザーに確認する。
 
 ## Opus だけのときの手順
 
@@ -74,7 +74,7 @@ bash "${CLAUDE_SKILL_DIR}/scripts/prepare.sh" [--cd <dir>] [--base <ref> | --com
 
 続けて Agent ツールで呼ぶ。
 
-- `subagent_type`: `opus-final-reviewer`（必ず指定する。`fork` や省略で会話を引き継ぐ形にしない）
+- `subagent_type`: `opus-reviewer`（必ず指定する。`fork` や省略で会話を引き継ぐ形にしない）
 - `effort`: 上の「Claude の推論レベル」。空や `auto` のときは `high`
 - `model`: **渡さない**（引数は別名しか受け付けず、親と同じ系統なら親のモデルになって、定義の `claude-opus-5-5` の固定が外れる）
 - `prompt`: 次の 1 行だけにする
@@ -85,7 +85,7 @@ bash "${CLAUDE_SKILL_DIR}/scripts/prepare.sh" [--cd <dir>] [--base <ref> | --com
 
 - Opus は Read / Grep / Glob しか使えず、この会話・auto memory・ユーザー用の CLAUDE.md・MCP は読み込まない。推論レベルが高いと 10 分以上かかる。バックグラウンドで動き、終わると通知が来るので、それまで待つ（その間、レビュー結果に左右されない作業は進めてよい）。
 - 返ってきた本文を、そのまま `<実行フォルダ>/review.md` に Write で保存する。
-- `opus-final-reviewer` が見つからないときは、エージェントがリンクされていない（このスキル集の `scripts/link-skills.sh --claude` で `~/.claude/agents` にリンクする）か、リンクする前に始めたセッション。そのことを伝えて終わる。
+- `opus-reviewer` が見つからないときは、エージェントがリンクされていない（このスキル集の `scripts/link-skills.sh --claude` で `~/.claude/agents` にリンクする）か、リンクする前に始めたセッション。そのことを伝えて終わる。
 
 ### 5. 指摘を判断する
 
@@ -105,7 +105,7 @@ bash "${CLAUDE_SKILL_DIR}/scripts/prepare.sh" [--cd <dir>] [--base <ref> | --com
 
 ### 7. 報告する
 
-設定（`opus-final-reviewer` / effort）・範囲（`prepare.sh` の出力）・所要時間とトークン（完了の通知）・保存先（`review.md`）を短く表示し、続けて次を日本語で簡潔に書く。Opus のレビュー全文は貼らない（保存先にある）。
+設定（`opus-reviewer` / effort）・範囲（`prepare.sh` の出力）・所要時間とトークン（完了の通知）・保存先（`review.md`）を短く表示し、続けて次を日本語で簡潔に書く。Opus のレビュー全文は貼らない（保存先にある）。
 
 ```markdown
 ## Opus の総評
