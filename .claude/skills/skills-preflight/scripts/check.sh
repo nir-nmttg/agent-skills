@@ -46,10 +46,13 @@ check_cmd() {
   fi
 }
 
+# Opus だけなら Codex なしで動くので、クロスレビューは Sol の分だけ Codex を使う
+codex_users="codex-*, implementation-cross-review・design-cross-review（Sol）"
+
 check_cmd git "ほぼすべて" "\`xcode-select --install\`（または \`brew install git\`）" git --version
 check_cmd jq "ほぼすべて" "\`brew install jq\`" jq --version
-check_cmd codex "codex-*" "\`brew install --cask codex\` のあと \`codex login\`" codex --version
-check_cmd perl "haiku-impl, codex-design-review, codex-impl-review, codex-risk-design-review, codex-risk-impl-review, opus-design-review, opus-impl-review" "\`brew install perl\`（macOS には標準で入っている）" perl -e 'print "perl $^V\n"'
+check_cmd codex "$codex_users" "\`brew install --cask codex\` のあと \`codex login\`" codex --version
+check_cmd perl "haiku-implementation, design-cross-review, implementation-cross-review, codex-risk-design-review, codex-risk-implementation-review" "\`brew install perl\`（macOS には標準で入っている）" perl -e 'print "perl $^V\n"'
 check_cmd gh "gh-todo, gh-issue-overview, gh-pr-precheck, codex-verify-prompt（PR を渡すとき）" "\`brew install gh\` のあと \`gh auth login\`" gh --version
 check_cmd python3 "gh-issue-overview" "\`xcode-select --install\`（または \`brew install python\`）" python3 --version
 check_cmd curl "gh-issue-overview, gh-pr-precheck" "\`brew install curl\`"
@@ -65,9 +68,9 @@ fi
 
 if has codex; then
   if out=$(codex login status 2>&1); then
-    add codex-login ok "Codex のログイン" "$(echo "$out" | head -1)" "codex-*"
+    add codex-login ok "Codex のログイン" "$(echo "$out" | head -1)" "$codex_users"
   else
-    add codex-login ng "Codex のログイン" "未ログイン" "codex-*" "\`codex login\`"
+    add codex-login ng "Codex のログイン" "未ログイン" "$codex_users" "\`codex login\`"
   fi
 fi
 
@@ -80,11 +83,11 @@ if has gh; then
   fi
 fi
 
-# --- サブエージェントのリンク（haiku-impl・haiku-check・Codex のレビュー 4 スキル・Opus のレビュー 2 スキルに必須） ---------
+# --- サブエージェントのリンク（haiku-implementation・haiku-check・レビューの 4 スキルに必須） ---------
 
 agents_src="$repo_root/.claude/agents"
 agents_dir="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/agents"
-agent_users="haiku-impl, haiku-check, codex-design-review, codex-impl-review, codex-risk-design-review, codex-risk-impl-review, opus-design-review, opus-impl-review"
+agent_users="haiku-implementation, haiku-check, design-cross-review, implementation-cross-review, codex-risk-design-review, codex-risk-implementation-review"
 unlinked_agents=()
 for f in "$agents_src"/*.md; do
   [[ -f $f ]] || continue
@@ -98,10 +101,10 @@ else
     "\`$repo_root/scripts/link-skills.sh --claude\`（初めて \`~/.claude/agents\` を作ったときは、新しいセッションで使う）"
 fi
 # haiku-implementer の hook は、ユーザー用のスキルのリンクから guard.sh を呼ぶ
-if [[ -L $link_dir/haiku-impl && $(readlink "$link_dir/haiku-impl") == "$skills_dir/haiku-impl" ]]; then
-  add haiku-impl-link ok "\`~/.claude/skills/haiku-impl\` のリンク" "リンク済み" "haiku-impl（hook の guard.sh）"
+if [[ -L $link_dir/haiku-implementation && $(readlink "$link_dir/haiku-implementation") == "$skills_dir/haiku-implementation" ]]; then
+  add haiku-implementation-link ok "\`~/.claude/skills/haiku-implementation\` のリンク" "リンク済み" "haiku-implementation（hook の guard.sh）"
 else
-  add haiku-impl-link ng "\`~/.claude/skills/haiku-impl\` のリンク" "未リンク" "haiku-impl（hook の guard.sh）" \
+  add haiku-implementation-link ng "\`~/.claude/skills/haiku-implementation\` のリンク" "未リンク" "haiku-implementation（hook の guard.sh）" \
     "\`$repo_root/scripts/link-skills.sh --claude\`"
 fi
 
@@ -126,17 +129,26 @@ fi
 skill_needs() {
   case $1 in
     codex-verify-prompt) echo "git jq" ;;
-    codex-design-review | codex-impl-review | codex-risk-design-review | codex-risk-impl-review) echo "git jq perl codex codex-login agents-link" ;;
+    codex-risk-design-review | codex-risk-implementation-review) echo "git jq perl codex codex-login agents-link" ;;
+    design-cross-review) echo "perl agents-link" ;;
+    implementation-cross-review) echo "git perl agents-link" ;;
     codex-*) echo "git jq codex codex-login" ;;
-    haiku-impl) echo "git jq perl agents-link haiku-impl-link" ;;
+    haiku-implementation) echo "git jq perl agents-link haiku-implementation-link" ;;
     haiku-check) echo "git agents-link" ;;
-    opus-design-review) echo "perl agents-link" ;;
-    opus-impl-review) echo "git perl agents-link" ;;
     gh-todo) echo "jq gh gh-login" ;;
     gh-issue-overview) echo "jq gh gh-login python3 curl" ;;
     gh-pr-precheck) echo "jq gh gh-login curl" ;;
     *) echo "" ;;
   esac
+}
+
+# Sol を動かすのに必要なものがそろっているか
+sol_ready() {
+  local m
+  for m in ${missing[@]+"${missing[@]}"}; do
+    [[ $m == jq || $m == codex || $m == codex-login ]] && return 1
+  done
+  return 0
 }
 
 ready=()
@@ -150,7 +162,13 @@ for skill in "$skills_dir"/*/; do
       [[ $m == "$need" ]] && lack+=("$need")
     done
   done
-  if ((${#lack[@]} == 0)); then ready+=("$name"); else blocked+=("$name（${lack[*]}）"); fi
+  if ((${#lack[@]} > 0)); then
+    blocked+=("$name（${lack[*]}）")
+  elif [[ $name == *-cross-review ]] && ! sol_ready; then
+    ready+=("$name（Opus のみ）")
+  else
+    ready+=("$name")
+  fi
 done
 
 # --- 出力 ---------------------------------------------------------------------

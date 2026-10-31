@@ -14,8 +14,8 @@
 # ユーザー用・親フォルダの CLAUDE.md を読まないので、プロジェクトの指示はここで渡す。
 # 実行に使う source.txt・scope.txt も残す。失敗したときは prompt.md を残さない。
 #
-# 環境変数 CODEX_IMPL_REVIEW_PROMPT で指示書を、CODEX_IMPL_REVIEW_INPUT で入力（requirements / context）を
-# 変えられる（codex-risk-impl-review が使う）。
+# 環境変数 IMPLEMENTATION_CROSS_REVIEW_PROMPT で指示書を、IMPLEMENTATION_CROSS_REVIEW_INPUT で入力（requirements / context）を
+# 変えられる（codex-risk-implementation-review が使う）。
 set -euo pipefail
 
 usage() { sed -n '5,10p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 1; }
@@ -34,8 +34,8 @@ while (($#)); do
 done
 [[ -n $run_dir ]] || usage
 
-prompt_file=${CODEX_IMPL_REVIEW_PROMPT:-$(dirname "$0")/../assets/review-prompt.md}
-input=${CODEX_IMPL_REVIEW_INPUT:-requirements}
+prompt_file=${IMPLEMENTATION_CROSS_REVIEW_PROMPT:-$(dirname "$0")/../assets/review-prompt.md}
+input=${IMPLEMENTATION_CROSS_REVIEW_INPUT:-requirements}
 case $input in
   requirements | context) ;;
   *) echo "エラー: 入力 '$input' には対応していません（requirements / context）" >&2; exit 1 ;;
@@ -112,7 +112,7 @@ if [[ $mode == commit ]]; then
   # HEAD でも未コミットの変更が混ざらないよう、当時のソースを展開する。
   # git archive は export-ignore / export-subst で中身が欠けたり変わったりするので、一時的なインデックスから取り出す
   mkdir -p "$source"
-  idx=$(mktemp "${TMPDIR:-/tmp}/codex-impl-review-index.XXXXXX")
+  idx=$(mktemp "${TMPDIR:-/tmp}/implementation-cross-review-index.XXXXXX")
   GIT_INDEX_FILE=$idx g read-tree "$sha"
   GIT_INDEX_FILE=$idx GIT_LFS_SKIP_SMUDGE=1 g checkout-index -a -f --prefix="$source/"
   rm -f "$idx"

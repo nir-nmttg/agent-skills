@@ -6,7 +6,7 @@
 #
 # 作業フォルダの今の状態（未コミットの変更を含む）を HEAD の子コミットにし、そこから <実行フォルダ>/worktree を切る。
 # ブランチや本物のインデックスには触れない。作業フォルダにある依存パッケージのフォルダ（.gitignore 対象の
-# node_modules / .venv / venv / .bundle / vendor。HAIKU_IMPL_LINK_DIRS で変えられる）は worktree にリンクする。
+# node_modules / .venv / venv / .bundle / vendor。HAIKU_IMPLEMENTATION_LINK_DIRS で変えられる）は worktree にリンクする。
 # prompt.md には、作業場所、ロックのコマンド、worktree のルートの CLAUDE.md・.claude/CLAUDE.md・AGENTS.md、
 # <実行フォルダ>/task.md をまとめる（haiku-implementer は omitClaudeMd で CLAUDE.md を自動では読まない）。
 set -euo pipefail
@@ -37,7 +37,7 @@ root_real=$(cd -P "$root" 2>/dev/null && pwd) || { echo "エラー: 実行フォ
 # haiku-implementer の hook は、ユーザー用のスキルのリンクから guard.sh を呼ぶ。リンクが別の場所を指していると、
 # 古い guard.sh が動いたり、見つからずにすべての操作が止まったりするので、先に確かめる
 config_dir=${CLAUDE_CONFIG_DIR:-$HOME/.claude}
-linked_guard=$config_dir/skills/haiku-impl/scripts/guard.sh
+linked_guard=$config_dir/skills/haiku-implementation/scripts/guard.sh
 if [[ ! -f $linked_guard ]] || [[ $(cd -P "$(dirname "$linked_guard")" && pwd) != "$script_dir" ]]; then
   echo "エラー: $linked_guard がこのスキルの guard.sh を指していません。このスキル集の scripts/link-skills.sh --claude でリンクしてください" >&2
   exit 1
@@ -60,14 +60,14 @@ cleanup() {
 }
 trap cleanup EXIT
 base_tree=$(snapshot "$repo")
-base_commit=$(GIT_AUTHOR_NAME=haiku-impl GIT_AUTHOR_EMAIL=haiku-impl@localhost \
-  GIT_COMMITTER_NAME=haiku-impl GIT_COMMITTER_EMAIL=haiku-impl@localhost \
-  git -C "$repo" commit-tree "$base_tree" -p HEAD -m "haiku-impl base")
+base_commit=$(GIT_AUTHOR_NAME=haiku-implementation GIT_AUTHOR_EMAIL=haiku-implementation@localhost \
+  GIT_COMMITTER_NAME=haiku-implementation GIT_COMMITTER_EMAIL=haiku-implementation@localhost \
+  git -C "$repo" commit-tree "$base_tree" -p HEAD -m "haiku-implementation base")
 git -C "$repo" -c core.hooksPath=/dev/null worktree add -q --detach "$wt" "$base_commit"
 
 # 依存パッケージのフォルダをリンクし、Haiku がテストを動かせるようにする（差分からは除く）
 : >"$run_dir/linked"
-link_names=" ${HAIKU_IMPL_LINK_DIRS:-node_modules .venv venv .bundle vendor} "
+link_names=" ${HAIKU_IMPLEMENTATION_LINK_DIRS:-node_modules .venv venv .bundle vendor} "
 while IFS= read -r -d '' d; do
   d=${d%/}
   [[ $link_names == *" ${d##*/} "* && ! -e $wt/$d ]] || continue

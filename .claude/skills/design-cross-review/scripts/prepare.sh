@@ -6,7 +6,7 @@
 #   --cd  レビュアーが既存コードを確かめる作業フォルダ（既定: 今のフォルダ）
 #
 # 実行に使う source.txt・scope.txt も残す。失敗したときは prompt.md を残さない。
-# 環境変数 CODEX_DESIGN_REVIEW_PROMPT で指示書を、CODEX_DESIGN_REVIEW_INPUT で入力（requirements-design / design）を
+# 環境変数 DESIGN_CROSS_REVIEW_PROMPT で指示書を、DESIGN_CROSS_REVIEW_INPUT で入力（requirements-design / design）を
 # 変えられる（codex-risk-design-review が使う）。
 set -euo pipefail
 
@@ -24,19 +24,19 @@ done
 
 # ~/.claude/skills のシンボリックリンク経由で呼ばれても、リンク先のリポジトリのファイルを使う
 here=$(cd -P "$(dirname "$0")" && pwd)
-prompt_file=${CODEX_DESIGN_REVIEW_PROMPT:-$here/../assets/review-prompt.md}
+prompt_file=${DESIGN_CROSS_REVIEW_PROMPT:-$here/../assets/review-prompt.md}
 
 [[ -d $run_dir ]] || { echo "エラー: 実行フォルダ $run_dir がありません" >&2; exit 1; }
 run_dir=$(cd -P "$run_dir" && pwd)
 # 途中で失敗したときに、前回の入力でレビューしないよう先に消す
 rm -f "$run_dir/prompt.md" "$run_dir/prompt.md.tmp" "$run_dir/source.txt" "$run_dir/scope.txt"
 
-lib=$here/../../codex-impl-review/scripts/lib.sh
-[[ -f $lib ]] || { echo "エラー: codex-impl-review スキルが見つかりません（${lib}）" >&2; exit 1; }
+lib=$here/../../implementation-cross-review/scripts/lib.sh
+[[ -f $lib ]] || { echo "エラー: implementation-cross-review スキルが見つかりません（${lib}）" >&2; exit 1; }
 # shellcheck source=/dev/null
 . "$lib"
 
-input=${CODEX_DESIGN_REVIEW_INPUT:-requirements-design}
+input=${DESIGN_CROSS_REVIEW_INPUT:-requirements-design}
 case $input in
   requirements-design | design) ;;
   *) echo "エラー: 入力 '$input' には対応していません（requirements-design / design）" >&2; exit 1 ;;

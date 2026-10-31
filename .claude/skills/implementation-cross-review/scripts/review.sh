@@ -4,8 +4,8 @@
 # 使い方: review.sh --effort <low|medium|high|xhigh|max> <実行フォルダ>
 #   --effort  Codex の推論レベル。Claude の推論レベルをそのまま渡す（省略時は $CLAUDE_EFFORT、それもなければ high）
 #
-# 環境変数 CODEX_IMPL_REVIEW_MODEL でモデルを、CODEX_IMPL_REVIEW_TITLE で出力の見出しを変えられる
-# （codex-risk-impl-review が使う）。
+# 環境変数 IMPLEMENTATION_CROSS_REVIEW_MODEL でモデルを、IMPLEMENTATION_CROSS_REVIEW_TITLE で出力の見出しを変えられる
+# （codex-risk-implementation-review が使う）。
 set -euo pipefail
 
 usage() { sed -n '4,5p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 1; }
@@ -20,8 +20,8 @@ while (($#)); do
 done
 [[ -n $run_dir ]] || usage
 
-model=${CODEX_IMPL_REVIEW_MODEL:-gpt-6.1-sol}
-title=${CODEX_IMPL_REVIEW_TITLE:-Codex の実装レビュー}
+model=${IMPLEMENTATION_CROSS_REVIEW_MODEL:-gpt-6.1-sol}
+title=${IMPLEMENTATION_CROSS_REVIEW_TITLE:-Codex の実装レビュー}
 effort=${effort:-${CLAUDE_EFFORT:-}}
 case $effort in
   low | medium | high | xhigh | max) ;;

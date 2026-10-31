@@ -1,15 +1,15 @@
 ---
-name: haiku-impl
+name: haiku-implementation
 description: 実装を Haiku 5.5（推論レベル max）のサブエージェントに任せ、手分けできる部分は同時に動かして、Claude は分割・指示・レビュー・反映に集中する。「実装を Haiku に任せて」「Haiku に並列で実装させて」などの依頼で使う。依頼がなくても、指示書に書けて確かめられる実装に取りかかるときは任せ、迷ったら任せる（詳しい基準は本文）。
 argument-hint: "[--cd <リポジトリ>] <実装してほしいこと>"
-allowed-tools: Bash(bash *haiku-impl/scripts/new-run.sh*), Bash(bash *haiku-impl/scripts/prepare.sh*), Bash(bash *haiku-impl/scripts/diff.sh*), Bash(bash *haiku-impl/scripts/apply.sh*), Read, Grep, Glob, Write(//**/artifacts/haiku-impl/**), Edit(//**/artifacts/haiku-impl/**)
+allowed-tools: Bash(bash *haiku-implementation/scripts/new-run.sh*), Bash(bash *haiku-implementation/scripts/prepare.sh*), Bash(bash *haiku-implementation/scripts/diff.sh*), Bash(bash *haiku-implementation/scripts/apply.sh*), Read, Grep, Glob, Write(//**/artifacts/haiku-implementation/**), Edit(//**/artifacts/haiku-implementation/**)
 ---
 
 # Haiku 5.5 に実装を任せる
 
 引数: $ARGUMENTS
 
-コードを書く作業を、この会話を共有しない Haiku 5.5 のサブエージェント `haiku-implementer` に任せ、Claude は「分割する」「指示書を書く」「差分をレビューして反映する」「仕上げる」だけを行う。Claude が自分でコードを読み書きする量を減らし、その間に別の作業を進めて、メインのモデルの使用量とコンテキストを節約するのが目的。モデル・推論レベル（max）・使えるツールはエージェントの定義で固定している。結果は `artifacts/haiku-impl/` に保存される。
+コードを書く作業を、この会話を共有しない Haiku 5.5 のサブエージェント `haiku-implementer` に任せ、Claude は「分割する」「指示書を書く」「差分をレビューして反映する」「仕上げる」だけを行う。Claude が自分でコードを読み書きする量を減らし、その間に別の作業を進めて、メインのモデルの使用量とコンテキストを節約するのが目的。モデル・推論レベル（max）・使えるツールはエージェントの定義で固定している。結果は `artifacts/haiku-implementation/` に保存される。
 
 Haiku の実行もプランの使用量になる（Haiku は安いが無料ではない）。**手分けできる部分は優先して同時に動かす。本数は部分どうしの関係で決まる。** 各 Haiku は専用の git worktree で動くので互いにぶつからず、その間 Claude は作業フォルダで自分の担当部分を進められる。進み具合はデスクトップアプリの Background tasks から見たり止めたりできる。
 
@@ -19,7 +19,7 @@ Haiku の実行もプランの使用量になる（Haiku は安いが無料で�
   - default モードでは、Haiku の Bash の確認がメインのセッションに次々と出る。並行数を 1〜2 本に減らすか、そのことをユーザーに伝えてから使う。
   - bypassPermissions では、下の guard.sh だけが歯止めになる。
 - `haiku-implementer` の hook（`scripts/guard.sh`）が、worktree の外への書き込み、`cd <worktree> &&` で始まらない Bash（サブエージェントの Bash は毎回メインの作業フォルダで始まるため）、リポジトリの状態を変える git コマンド、依存パッケージのインストールを止める。事故防止のためのもので、悪意のある回避は想定していない。
-- エージェントの定義（`~/.claude/agents/haiku-implementer.md`）と hook のスクリプト（`~/.claude/skills/haiku-impl`）は、このスキル集の `scripts/link-skills.sh --claude` でリンクしておく。prepare.sh がリンクを確かめる。
+- エージェントの定義（`~/.claude/agents/haiku-implementer.md`）と hook のスクリプト（`~/.claude/skills/haiku-implementation`）は、このスキル集の `scripts/link-skills.sh --claude` でリンクしておく。prepare.sh がリンクを確かめる。
 
 ## いつ使うか
 
@@ -30,13 +30,13 @@ Haiku の実行もプランの使用量になる（Haiku は安いが無料で�
 **Claude が書く**（次のときだけ）
 
 - 指示・起動・確認まで含めると、Claude が書くほうが明らかに早い（比べるのは全体の時間。Haiku は 1 本に 8 分ほどかかるので、150 行未満は Claude が速いことが多い）
-- 要件や設計がまだ決まっていない（先に固める。codex-design-review の条件で設計レビューを使う）
+- 要件や設計がまだ決まっていない（先に固める。design-cross-review の条件で設計レビューを使う）
 - 原因のわからないバグの調査
 - テスト・型チェック・リンターのどれでも確かめられない、または外部サービス・認証情報がないと確かめられない
 - 重要な決定そのもの: 認証の成立・失効、認可の判定、金額の計算、請求の実行と状態、秘密情報の扱い、情報の受信者と公開範囲（当たるか迷ったら Claude が書く）。周辺の画面・メールの見た目・テストなどは切り出して任せる
 - ユーザーが「自分で書いて」「Haiku は使わないで」と言っている、または急ぎで待てない
 
-採用した指摘の修正や仕様の変更も同じ基準で担当を決め、手間に見合う独立した修正は同時に動かす（小さなものは 2. のとおり）。Haiku に任せたときも、再レビューの要否は codex-impl-review の再レビューの条件で判断する。
+採用した指摘の修正や仕様の変更も同じ基準で担当を決め、手間に見合う独立した修正は同時に動かす（小さなものは 2. のとおり）。Haiku に任せたときも、再レビューの要否は implementation-cross-review の再レビューの条件で判断する。
 
 **自分の判断で使うときの違い**
 
@@ -122,7 +122,7 @@ bash "${CLAUDE_SKILL_DIR}/scripts/prepare.sh" [--cd <dir>] <実行フォルダ>
 
 **DB や Docker が要るテスト**
 
-Haiku はサンドボックスなしで動くので、DB や Docker を使うテストも自分で実行できる。ただし並行する Haiku どうしが同じテスト用 DB を取り合わないよう、prompt.md の「ロック」のコマンド（`locked.sh`）を通して 1 本ずつ実行させる（待つのは既定で 300 秒まで。`HAIKU_IMPL_LOCK_WAIT` で変えられる）。
+Haiku はサンドボックスなしで動くので、DB や Docker を使うテストも自分で実行できる。ただし並行する Haiku どうしが同じテスト用 DB を取り合わないよう、prompt.md の「ロック」のコマンド（`locked.sh`）を通して 1 本ずつ実行させる（待つのは既定で 300 秒まで。`HAIKU_IMPLEMENTATION_LOCK_WAIT` で変えられる）。
 
 - 指示書の「確認方法」は、**作業フォルダではなく worktree のコードをテストするコマンド**にする。たとえば、作業フォルダをマウントしたコンテナで動く `docker compose exec` は、Haiku が書いたコードをテストしない。Docker Compose のプロジェクトなら、worktree をマウントした使い捨てのコンテナで動かす。
 
@@ -170,7 +170,7 @@ bash "${CLAUDE_SKILL_DIR}/scripts/apply.sh" <実行フォルダ>...
 - すべて反映したら、作業フォルダで指示書の「確認方法」のテスト・型チェックを実行する（Haiku が worktree で通したテストも、組み合わせた結果としてもう一度確かめる）。小タスクを組み合わせた結果として正しく動くかもここで確かめる。実行は haiku-check スキルに任せ、報告だけを読む。
 - 見つかった問題の担当は「いつ使うか」の基準で決める。数行の修正、命名、小タスクどうしのつなぎ目は、Claude が直すほうが早いことが多い。直したら、もう一度テストを実行する。
 - 不要な変更が混ざっていたら、その部分だけ取り除く。ユーザーのもとからの未コミットの変更には触れない。
-- テストが通ったら、codex-impl-review と opus-impl-review を同時に動かしてレビューする（ユーザーが不要と言ったときを除き、Haiku に書かせた変更には必ず使う）。一部が失敗したら、成功した分で判断して失敗を報告する。動かしたレビューがどれも結果を返さなかったら、変更を未レビューと明記し、完了を保留してユーザーに確認する。
+- テストが通ったら、implementation-cross-review で Sol と Opus を同時に動かしてレビューする（ユーザーが不要と言ったときを除き、Haiku に書かせた変更には必ず使う）。一部が失敗したら、成功した分で判断して失敗を報告する。動かしたレビューがどれも結果を返さなかったら、変更を未レビューと明記し、完了を保留してユーザーに確認する。
 - コミットやプッシュはユーザーに頼まれない限りしない。
 
 ### 8. 報告する

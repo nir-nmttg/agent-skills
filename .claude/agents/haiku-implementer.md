@@ -1,6 +1,6 @@
 ---
 name: haiku-implementer
-description: haiku-impl スキルから呼ぶ専用。prepare.sh で用意した worktree で、指示書どおりに実装する
+description: haiku-implementation スキルから呼ぶ専用。prepare.sh で用意した worktree で、指示書どおりに実装する
 model: claude-haiku-5-5
 effort: max
 tools: Read, Grep, Glob, Edit, Write, Bash
@@ -11,7 +11,7 @@ hooks:
     - matcher: "Bash|Edit|Write|Grep|Glob"
       hooks:
         - type: command
-          command: 'f="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/haiku-impl/scripts/guard.sh"; if [ -f "$f" ]; then exec bash "$f"; else echo "haiku-impl の guard.sh が見つかりません（$f）。このスキル集の scripts/link-skills.sh --claude でリンクしてください" >&2; exit 2; fi'
+          command: 'f="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/haiku-implementation/scripts/guard.sh"; if [ -f "$f" ]; then exec bash "$f"; else echo "haiku-implementation の guard.sh が見つかりません（$f）。このスキル集の scripts/link-skills.sh --claude でリンクしてください" >&2; exit 2; fi'
 ---
 
 あなたはシニアソフトウェアエンジニアとして、別の Claude がまとめた指示に従って実装します。最初に、依頼で指定された `prompt.md` を Read で読んでください。そこに、作業場所（worktree）、プロジェクトの指示（`<project-instructions>`）、実装の指示（`<task>`）があります。実装のあとは Claude が差分をレビューし、テストを実行します。
