@@ -1,7 +1,7 @@
 ---
 name: codex-risk-impl-review
 description: リスクの高い実装（git の差分）を Codex CLI の GPT-6 Astra に「どう壊れるか」の観点でレビューさせて直す。「実装を Astra にレビューしてもらって」「本番に出す前に Astra で確認して」などの依頼で使う。重いので自分の判断では実行せず、DB 移行・認可・課金・外部への送信など戻しにくい変更のときだけ、使うかをユーザーに聞く（詳しい基準は本文）。
-argument-hint: "[--fast] [--base <ref> | --commit <sha> | --uncommitted] [補足]"
+argument-hint: "[--base <ref> | --commit <sha> | --uncommitted] [補足]"
 allowed-tools: Bash(bash *codex-risk-impl-review/scripts/new-run.sh*), Bash(bash *codex-risk-impl-review/scripts/review.sh*), Read, Grep, Glob, Write(//**/artifacts/codex-risk-impl-review/**), Edit(//**/artifacts/codex-risk-impl-review/**)
 ---
 
@@ -36,7 +36,7 @@ Astra は重いので、**ユーザーに頼まれていなければ、自分の
 
 **聞き方**
 
-- AskUserQuestion で 1 問だけ聞く。質問には、どのリスクに当たるか（例: 「マイグレーションで既存データを変換している」）を 1 行で添える。選択肢は「Sol に Astra を加えてレビューする（推奨）」「Fast モードで Astra を加える」「Sol だけでレビューする」「レビューしない」。
+- AskUserQuestion で 1 問だけ聞く。質問には、どのリスクに当たるか（例: 「マイグレーションで既存データを変換している」）を 1 行で添える。選択肢は「Sol に Astra を加えてレビューする（推奨）」「Sol だけでレビューする」「レビューしない」。
 - Astra を加えると選ばれたら、このスキルの手順を進める（4. で codex-impl-review も並べて実行する）。
 - それ以外を選ばれたら、このスキルは使わず、その答えに従う（「Sol だけ」なら codex-impl-review を使う）。
 
@@ -44,7 +44,6 @@ Astra は重いので、**ユーザーに頼まれていなければ、自分の
 
 ### 1. 引数を読む
 
-- `--fast` または `fast` があれば Fast モードにする（速いぶん Codex の使用量が増える）。それ以外の依頼文に「速く」「fast で」とあるときや、聞いたときに Fast を選ばれたときも同じ。
 - 範囲の指定があればそのまま 4. に渡す。「未コミットだけ」→ `--uncommitted`、「このコミット」→ `--commit <sha>`、「develop との差分」→ `--base develop`。指定がなければ渡さない（既定ブランチから分岐して以降の変更を、未コミットも含めてすべてレビューする）。
 - 対象が今のフォルダ以外のリポジトリなら、4. で `--cd <そのリポジトリのパス>` をつける。
 
@@ -76,10 +75,10 @@ bash "${CLAUDE_SKILL_DIR}/scripts/new-run.sh" <slug>
 Bash ツールを **`run_in_background: true`** で実行する（Astra は推論レベルが高いと数十分かかることがある）。終わると通知が来るので、それまで待つ。ポーリングはしない。
 
 ```bash
-bash "${CLAUDE_SKILL_DIR}/scripts/review.sh" --effort ${CLAUDE_EFFORT} [--fast] [--cd <dir>] [--base <ref> | --commit <sha> | --uncommitted] <実行フォルダ>
+bash "${CLAUDE_SKILL_DIR}/scripts/review.sh" --effort ${CLAUDE_EFFORT} [--cd <dir>] [--base <ref> | --commit <sha> | --uncommitted] <実行フォルダ>
 ```
 
-- codex-impl-review（Sol）も、同じ範囲・同じ変更の状態で並べて実行する。聞いて選ばれたときも、`/codex-risk-impl-review` で直接頼まれたときも同じで、ユーザーが「Astra だけ」と言ったときだけ省く。実装の説明は両方のスキルの 3. の項目をすべて含めて書き、同じ内容を両方の実行フォルダに置き、2 つの review.sh を同じ範囲の指定で同時に background で動かす。Fast モードなら Sol も `--fast` にする。**両方が終わるまでファイルを編集しない。** 終わったら、指摘をまとめて判断する（重複は 1 つにし、食い違いはコードで確かめる）。
+- codex-impl-review（Sol）も、同じ範囲・同じ変更の状態で並べて実行する。聞いて選ばれたときも、`/codex-risk-impl-review` で直接頼まれたときも同じで、ユーザーが「Astra だけ」と言ったときだけ省く。実装の説明は両方のスキルの 3. の項目をすべて含めて書き、同じ内容を両方の実行フォルダに置き、2 つの review.sh を同じ範囲の指定で同時に background で動かす。**両方が終わるまでファイルを編集しない。** 終わったら、指摘をまとめて判断する（重複は 1 つにし、食い違いはコードで確かめる）。
 - `--effort` には上の「Claude の推論レベル」をそのまま渡す（Claude が high なら Codex も high）。空や `auto` のときは省略してよい（スクリプトが high にする）。
 - Codex は読み取り専用のサンドボックスと 1M コンテキストで動き、個人設定（MCP サーバーやプラグイン）は読み込まない。コードを書き換えることはない。
 - 待っている間に、テストの実行など、レビュー結果に左右されない作業を進めてよい。
