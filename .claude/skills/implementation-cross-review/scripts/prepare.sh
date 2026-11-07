@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # 作業フォルダの git の変更を取り出し、要件と合わせて、レビュアーに読ませる prompt.md を作る。
-# Sol（review.sh）と Opus（opus-reviewer）は、ここで作った同じ prompt.md を読む。
+# Astra（review.sh）と Opus（opus-reviewer）は、ここで作った同じ prompt.md を読む。
 #
 # 使い方: prepare.sh [--cd <dir>] [--base <ref> | --commit <sha> | --uncommitted] <実行フォルダ>
 #   --cd           レビューするリポジトリ（既定: 今のフォルダ）
@@ -13,9 +13,6 @@
 # CLAUDE.md・.claude/CLAUDE.md・AGENTS.md を prompt.md にまとめる。サブエージェントは omitClaudeMd で
 # ユーザー用・親フォルダの CLAUDE.md を読まないので、プロジェクトの指示はここで渡す。
 # 実行に使う source.txt・scope.txt も残す。失敗したときは prompt.md を残さない。
-#
-# 環境変数 IMPLEMENTATION_CROSS_REVIEW_PROMPT で指示書を、IMPLEMENTATION_CROSS_REVIEW_INPUT で入力（requirements / context）を
-# 変えられる（codex-risk-implementation-review が使う）。
 set -euo pipefail
 
 usage() { sed -n '5,10p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 1; }
@@ -34,12 +31,7 @@ while (($#)); do
 done
 [[ -n $run_dir ]] || usage
 
-prompt_file=${IMPLEMENTATION_CROSS_REVIEW_PROMPT:-$(dirname "$0")/../assets/review-prompt.md}
-input=${IMPLEMENTATION_CROSS_REVIEW_INPUT:-requirements}
-case $input in
-  requirements | context) ;;
-  *) echo "エラー: 入力 '$input' には対応していません（requirements / context）" >&2; exit 1 ;;
-esac
+prompt_file=$(dirname "$0")/../assets/review-prompt.md
 
 [[ -d $run_dir ]] || { echo "エラー: 実行フォルダ $run_dir がありません" >&2; exit 1; }
 run_dir=$(cd -P "$run_dir" && pwd)
@@ -50,7 +42,7 @@ rm -rf "$run_dir/prompt.md" "$run_dir/prompt.md.tmp" "$run_dir/source.txt" "$run
 . "$(dirname "$0")/lib.sh"
 
 [[ -f $prompt_file ]] || { echo "エラー: レビューの指示書 $prompt_file がありません" >&2; exit 1; }
-[[ -s $run_dir/$input.md ]] || { echo "エラー: $run_dir/$input.md がないか空です" >&2; exit 1; }
+[[ -s $run_dir/requirements.md ]] || { echo "エラー: $run_dir/requirements.md がないか空です" >&2; exit 1; }
 [[ -d $workdir ]] || { echo "エラー: 作業フォルダ $workdir がありません" >&2; exit 1; }
 toplevel=$(git -C "$workdir" rev-parse --show-toplevel 2>/dev/null) || { echo "エラー: $workdir は git リポジトリではありません" >&2; exit 1; }
 workdir=$toplevel
@@ -63,12 +55,8 @@ untracked=() source=$workdir
 if [[ $mode == commit ]]; then
   sha=$(g rev-parse -q --verify "$target^{commit}") || { echo "エラー: コミット '$target' が見つかりません" >&2; exit 1; }
   scope="コミット $(g log -1 --format='%h %s' "$sha")"
-  # コミットメッセージには作成者の説明が入るので、Sol と Opus には件名だけを渡す（Astra は実装の説明も読む）
-  if [[ $input == context ]]; then
-    commits=$(g log -1 --format='%h %s%n%n%b' "$sha")
-  else
-    commits=$(g log -1 --format='%h %s' "$sha")
-  fi
+  # コミットメッセージには作成者の説明が入るので、件名だけを渡す
+  commits=$(g log -1 --format='%h %s' "$sha")
   # マージコミットは combined diff だと取り込んだ変更が出ないので、第一親との差分にする
   if g rev-parse -q --verify "$sha^1" >/dev/null; then
     stat=$(g diff --stat "$sha^1" "$sha")
@@ -136,9 +124,9 @@ size=$(wc -c <"$run_dir/diff.patch" | tr -d ' ')
   if ((${#untracked[@]})); then printf '\n未追跡の新規ファイル:\n'; printf '%s\n' "${untracked[@]}"; fi
   printf '</scope>\n'
   print_project_instructions "$source"
-  printf '\n<%s>\n' "$input"
-  cat "$run_dir/$input.md"
-  printf '\n</%s>\n\n<diff>\n' "$input"
+  printf '\n<requirements>\n'
+  cat "$run_dir/requirements.md"
+  printf '\n</requirements>\n\n<diff>\n'
   if ((size <= max_bytes)); then
     cat "$run_dir/diff.patch"
   else
