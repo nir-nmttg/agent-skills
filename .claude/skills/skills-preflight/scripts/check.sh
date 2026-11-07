@@ -46,7 +46,7 @@ check_cmd() {
   fi
 }
 
-# Opus だけなら Codex なしで動くので、クロスレビューは Astra の分だけ Codex を使う
+# Fable だけなら Codex なしで動くので、クロスレビューは Astra の分だけ Codex を使う
 codex_users="codex-*, implementation-cross-review・design-cross-review（Astra）"
 
 check_cmd git "ほぼすべて" "\`xcode-select --install\`（または \`brew install git\`）" git --version
@@ -164,7 +164,7 @@ for skill in "$skills_dir"/*/; do
   if ((${#lack[@]} > 0)); then
     blocked+=("$name（${lack[*]}）")
   elif [[ $name == *-cross-review ]] && ! codex_ready; then
-    ready+=("$name（Opus のみ）")
+    ready+=("$name（Fable のみ）")
   else
     ready+=("$name")
   fi
