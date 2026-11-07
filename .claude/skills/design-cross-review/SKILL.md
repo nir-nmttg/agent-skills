@@ -1,16 +1,16 @@
 ---
 name: design-cross-review
-description: Claude が考えた設計（会話中の案や設計書）を Codex CLI の GPT-6 Astra と Opus 5.5 に同じ依頼でレビューさせる。「この設計を Codex にレビューしてもらって」「Opus で設計をレビューして」などの依頼で使う。依頼がなくても、作り方の判断を含む設計や実装計画は、提示や実装の前に使い、迷ったら使う（除外は本文）。
-argument-hint: "[--only astra|sol|opus] [--cd <dir>] [設計書のパス] [補足]"
+description: Claude が考えた設計（会話中の案や設計書）を Codex CLI の GPT-6 Astra と Fable 5.1 に同じ依頼でレビューさせる。「この設計を Codex にレビューしてもらって」「Fable で設計をレビューして」などの依頼で使う。依頼がなくても、作り方の判断を含む設計や実装計画は、提示や実装の前に使い、迷ったら使う（除外は本文）。
+argument-hint: "[--only astra|sol|fable] [--cd <dir>] [設計書のパス] [補足]"
 allowed-tools: Bash(bash *design-cross-review/scripts/new-run.sh*), Bash(bash *design-cross-review/scripts/prepare.sh*), Bash(bash *design-cross-review/scripts/review.sh*), Read, Grep, Glob, Write(//**/artifacts/design-cross-review/**), Edit(//**/artifacts/design-cross-review/**)
 ---
 
-# Astra と Opus による設計レビュー
+# Astra と Fable による設計レビュー
 
 引数: $ARGUMENTS
 Claude の推論レベル: ${CLAUDE_EFFORT}
 
-Claude が考えた設計を、Astra（Codex CLI の GPT-6 Astra）と Opus（`opus-reviewer`）に**同じ依頼で**レビューさせ、その指摘を Claude が吟味する。同じ観点を別のモデルで見て、単一モデルの見落としを補う。どちらも要件と設計から読み解くので、実装者の不安に注意が偏らない。要件との一致や前提の誤りに加えて、データ・認可・お金・外部への送信・移行・並行処理など壊れると影響の大きい部分では、壊れ方と戻しやすさも重点的に見る。Astra が使えないときは Sol（GPT-6.1 Sol）で代わりに動かす。プロンプトの組み立てと Codex の呼び出しはスクリプトに任せ、Claude は「要件と設計書をまとめる」「指摘を判断する」だけを行う。結果は `artifacts/design-cross-review/` に保存される。
+Claude が考えた設計を、Astra（Codex CLI の GPT-6 Astra）と Fable（`fable-reviewer`）に**同じ依頼で**レビューさせ、その指摘を Claude が吟味する。同じ観点を別のモデルで見て、単一モデルの見落としを補う。どちらも要件と設計から読み解くので、実装者の不安に注意が偏らない。要件との一致や前提の誤りに加えて、データ・認可・お金・外部への送信・移行・並行処理など壊れると影響の大きい部分では、壊れ方と戻しやすさも重点的に見る。Astra が使えないときは Sol（GPT-6.1 Sol）で代わりに動かす。プロンプトの組み立てと Codex の呼び出しはスクリプトに任せ、Claude は「要件と設計書をまとめる」「指摘を判断する」だけを行う。結果は `artifacts/design-cross-review/` に保存される。
 
 ## 自分の判断で使うとき
 
@@ -43,11 +43,11 @@ Claude が考えた設計を、Astra（Codex CLI の GPT-6 Astra）と Opus（`o
 
 次の順に決める。
 
-1. **指定**: `--only astra`・`--only opus`、または「Astra だけ」「Codex だけ」「Opus だけ」と言われたら、その担当だけを動かす（レビュー済みでも動かす）。`--only` の値が `astra` / `sol` / `opus` 以外なら、そのことを伝えて止める。「Opus で設計をレビューして」「Codex にレビューしてもらって」のように名前を挙げただけの依頼は、指定に数えない。
-2. **直接の依頼**: `/design-cross-review` やレビューを頼まれたら、レビュー済みでも Astra と Opus を動かす。
-3. **自分の判断で使うとき**: Astra と Opus を対象にする。そこから、同じ設計をこの会話ですでにレビューして結果を受け取った担当を除く。残りがなければ動かさない。
+1. **指定**: `--only astra`・`--only fable`、または「Astra だけ」「Codex だけ」「Fable だけ」と言われたら、その担当だけを動かす（レビュー済みでも動かす）。`--only` の値が `astra` / `sol` / `fable` 以外なら、そのことを伝えて止める。「Fable で設計をレビューして」「Codex にレビューしてもらって」のように名前を挙げただけの依頼は、指定に数えない。
+2. **直接の依頼**: `/design-cross-review` やレビューを頼まれたら、レビュー済みでも Astra と Fable を動かす。
+3. **自分の判断で使うとき**: Astra と Fable を対象にする。そこから、同じ設計をこの会話ですでにレビューして結果を受け取った担当を除く。残りがなければ動かさない。
 
-「Sol で」と言われたとき、`--only sol` や「Sol だけ」と言われたとき、この会話で Astra がモデルを使えない・プランの対象外の理由で失敗していたときは、Astra の代わりに Sol で動かす（4. で `--model gpt-6.1-sol` を渡す。`--only sol`・「Sol だけ」なら Opus は動かさない）。
+「Sol で」と言われたとき、`--only sol` や「Sol だけ」と言われたとき、この会話で Astra がモデルを使えない・プランの対象外の理由で失敗していたときは、Astra の代わりに Sol で動かす（4. で `--model gpt-6.1-sol` を渡す。`--only sol`・「Sol だけ」なら Fable は動かさない）。
 
 ## 手順
 
@@ -107,11 +107,11 @@ Astra は Bash ツールを **`run_in_background: true`** で実行する（推�
 bash "${CLAUDE_SKILL_DIR}/scripts/review.sh" --effort ${CLAUDE_EFFORT} <実行フォルダ>
 ```
 
-Opus は Agent ツールで呼ぶ。
+Fable は Agent ツールで呼ぶ。
 
-- `subagent_type`: `opus-reviewer`（必ず指定する。`fork` や省略で会話を引き継ぐ形にしない）
+- `subagent_type`: `fable-reviewer`（必ず指定する。`fork` や省略で会話を引き継ぐ形にしない）
 - `effort`: 上の「Claude の推論レベル」。空や `auto` のときは `high`
-- `model`: **渡さない**（引数は別名しか受け付けず、親と同じ系統なら親のモデルになって、定義の `claude-opus-5-5` の固定が外れる）
+- `model`: **渡さない**（引数は別名しか受け付けず、親と同じ系統なら親のモデルになって、定義の `claude-fable-5-1` の固定が外れる）
 - `prompt`: 次の 1 行だけにする
 
   ```text
@@ -119,23 +119,23 @@ Opus は Agent ツールで呼ぶ。
   ```
 
 - どちらも終わると通知が来るので、それまで待つ。ポーリングはしない。
-- Opus の返答は、そのまま `<実行フォルダ>/review-opus.md` に Write で保存する。Astra（または Sol）の結果は `<実行フォルダ>/review.md` に保存される。
+- Fable の返答は、そのまま `<実行フォルダ>/review-fable.md` に Write で保存する。Astra（または Sol）の結果は `<実行フォルダ>/review.md` に保存される。
 - `--effort` には上の「Claude の推論レベル」をそのまま渡す。空や `auto` のときは省略してよい（スクリプトが high にする）。
-- Codex（Astra / Sol）は読み取り専用のサンドボックスと 1M コンテキストで動き、個人設定（MCP サーバーやプラグイン）は読み込まない。Opus は Read / Grep / Glob しか使えず、この会話・auto memory・ユーザー用の CLAUDE.md・MCP は読み込まない。
+- Codex（Astra / Sol）は読み取り専用のサンドボックスと 1M コンテキストで動き、個人設定（MCP サーバーやプラグイン）は読み込まない。Fable は Read / Grep / Glob しか使えず、この会話・auto memory・ユーザー用の CLAUDE.md・MCP は読み込まない。
 - `prepare.sh` が失敗したら、原因（要件や設計書の書き忘れなど）を直して実行し直す。直せないときは、そのことを伝えてレビューなしで設計を提示する。
 - Astra が、モデルを使えない・プランの対象外・使用量の上限などの理由で失敗したら、同じ実行フォルダに対して `--model gpt-6.1-sol` を加えて、Sol で 1 回だけやり直す（同じく `run_in_background: true`）。やり直すと Astra のログは上書きされるので、先に Astra の失敗の理由（エラーの要点）を控え、5. で `decisions.md` の実行状態に書く。その担当は報告で Sol と書く。モデルによらない失敗（`codex` がない・ログインしていない・ネットワークなど）はやり直さない。
 - 片方が失敗したら、全部の結果が出揃ってから、成功した分で判断して失敗を報告する。どれも結果を返さなかったら、そのことを伝えてレビューなしで設計を提示し、実行状態を `decisions.md` に残す。
-- `codex` が見つからない・ログインしていないときは、`brew install --cask codex` と `codex login` を案内する。`opus-reviewer` が見つからないときは、エージェントがリンクされていない（このスキル集の `scripts/link-skills.sh --claude` で `~/.claude/agents` にリンクする）か、リンクする前に始めたセッション。
+- `codex` が見つからない・ログインしていないときは、`brew install --cask codex` と `codex login` を案内する。`fable-reviewer` が見つからないときは、エージェントがリンクされていない（このスキル集の `scripts/link-skills.sh --claude` で `~/.claude/agents` にリンクする）か、リンクする前に始めたセッション。
 
 ### 5. 指摘を判断して報告する
 
 すべての結果が揃ってから、「要件ごとの判定」で「一部だけ」「満たさない」「判断できない」としたものを確かめる。判定が食い違えば、R 番号ごとに設計とコードで確かめる。
 
-同じ原因の指摘を 1 件にまとめ、見つけた担当を頭に書く（`[Astra]`・`[Opus]`・`[Astra・Opus]`。Sol で代わりに動かしたときは Astra を Sol と書く）。指摘はうのみにしない。必要なら指摘されたファイルを Read / Grep で確かめ、根拠をもって判断する。誤りなら「不採用」とし、理由を書く。
+同じ原因の指摘を 1 件にまとめ、見つけた担当を頭に書く（`[Astra]`・`[Fable]`・`[Astra・Fable]`。Sol で代わりに動かしたときは Astra を Sol と書く）。指摘はうのみにしない。必要なら指摘されたファイルを Read / Grep で確かめ、根拠をもって判断する。誤りなら「不採用」とし、理由を書く。
 
 判断の表、各レビューの実行状態（成功・失敗・省略）、件数の行を `<実行フォルダ>/decisions.md` に Write で保存する。あとでモデルごとの効果を確かめるのに使う。
 
-Astra（または Sol）を動かしたら、スクリプトの出力の先頭（設定・所要時間・保存先・`codex resume` の行）をそのまま表示する。Opus を動かしたら、設定（`opus-reviewer` / effort）・所要時間とトークン（完了の通知）・保存先を短く添える。続けて次を日本語で簡潔に書く。レビューの全文は貼らない（保存先にある）。
+Astra（または Sol）を動かしたら、スクリプトの出力の先頭（設定・所要時間・保存先・`codex resume` の行）をそのまま表示する。Fable を動かしたら、設定（`fable-reviewer` / effort）・所要時間とトークン（完了の通知）・保存先を短く添える。続けて次を日本語で簡潔に書く。レビューの全文は貼らない（保存先にある）。
 
 ```markdown
 ## レビューの総評
@@ -147,9 +147,9 @@ Astra（または Sol）を動かしたら、スクリプトの出力の先頭�
 ## 指摘への判断
 | 重要度 | 指摘 | 判断 | 理由 |
 | --- | --- | --- | --- |
-| 高 | [Astra・Opus] ... | 採用 / 一部採用 / 不採用 / 要確認 | ... |
+| 高 | [Astra・Fable] ... | 採用 / 一部採用 / 不採用 / 要確認 | ... |
 
-両方 n 件、Astra だけ n 件、Opus だけ n 件（うち採用 n 件、不採用 n 件）
+両方 n 件、Astra だけ n 件、Fable だけ n 件（うち採用 n 件、不採用 n 件）
 
 ## 設計の修正案
 （採用した指摘をもとに、設計のどこをどう変えるか。箇条書きで）
@@ -161,7 +161,7 @@ Astra（または Sol）を動かしたら、スクリプトの出力の先頭�
 （「確認したい点」や「要確認」のうち、ユーザーにしか決められないもの。なければ省く）
 ```
 
-- 件数の行は Codex の担当と Opus の両方が成功した回だけ書き、それ以外は「比較なし」と書く。
+- 件数の行は Codex の担当と Fable の両方が成功した回だけ書き、それ以外は「比較なし」と書く。
 - 「実装・リリースで守ること」は、実装に入ったら守る。
 - 修正案は提案にとどめ、設計書やコードはユーザーの了承なしに書き換えない（自分の判断で使った場合の、提示前の設計案への反映は除く）。
 - 修正後にもう一度レビューする場合は、新しい実行フォルダに同じ要件と、修正した設計書の全体を書いて 2. からやり直す。要件の解釈を変えたときは、そのことを報告で伝える。前回の指摘や対応は書かない（先入観を渡さないため）。

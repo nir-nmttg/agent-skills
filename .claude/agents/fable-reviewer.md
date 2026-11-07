@@ -1,7 +1,7 @@
 ---
-name: opus-reviewer
+name: fable-reviewer
 description: implementation-cross-review・design-cross-review から呼ぶ専用。読み取り専用で実装や設計をレビューする
-model: claude-opus-5-5
+model: claude-fable-5-1
 effort: high
 tools: Read, Grep, Glob
 omitClaudeMd: true
