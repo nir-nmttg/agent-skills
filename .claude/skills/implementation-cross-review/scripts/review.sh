@@ -1,18 +1,19 @@
 #!/usr/bin/env bash
-# prepare.sh で作った prompt.md を Codex CLI（GPT-6.1 Sol）に読み取り専用でレビューさせ、review.md に保存する。
+# prepare.sh で作った prompt.md を Codex CLI（既定は GPT-6 Astra）に読み取り専用でレビューさせ、review.md に保存する。
 #
-# 使い方: review.sh --effort <low|medium|high|xhigh|max> <実行フォルダ>
+# 使い方: review.sh [--model <id>] --effort <low|medium|high|xhigh|max> <実行フォルダ>
+#   --model   Codex のモデル（既定: gpt-6-astra）。Astra が使えないときは gpt-6.1-sol を渡す
 #   --effort  Codex の推論レベル。Claude の推論レベルをそのまま渡す（省略時は $CLAUDE_EFFORT、それもなければ high）
 #
-# 環境変数 IMPLEMENTATION_CROSS_REVIEW_MODEL でモデルを、IMPLEMENTATION_CROSS_REVIEW_TITLE で出力の見出しを変えられる
-# （codex-risk-implementation-review が使う）。
+# 環境変数 IMPLEMENTATION_CROSS_REVIEW_TITLE で出力の見出しを変えられる（design-cross-review が使う）。
 set -euo pipefail
 
-usage() { sed -n '4,5p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 1; }
+usage() { sed -n '4,6p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 1; }
 
-effort="" run_dir=""
+model=gpt-6-astra effort="" run_dir=""
 while (($#)); do
   case $1 in
+    --model) model=${2:-}; [[ -n $model ]] || usage; shift 2 ;;
     --effort) effort=${2:-}; shift 2 || usage ;;
     -*) usage ;;
     *) [[ -z $run_dir ]] || usage; run_dir=$1; shift ;;
@@ -20,7 +21,6 @@ while (($#)); do
 done
 [[ -n $run_dir ]] || usage
 
-model=${IMPLEMENTATION_CROSS_REVIEW_MODEL:-gpt-6.1-sol}
 title=${IMPLEMENTATION_CROSS_REVIEW_TITLE:-Codex の実装レビュー}
 effort=${effort:-${CLAUDE_EFFORT:-}}
 case $effort in

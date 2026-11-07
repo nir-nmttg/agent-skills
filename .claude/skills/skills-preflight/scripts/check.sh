@@ -46,13 +46,13 @@ check_cmd() {
   fi
 }
 
-# Opus だけなら Codex なしで動くので、クロスレビューは Sol の分だけ Codex を使う
-codex_users="codex-*, implementation-cross-review・design-cross-review（Sol）"
+# Opus だけなら Codex なしで動くので、クロスレビューは Astra の分だけ Codex を使う
+codex_users="codex-*, implementation-cross-review・design-cross-review（Astra）"
 
 check_cmd git "ほぼすべて" "\`xcode-select --install\`（または \`brew install git\`）" git --version
 check_cmd jq "ほぼすべて" "\`brew install jq\`" jq --version
 check_cmd codex "$codex_users" "\`brew install --cask codex\` のあと \`codex login\`" codex --version
-check_cmd perl "haiku-implementation, design-cross-review, implementation-cross-review, codex-risk-design-review, codex-risk-implementation-review" "\`brew install perl\`（macOS には標準で入っている）" perl -e 'print "perl $^V\n"'
+check_cmd perl "haiku-implementation, design-cross-review, implementation-cross-review" "\`brew install perl\`（macOS には標準で入っている）" perl -e 'print "perl $^V\n"'
 check_cmd gh "gh-todo, gh-issue-overview, gh-pr-precheck, codex-verify-prompt（PR を渡すとき）" "\`brew install gh\` のあと \`gh auth login\`" gh --version
 check_cmd python3 "gh-issue-overview" "\`xcode-select --install\`（または \`brew install python\`）" python3 --version
 check_cmd curl "gh-issue-overview, gh-pr-precheck" "\`brew install curl\`"
@@ -83,11 +83,11 @@ if has gh; then
   fi
 fi
 
-# --- サブエージェントのリンク（haiku-implementation・haiku-check・レビューの 4 スキルに必須） ---------
+# --- サブエージェントのリンク（haiku-implementation・haiku-check・クロスレビューの 2 スキルに必須） ---------
 
 agents_src="$repo_root/.claude/agents"
 agents_dir="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/agents"
-agent_users="haiku-implementation, haiku-check, design-cross-review, implementation-cross-review, codex-risk-design-review, codex-risk-implementation-review"
+agent_users="haiku-implementation, haiku-check, design-cross-review, implementation-cross-review"
 unlinked_agents=()
 for f in "$agents_src"/*.md; do
   [[ -f $f ]] || continue
@@ -129,7 +129,6 @@ fi
 skill_needs() {
   case $1 in
     codex-verify-prompt) echo "git jq" ;;
-    codex-risk-design-review | codex-risk-implementation-review) echo "git jq perl codex codex-login agents-link" ;;
     design-cross-review) echo "perl agents-link" ;;
     implementation-cross-review) echo "git perl agents-link" ;;
     codex-*) echo "git jq codex codex-login" ;;
@@ -142,8 +141,8 @@ skill_needs() {
   esac
 }
 
-# Sol を動かすのに必要なものがそろっているか
-sol_ready() {
+# Astra を動かすのに必要なものがそろっているか
+codex_ready() {
   local m
   for m in ${missing[@]+"${missing[@]}"}; do
     [[ $m == jq || $m == codex || $m == codex-login ]] && return 1
@@ -164,7 +163,7 @@ for skill in "$skills_dir"/*/; do
   done
   if ((${#lack[@]} > 0)); then
     blocked+=("$name（${lack[*]}）")
-  elif [[ $name == *-cross-review ]] && ! sol_ready; then
+  elif [[ $name == *-cross-review ]] && ! codex_ready; then
     ready+=("$name（Opus のみ）")
   else
     ready+=("$name")
