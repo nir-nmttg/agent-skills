@@ -46,8 +46,8 @@ check_cmd() {
   fi
 }
 
-# Fable だけなら Codex なしで動くので、クロスレビューは Astra の分だけ Codex を使う
-codex_users="codex-*, implementation-cross-review・design-cross-review（Astra）"
+# Claude の担当（Opus・Fable）だけなら Codex なしで動くので、クロスレビューは Codex の担当の分だけ Codex を使う
+codex_users="codex-*, implementation-cross-review（Sol）・design-cross-review（Astra）"
 
 check_cmd git "ほぼすべて" "\`xcode-select --install\`（または \`brew install git\`）" git --version
 check_cmd jq "ほぼすべて" "\`brew install jq\`" jq --version
@@ -141,7 +141,7 @@ skill_needs() {
   esac
 }
 
-# Astra を動かすのに必要なものがそろっているか
+# Codex の担当（Sol・Astra）を動かすのに必要なものがそろっているか
 codex_ready() {
   local m
   for m in ${missing[@]+"${missing[@]}"}; do
@@ -163,7 +163,9 @@ for skill in "$skills_dir"/*/; do
   done
   if ((${#lack[@]} > 0)); then
     blocked+=("$name（${lack[*]}）")
-  elif [[ $name == *-cross-review ]] && ! codex_ready; then
+  elif [[ $name == implementation-cross-review ]] && ! codex_ready; then
+    ready+=("$name（Opus のみ）")
+  elif [[ $name == design-cross-review ]] && ! codex_ready; then
     ready+=("$name（Fable のみ）")
   else
     ready+=("$name")
