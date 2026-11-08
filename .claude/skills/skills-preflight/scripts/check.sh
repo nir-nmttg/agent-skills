@@ -47,15 +47,13 @@ check_cmd() {
 }
 
 # Claude の担当（Opus・Fable）だけなら Codex なしで動くので、クロスレビューは Codex の担当の分だけ Codex を使う
-codex_users="codex-*, implementation-cross-review（Sol）・design-cross-review（Astra）"
+codex_users="implementation-cross-review（Sol）・design-cross-review（Astra）"
 
 check_cmd git "ほぼすべて" "\`xcode-select --install\`（または \`brew install git\`）" git --version
 check_cmd jq "ほぼすべて" "\`brew install jq\`" jq --version
 check_cmd codex "$codex_users" "\`brew install --cask codex\` のあと \`codex login\`" codex --version
 check_cmd perl "haiku-implementation, design-cross-review, implementation-cross-review" "\`brew install perl\`（macOS には標準で入っている）" perl -e 'print "perl $^V\n"'
-check_cmd gh "gh-todo, gh-issue-overview, gh-pr-precheck, codex-verify-prompt（PR を渡すとき）" "\`brew install gh\` のあと \`gh auth login\`" gh --version
-check_cmd python3 "gh-issue-overview" "\`xcode-select --install\`（または \`brew install python\`）" python3 --version
-check_cmd curl "gh-issue-overview, gh-pr-precheck" "\`brew install curl\`"
+check_cmd gh "gh-todo" "\`brew install gh\` のあと \`gh auth login\`" gh --version
 
 # インストール方法は Homebrew 前提なので、足りないコマンドがあって Homebrew も無ければ先に入れてもらう
 need_brew=false
@@ -77,9 +75,9 @@ fi
 if has gh; then
   if gh auth status >/dev/null 2>&1; then
     user=$(gh api user --jq .login 2>/dev/null || true)
-    add gh-login ok "GitHub（gh）のログイン" "${user:+@$user}" "gh-todo, gh-issue-overview, gh-pr-precheck, codex-verify-prompt（PR を渡すとき）"
+    add gh-login ok "GitHub（gh）のログイン" "${user:+@$user}" "gh-todo"
   else
-    add gh-login ng "GitHub（gh）のログイン" "未ログイン" "gh-todo, gh-issue-overview, gh-pr-precheck, codex-verify-prompt（PR を渡すとき）" "\`gh auth login\`"
+    add gh-login ng "GitHub（gh）のログイン" "未ログイン" "gh-todo" "\`gh auth login\`"
   fi
 fi
 
@@ -128,15 +126,11 @@ fi
 
 skill_needs() {
   case $1 in
-    codex-verify-prompt) echo "git jq" ;;
     design-cross-review) echo "perl agents-link" ;;
     implementation-cross-review) echo "git perl agents-link" ;;
-    codex-*) echo "git jq codex codex-login" ;;
     haiku-implementation) echo "git jq perl agents-link haiku-implementation-link" ;;
     haiku-check) echo "git agents-link" ;;
     gh-todo) echo "jq gh gh-login" ;;
-    gh-issue-overview) echo "jq gh gh-login python3 curl" ;;
-    gh-pr-precheck) echo "jq gh gh-login curl" ;;
     *) echo "" ;;
   esac
 }
