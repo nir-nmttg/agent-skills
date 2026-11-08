@@ -4,7 +4,7 @@ Claude Code で開発し、Codex で整備するための汎用スキル集。�
 
 | | Claude Code | Codex |
 | --- | --- | --- |
-| 役割 | 開発する（Issue の把握・設計・実装・テスト・レビュー・PR） | 整備する（設計への整合・構造・テスト・宣言順・文書・依存の更新）と、ファイル整理 |
+| 役割 | 開発する（設計・実装・テスト・レビュー・PR） | 整備する（設計への整合・構造・テスト・宣言順・文書・依存の更新）と、ファイル整理 |
 | 使い方 | 条件に当たると Claude が自分の判断で使うスキルが中心 | `$スキル名` で指定したときだけ使う |
 
 Claude Code で機能を作り、余裕のあるときに Codex でコードベースを整え（`$codebase-cleanup-workflow`）、また Claude Code で次の開発に進む。Claude は作業の一部を Haiku 5.5・Opus 5.5・Fable 5.1 のサブエージェントや Codex CLI（GPT-6.1 Sol・GPT-6 Astra）に任せ、指示・採否の判断・反映を受け持つ。
@@ -35,7 +35,7 @@ Claude Code で機能を作り、余裕のあるときに Codex でコードベ�
 | 種類 | 開発用 | 雑務用 |
 | --- | --- | --- |
 | 自動で使われる（`/スキル名` や話しかけても使える） | [design-cross-review・haiku-implementation・haiku-check・implementation-cross-review](#自動で使われる開発用スキル) | [japanese-report・session-status-emoji](#自動で使われる雑務用スキル) |
-| 明示的に呼び出す（`/スキル名` で指定したときだけ） | [gh-issue-overview・codex-verify-prompt・gh-pr-precheck・whats-next](#明示的に呼び出す開発用スキル) | [skills-preflight・gh-todo・browser-readonly-research](#明示的に呼び出す雑務用スキル) |
+| 明示的に呼び出す（`/スキル名` で指定したときだけ） | [whats-next](#明示的に呼び出す開発用スキル) | [skills-preflight・gh-todo・browser-readonly-research](#明示的に呼び出す雑務用スキル) |
 
 ### 自動で使われる開発用スキル
 
@@ -52,9 +52,6 @@ Claude Code で機能を作り、余裕のあるときに Codex でコードベ�
 
 | スキル | できること | 使い方の例 | 前提 |
 | --- | --- | --- | --- |
-| [gh-issue-overview](.claude/skills/gh-issue-overview/SKILL.md) | Issue を調べ、前提・全体像の図・進め方を実装計画の概要にまとめ、組み込みブラウザに表示する | `/gh-issue-overview <Issue の URL>` | `gh` のログイン、`python3` |
-| [codex-verify-prompt](.claude/skills/codex-verify-prompt/SKILL.md) | PR や作業中の変更から、Codex に渡す動作確認のプロンプトを作る（`--browser builtin` / `chrome` は必須） | `/codex-verify-prompt --browser builtin <PR の URL>` | `git`、`jq`（PR には `gh` のログイン） |
-| [gh-pr-precheck](.claude/skills/gh-pr-precheck/SKILL.md) | PR を Issue の要件・方針・CI・未解決のレビューと照らし、人のレビューに進めるか判定する。書き込みはしない | `/gh-pr-precheck <Issue の URL> <PR の URL>` | `gh` のログイン、`jq`、`curl`、gh-issue-overview スキル |
 | [whats-next](.claude/skills/whats-next/SKILL.md) | 会話とブランチ・PR の状態から、進捗と次のアクションを 1 つ示し、承認後に進める | `/whats-next` | なし |
 
 ### 自動で使われる雑務用スキル
