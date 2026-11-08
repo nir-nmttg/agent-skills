@@ -7,7 +7,7 @@ Claude Code で開発し、Codex で整備するための汎用スキル集。�
 | 役割 | 開発する（Issue の把握・設計・実装・テスト・レビュー・PR） | 整備する（設計への整合・構造・テスト・宣言順・文書・依存の更新）と、ファイル整理 |
 | 使い方 | 条件に当たると Claude が自分の判断で使うスキルが中心 | `$スキル名` で指定したときだけ使う |
 
-Claude Code で機能を作り、余裕のあるときに Codex でコードベースを整え（`$codebase-cleanup-workflow`）、また Claude Code で次の開発に進む。Claude は作業の一部を Haiku 5.5・Fable 5.1 のサブエージェントや Codex CLI（GPT-6 Astra）に任せ、指示・採否の判断・反映を受け持つ。
+Claude Code で機能を作り、余裕のあるときに Codex でコードベースを整え（`$codebase-cleanup-workflow`）、また Claude Code で次の開発に進む。Claude は作業の一部を Haiku 5.5・Opus 5.5・Fable 5.1 のサブエージェントや Codex CLI（GPT-6.1 Sol・GPT-6 Astra）に任せ、指示・採否の判断・反映を受け持つ。
 
 ## はじめに
 
@@ -44,9 +44,9 @@ Claude Code で機能を作り、余裕のあるときに Codex でコードベ�
 | [design-cross-review](.claude/skills/design-cross-review/SKILL.md) | 設計を Astra と Fable に同じ依頼でレビューさせ、Claude が採否を判断して修正案を出す。壊れると影響の大きい設計は、壊れ方と戻しやすさも見る | 作り方の判断を含む設計・実装計画を、提示・実装する前（迷ったら使う） | `/design-cross-review docs/design.md`<br>「この設計を Codex にレビューしてもらって」 | `perl`、`~/.claude/agents` のリンク、implementation-cross-review スキル。Astra には `codex` のログインと `jq` |
 | [haiku-implementation](.claude/skills/haiku-implementation/SKILL.md) | 実装を Haiku 5.5（max）に任せ、Claude は分割・指示・レビュー・反映に集中する。手分けできる部分は worktree で同時に実装する。コミットはしない | 指示書に書けて、テストなどで確かめられる実装に取りかかるとき（迷ったら任せる） | `/haiku-implementation CSV エクスポートを追加して`<br>「Haiku に並列で実装させて」 | メインが auto モード、`jq`、`perl`、git リポジトリ、`~/.claude/agents` と `~/.claude/skills/haiku-implementation` のリンク |
 | [haiku-check](.claude/skills/haiku-check/SKILL.md) | テスト・型チェック・lint・ビルド・依存の脆弱性検査・CI の失敗ログなど、出力が長く状態を変えない確認を Haiku 5.5 に任せ、要点と原因だけを受け取る | Claude がこれらの確認を実行するとき（迷ったら任せる。状態を変えるコマンドと本番への接続は除く） | `/haiku-check`<br>「CI が落ちた理由を見て」 | `~/.claude/agents` のリンク（CI のログには `gh` のログイン） |
-| [implementation-cross-review](.claude/skills/implementation-cross-review/SKILL.md) | git の差分を Astra と Fable に、要件と差分だけを渡してレビューさせ、Claude が採否を判断して直す。壊れると影響の大きい変更は、壊れ方も見る | 動作が変わりうる変更（プロンプト・設定を含む）の完了報告・コミット・PR の前（迷ったら使う。README など動作を決めない文書だけなら Fable だけ。Haiku に書かせた変更には必ず使う） | `/implementation-cross-review`<br>`/implementation-cross-review --only fable` | `perl`、git リポジトリ、`~/.claude/agents` のリンク。Astra には `codex` のログインと `jq` |
+| [implementation-cross-review](.claude/skills/implementation-cross-review/SKILL.md) | git の差分を Sol と Opus に、要件と差分だけを渡してレビューさせ、Claude が採否を判断して直す。壊れると影響の大きい変更は、壊れ方も見る | 動作が変わりうる変更（プロンプト・設定を含む）の完了報告・コミット・PR の前（迷ったら使う。README など動作を決めない文書だけなら Opus だけ。Haiku に書かせた変更には必ず使う） | `/implementation-cross-review`<br>`/implementation-cross-review --only opus` | `perl`、git リポジトリ、`~/.claude/agents` のリンク。Sol には `codex` のログインと `jq` |
 
-2 つのレビューは推論レベルを今の Claude に揃え、`--only astra|sol|fable` で担当を選べる。Astra が使えないときは GPT-6.1 Sol で代わりに動かす。
+2 つのレビューは推論レベルを今の Claude に揃え、`--only` で担当を選べる（設計は `astra|sol|fable`、実装は `sol|astra|opus`）。Codex の担当が使えないときは、設計は Sol、実装は Astra で代わりに動かす。
 
 ### 明示的に呼び出す開発用スキル
 
