@@ -32,12 +32,17 @@ Claude Code で機能を作り、余裕のあるときに Codex でコードベ�
 
 ## Claude Code 用スキル一覧
 
-| 種類 | 開発用 | 雑務用 |
-| --- | --- | --- |
-| 自動で使われる（`/スキル名` や話しかけても使える） | [design-cross-review・haiku-implementation・haiku-check・implementation-cross-review](#自動で使われる開発用スキル) | [japanese-report・session-status-emoji](#自動で使われる雑務用スキル) |
-| 明示的に呼び出す（`/スキル名` で指定したときだけ） | [whats-next](#明示的に呼び出す開発用スキル) | [skills-preflight・gh-todo・browser-readonly-research](#明示的に呼び出す雑務用スキル) |
+スキルが何をするかで分けている。自動で使われるスキルも、`/スキル名` や話しかけて使える。
 
-### 自動で使われる開発用スキル
+| 用途 | 自動で使われる | `/スキル名` で指定したときだけ使う |
+| --- | --- | --- |
+| [コードを作る](#コードを作る)（設計・実装・確認・レビュー） | design-cross-review・haiku-implementation・haiku-check・implementation-cross-review | なし |
+| [ユーザーに伝える](#ユーザーに伝える)（報告・作業の段階・次の一手） | japanese-report・session-status-emoji | whats-next |
+| [情報を集める](#情報を集める)（環境・GitHub・Web を読むだけ） | なし | skills-preflight・gh-todo・browser-readonly-research |
+
+### コードを作る
+
+設計 → 実装 → 確認 → レビューの順に並べている。
 
 | スキル | できること | 自動で使う条件 | 使い方の例 | 前提 |
 | --- | --- | --- | --- | --- |
@@ -48,20 +53,17 @@ Claude Code で機能を作り、余裕のあるときに Codex でコードベ�
 
 2 つのレビューは推論レベルを今の Claude に揃え、`--only` で担当を選べる（設計は `astra|sol|fable`、実装は `sol|astra|opus`）。Codex の担当が使えないときは、設計は Sol、実装は Astra で代わりに動かす。
 
-### 明示的に呼び出す開発用スキル
-
-| スキル | できること | 使い方の例 | 前提 |
-| --- | --- | --- | --- |
-| [whats-next](.claude/skills/whats-next/SKILL.md) | 会話とブランチ・PR の状態から、進捗と次のアクションを 1 つ示し、承認後に進める | `/whats-next` | なし |
-
-### 自動で使われる雑務用スキル
+### ユーザーに伝える
 
 | スキル | できること | 自動で使う条件 | 使い方の例 | 前提 |
 | --- | --- | --- | --- | --- |
 | [japanese-report](.claude/skills/japanese-report/SKILL.md) | 報告を見出しまで自然な日本語で書く。英語の出力も日本語で要約する | 結果を報告する前 | 「日本語で報告して」 | なし |
 | [session-status-emoji](.claude/skills/session-status-emoji/SKILL.md) | セッション名の先頭に作業の段階の絵文字を付け、並行セッションを見分けやすくする | デスクトップアプリのすべてのセッションの最初のターンから | 「セッション名に状態の絵文字を付けて」 | Claude デスクトップアプリ |
+| [whats-next](.claude/skills/whats-next/SKILL.md) | 会話とブランチ・PR の状態から、進捗と次のアクションを 1 つ示し、承認後に進める | なし | `/whats-next` | なし |
 
-### 明示的に呼び出す雑務用スキル
+### 情報を集める
+
+どれも調べる先（環境・GitHub・Web）を読むだけで、変えない。
 
 | スキル | できること | 使い方の例 | 前提 |
 | --- | --- | --- | --- |
@@ -71,14 +73,15 @@ Claude Code で機能を作り、余裕のあるときに Codex でコードベ�
 
 ## Codex 用スキル一覧
 
-すべて `$スキル名` で指定したときだけ使う。
+スキルが何をするかで分けている。すべて `$スキル名` で指定したときだけ使う。
 
 | 用途 | スキル |
 | --- | --- |
-| [開発用](#codex-の開発用スキル) | minor-version-upgrade・codebase-cleanup-workflow・design-alignment-refactor・code-structure-refactor・test-suite-refactor・code-order-refactor・docs-align-with-code |
-| [雑務用](#codex-の雑務用スキル) | skills-preflight・rename-files-by-content |
+| [コードを整える](#コードを整える)（依存の更新・整備） | minor-version-upgrade・codebase-cleanup-workflow・design-alignment-refactor・code-structure-refactor・test-suite-refactor・code-order-refactor・docs-align-with-code |
+| [ファイルを整理する](#ファイルを整理する) | rename-files-by-content |
+| [情報を集める](#情報を集める-1) | skills-preflight |
 
-### Codex の開発用スキル
+### コードを整える
 
 整備スキルは既存の振る舞いを保ち、対象を省略するとプロジェクト全体を探す。minor-version-upgrade は互換性を確かめたうえで、必要な移行も行う。
 
@@ -92,12 +95,17 @@ Claude Code で機能を作り、余裕のあるときに Codex でコードベ�
 | [code-order-refactor](.agents/skills/code-order-refactor/SKILL.md) | メソッドや関数を読みやすい順に並べ替える | `$code-order-refactor` | 関連する検証を実行できること |
 | [docs-align-with-code](.agents/skills/docs-align-with-code/SKILL.md) | 実装を正として、利用・開発・運用の文書を更新する | `$docs-align-with-code README.md を現状の実装に合わせて更新して` | なし |
 
-### Codex の雑務用スキル
+### ファイルを整理する
+
+| スキル | できること | 使い方の例 | 前提 |
+| --- | --- | --- | --- |
+| [rename-files-by-content](.agents/skills/rename-files-by-content/SKILL.md) | フォルダ直下のファイルを、内容から `YYYY-MM-DD_名前.拡張子` に改名する | `$rename-files-by-content /絶対パス/フォルダ` | `bash`、Python 3.9 以降 |
+
+### 情報を集める
 
 | スキル | できること | 使い方の例 | 前提 |
 | --- | --- | --- | --- |
 | [skills-preflight](.agents/skills/skills-preflight/SKILL.md) | スキルの定義・リンク・必要なコマンドと検証環境を確かめる。環境は変えない | `$skills-preflight` | `bash` |
-| [rename-files-by-content](.agents/skills/rename-files-by-content/SKILL.md) | フォルダ直下のファイルを、内容から `YYYY-MM-DD_名前.拡張子` に改名する | `$rename-files-by-content /絶対パス/フォルダ` | `bash`、Python 3.9 以降 |
 
 ## 実行結果とスキルの追加・変更
 
