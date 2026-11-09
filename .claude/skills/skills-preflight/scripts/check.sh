@@ -47,7 +47,7 @@ check_cmd() {
 }
 
 # Claude の担当（Opus・Fable）だけなら Codex なしで動くので、クロスレビューは Codex の担当の分だけ Codex を使う
-codex_users="implementation-cross-review（Sol）・design-cross-review（Astra）"
+codex_users="implementation-cross-review（Astra）・design-cross-review（Astra）"
 
 check_cmd git "ほぼすべて" "\`xcode-select --install\`（または \`brew install git\`）" git --version
 check_cmd jq "ほぼすべて" "\`brew install jq\`" jq --version
@@ -135,7 +135,7 @@ skill_needs() {
   esac
 }
 
-# Codex の担当（Sol・Astra）を動かすのに必要なものがそろっているか
+# Codex の担当（Astra、使えないときは Sol）を動かすのに必要なものがそろっているか
 codex_ready() {
   local m
   for m in ${missing[@]+"${missing[@]}"}; do
