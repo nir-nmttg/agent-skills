@@ -1,6 +1,6 @@
 # agent-skills
 
-Claude Code で開発し、Codex で整備するための汎用スキル集。
+Claude Code で開発し、Codex で整備するための汎用スキル集。\
 特定のプロジェクトに依存しない。
 
 | | Claude Code | Codex |
@@ -8,13 +8,13 @@ Claude Code で開発し、Codex で整備するための汎用スキル集。
 | 役割 | 開発する（設計・実装・テスト・レビュー・PR） | 整備する（設計への整合・構造・テスト・宣言順・文書・依存の更新）と、ファイル整理 |
 | 使い方 | 条件に当たると Claude が自分の判断で使うスキルが中心 | `$スキル名` で指定したときだけ使う |
 
-Claude Code で機能を作り、余裕のあるときに Codex でコードベースを整え（`$codebase-cleanup-workflow`）、また Claude Code で次の開発に進む。
+Claude Code で機能を作り、余裕のあるときに Codex でコードベースを整え（`$codebase-cleanup-workflow`）、また Claude Code で次の開発に進む。\
 Claude は作業の一部を Haiku 5.5・Opus 5.5・Fable 5.1 のサブエージェントや Codex CLI（GPT-6 Astra・GPT-6.1 Sol）に任せ、指示・採否の判断・反映を受け持つ。
 
 ## はじめに
 
-1. リポジトリ直下でリンクする。
-   `--claude` / `--codex` で片方だけにできる。
+1. リポジトリ直下でリンクする。\
+   `--claude` / `--codex` で片方だけにできる。\
    スキルの追加・改名・削除のあとも再実行する。
 
    ```bash
@@ -26,14 +26,15 @@ Claude は作業の一部を Haiku 5.5・Opus 5.5・Fable 5.1 のサブエージ
    | Claude Code | `.claude/skills/`、`.claude/agents/` | `~/.claude/skills/`、`~/.claude/agents/`（`CLAUDE_CONFIG_DIR` があればその配下） | `/スキル名` |
    | Codex | `.agents/skills/` | `~/.agents/skills/` | `$スキル名` |
 
-   - 既存の同名ファイルや別の場所へのリンクは上書きしない。
+   - 既存の同名ファイルや別の場所へのリンクは上書きしない。\
      このリポジトリを指す切れたリンクは、張り直すか取り除く。
-   - git worktree からは実行できない。
+   - git worktree からは実行できない。\
      メインの checkout で実行する。
    - 反映されなければ、新しいセッションを始めるか Codex を再起動する。
 
-2. `/skills-preflight`（Claude Code）・`$skills-preflight`（Codex）で、必要なコマンド・ログイン・リンクを確かめる。
-   確認だけで、環境は変えない。
+2. [`/skills-preflight`](.claude/skills/skills-preflight/SKILL.md)（Claude Code）・[`$skills-preflight`](.agents/skills/skills-preflight/SKILL.md)（Codex）で、必要なコマンド・ログイン・リンクを確かめる。\
+   Claude Code では、足りないコマンドとリンクを了承を得てから入れる（ログインはユーザーが行う）。\
+   Codex はスキルの定義も確かめ、環境は変えない。\
    主な前提は次のとおり（細かい条件は各 SKILL.md にある）。
 
    | 前提 | 使うスキル |
@@ -47,7 +48,7 @@ Claude は作業の一部を Haiku 5.5・Opus 5.5・Fable 5.1 のサブエージ
    | 組み込みブラウザか Claude in Chrome | browser-readonly-research |
    | Python 3.9 以降 | Codex の minor-version-upgrade・rename-files-by-content |
 
-3. 下の一覧から選ぶ。
+3. 下の一覧から選ぶ。\
    名前のリンク先に、手順とオプションがある。
 
 ## Claude Code 用スキル一覧
@@ -56,7 +57,7 @@ Claude は作業の一部を Haiku 5.5・Opus 5.5・Fable 5.1 のサブエージ
 
 ### 自動で使われるスキル
 
-条件に当たると、Claude が頼まれなくても使う。
+条件に当たると、Claude が頼まれなくても使う。\
 作業の流れ（セッション開始 → 設計 → 実装 → 確認 → レビュー → 報告）の順に並べている。
 
 | スキル | できること | 使う場面 |
@@ -73,13 +74,12 @@ Claude は作業の一部を Haiku 5.5・Opus 5.5・Fable 5.1 のサブエージ
 | スキル | できること |
 | --- | --- |
 | [`/whats-next`](.claude/skills/whats-next/SKILL.md) | 進捗と次のアクションを 1 つ示し、承認後に進める |
-| [`/skills-preflight`](.claude/skills/skills-preflight/SKILL.md) | 必要なコマンド・ログイン・リンクを確かめる |
 | [`/gh-todo`](.claude/skills/gh-todo/SKILL.md) | レビュー依頼・メンション・自分の Issue / PR を一覧にする |
 | [`/browser-readonly-research`](.claude/skills/browser-readonly-research/SKILL.md) | Web ページを読むだけで調べてまとめる |
 
 ## Codex 用スキル一覧
 
-すべて `$スキル名` で指定したときだけ使う。
+すべて `$スキル名` で指定したときだけ使う。\
 コードを整えるスキル（minor-version-upgrade から docs-align-with-code まで）は既存の振る舞いを保ち、対象を省略するとプロジェクト全体を探す。
 
 | スキル | できること |
@@ -92,12 +92,11 @@ Claude は作業の一部を Haiku 5.5・Opus 5.5・Fable 5.1 のサブエージ
 | [`$code-order-refactor`](.agents/skills/code-order-refactor/SKILL.md) | メソッドや関数を読みやすい順に並べ替える |
 | [`$docs-align-with-code`](.agents/skills/docs-align-with-code/SKILL.md) | 実装に合わせて文書を更新する |
 | [`$rename-files-by-content`](.agents/skills/rename-files-by-content/SKILL.md) | ファイルを内容から `YYYY-MM-DD_名前` に改名する |
-| [`$skills-preflight`](.agents/skills/skills-preflight/SKILL.md) | スキルの定義・リンク・必要なコマンドを確かめる |
 
 ## 実行結果とスキルの追加・変更
 
 - レポートなどは、このリポジトリの `artifacts/<スキル名>/`（gitignore 済み）に保存される。
-- 作り方のルールは [AGENTS.md](AGENTS.md) にある。
+- 作り方のルールは [AGENTS.md](AGENTS.md) にある。\
   変更したら `scripts/check-descriptions.sh` と `git diff --check` を実行し、追加・改名・削除のあとは `scripts/link-skills.sh` を実行する。
 
 ## ライセンス
