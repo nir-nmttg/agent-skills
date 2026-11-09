@@ -40,13 +40,14 @@ Claude は作業の一部を Haiku 5.5・Opus 5.5・Fable 5.1 のサブエージ
 
    | 前提 | 使うスキル |
    | --- | --- |
-   | `perl` | design-cross-review・implementation-cross-review・haiku-implementation |
-   | `jq` | haiku-implementation・gh-todo、クロスレビューの Codex の担当 |
+   | `perl` | design-cross-review・implementation-cross-review・haiku-implementation・gh-issue-autofix |
+   | `jq` | haiku-implementation・gh-todo・gh-issue-autofix、クロスレビューの Codex の担当 |
    | `codex` のログイン | クロスレビューの Codex の担当（Astra。使えないときは Sol） |
-   | メインが auto モード | haiku-implementation |
-   | `gh` のログイン | gh-todo、haiku-check で CI のログを見るとき |
+   | メインが auto モード | haiku-implementation・gh-issue-autofix |
+   | `gh` のログイン | gh-todo・gh-issue-autofix、haiku-check で CI のログを見るとき |
    | Claude デスクトップアプリ | session-status-emoji |
    | 組み込みブラウザか Claude in Chrome | browser-readonly-research |
+   | 組み込みブラウザ | gh-issue-autofix（ないときは動作確認を未検証にする） |
    | Python 3.9 以降 | Codex の minor-version-upgrade・rename-files-by-content |
 
 3. 下の一覧から選ぶ。\
@@ -76,6 +77,7 @@ Claude は作業の一部を Haiku 5.5・Opus 5.5・Fable 5.1 のサブエージ
 | --- | --- |
 | [`/whats-next`](.claude/skills/whats-next/SKILL.md) | 進捗と次のアクションを 1 つ示し、承認後に進める |
 | [`/gh-todo`](.claude/skills/gh-todo/SKILL.md) | レビュー依頼・メンション・自分の Issue / PR を一覧にする |
+| [`/gh-issue-autofix`](.claude/skills/gh-issue-autofix/SKILL.md) | `agent:autofix` ラベルの Issue を 1 件、確認なしで直してドラフト PR にする |
 | [`/browser-readonly-research`](.claude/skills/browser-readonly-research/SKILL.md) | Web ページを読むだけで調べてまとめる |
 
 ## Codex 用スキル一覧
