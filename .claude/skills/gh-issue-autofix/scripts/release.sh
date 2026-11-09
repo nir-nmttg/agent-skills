@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
-# コミットせずに止めたとき、Issue の着手を取り消す。worktree の外（メインの checkout）で実行する。
+# Issue の worktree を片付け、作業がなければ着手も取り消す。worktree の外（メインの checkout）で実行する。
+#   - コミットせずに止めたとき: 着手（リモートの claude/issue-<番号>）を取り消す
+#   - ドラフト PR を作ったあと: worktree だけを消す（PR があるのでブランチは残る）
 #
 # 使い方: release.sh <Issue の番号>
 #   リモートの claude/issue-<番号> に既定ブランチにないコミットがなく、PR もなければ消す。
-#   worktree に変更がなければ、worktree とローカルのブランチも消す。
+#   worktree に変更がなければ、worktree と、既定ブランチにないコミットのないローカルのブランチを消す。
 set -euo pipefail
 source "$(dirname "$0")/lib.sh"
 
@@ -27,7 +29,8 @@ if [[ -n $wt ]]; then
     echo "- worktree: 未コミットの変更があるので残した（$wt）"
     keep_local=true
   else
-    git worktree remove "$wt"
+    # 変更がないことを確かめたので --force で消す（submodule を含む worktree は --force がないと消せない）
+  git worktree remove --force "$wt"
     echo "- worktree: 消した（$wt）"
   fi
 fi

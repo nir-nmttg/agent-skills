@@ -48,6 +48,7 @@ Claude は作業の一部を Haiku 5.5・Opus 5.5・Fable 5.1 のサブエージ
    | Claude デスクトップアプリ | session-status-emoji |
    | 組み込みブラウザか Claude in Chrome | browser-readonly-research |
    | 組み込みブラウザ | gh-issue-autofix（ないときは動作確認を未検証にする） |
+   | デスクトップアプリが開いていて PC が起きている（専用の PC を勧める） | スケジュールに登録するスキル |
    | Python 3.9 以降 | Codex の minor-version-upgrade・rename-files-by-content |
 
 3. 下の一覧から選ぶ。\
@@ -77,8 +78,16 @@ Claude は作業の一部を Haiku 5.5・Opus 5.5・Fable 5.1 のサブエージ
 | --- | --- |
 | [`/whats-next`](.claude/skills/whats-next/SKILL.md) | 進捗と次のアクションを 1 つ示し、承認後に進める |
 | [`/gh-todo`](.claude/skills/gh-todo/SKILL.md) | レビュー依頼・メンション・自分の Issue / PR を一覧にする |
-| [`/gh-issue-autofix`](.claude/skills/gh-issue-autofix/SKILL.md) | `agent:autofix` ラベルの Issue を 1 件、確認なしで直してドラフト PR にする |
 | [`/browser-readonly-research`](.claude/skills/browser-readonly-research/SKILL.md) | Web ページを読むだけで調べてまとめる |
+
+### スケジュールに登録するスキル
+
+Claude デスクトップアプリのスケジュールタスクに登録し、`/スキル名` で定期実行する。\
+登録のしかたと試運転は SKILL.md にある。
+
+| スキル | できること |
+| --- | --- |
+| [`/gh-issue-autofix`](.claude/skills/gh-issue-autofix/SKILL.md) | `agent:autofix` ラベルの Issue を 1 件、確認なしで直してドラフト PR にし、止めたら Issue に理由を書く |
 
 ## Codex 用スキル一覧
 

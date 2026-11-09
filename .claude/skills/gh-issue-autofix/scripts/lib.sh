@@ -79,3 +79,22 @@ fetch_default() {
   git fetch -q origin "+refs/heads/$DEFAULT_BRANCH:refs/remotes/origin/$DEFAULT_BRANCH" ||
     die "origin から $DEFAULT_BRANCH を取得できません。"
 }
+
+# 依存を決めるロックファイル（git の pathspec）
+LOCKFILES=('*package-lock.json' '*npm-shrinkwrap.json' '*pnpm-lock.yaml' '*yarn.lock' '*bun.lock' '*bun.lockb'
+  '*uv.lock' '*poetry.lock' '*Pipfile.lock' '*requirements*.txt' '*Gemfile.lock' '*composer.lock' '*go.sum' '*Cargo.lock')
+
+# submodule があれば、作業ツリーに合わせて更新する（hook は動かさない）
+update_submodules() {
+  [[ -f ${1:-.}/.gitmodules ]] || return 0
+  git -C "${1:-.}" -c core.hooksPath=/dev/null submodule update -q --init --recursive
+}
+
+# このスキルの状態（ロック・依存のインストールの記録・前回の結果）の置き場所。
+# git が管理しない共通の .git の中に置き、どの worktree から実行しても同じ場所にする
+state_dir() {
+  local d
+  d="$(git rev-parse --path-format=absolute --git-common-dir)/gh-issue-autofix"
+  mkdir -p "$d"
+  echo "$d"
+}
