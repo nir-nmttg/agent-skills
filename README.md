@@ -1,11 +1,12 @@
 # agent-skills
 
 Claude Code で開発し、Codex で整備するための汎用スキル集。\
+開発以外の作業に使うスキルも置いている。\
 特定のプロジェクトに依存しない。
 
 | | Claude Code | Codex |
 | --- | --- | --- |
-| 役割 | 開発する（設計・実装・テスト・レビュー・PR） | 整備する（設計への整合・構造・テスト・宣言順・文書・依存の更新）と、ファイル整理 |
+| 役割 | 開発する（設計・実装・テスト・レビュー・PR） | 整備する（設計への整合・構造・テスト・宣言順・文書・依存の更新） |
 | 使い方 | 条件に当たると Claude が自分の判断で使うスキルが中心 | `$スキル名` で指定したときだけ使う |
 
 Claude Code で機能を作り、余裕のあるときに Codex でコードベースを整え（`$codebase-cleanup-workflow`）、また Claude Code で次の開発に進む。\
@@ -80,7 +81,7 @@ Claude は作業の一部を Haiku 5.5・Opus 5.5・Fable 5.1 のサブエージ
 ## Codex 用スキル一覧
 
 すべて `$スキル名` で指定したときだけ使う。\
-コードを整えるスキル（minor-version-upgrade から docs-align-with-code まで）は既存の振る舞いを保ち、対象を省略するとプロジェクト全体を探す。
+どのスキルも既存の振る舞いを保ち、対象を省略するとプロジェクト全体を探す。
 
 | スキル | できること |
 | --- | --- |
@@ -91,7 +92,14 @@ Claude は作業の一部を Haiku 5.5・Opus 5.5・Fable 5.1 のサブエージ
 | [`$test-suite-refactor`](.agents/skills/test-suite-refactor/SKILL.md) | 検出力を保ったまま、テストの重複を整理する |
 | [`$code-order-refactor`](.agents/skills/code-order-refactor/SKILL.md) | メソッドや関数を読みやすい順に並べ替える |
 | [`$docs-align-with-code`](.agents/skills/docs-align-with-code/SKILL.md) | 実装に合わせて文書を更新する |
-| [`$rename-files-by-content`](.agents/skills/rename-files-by-content/SKILL.md) | ファイルを内容から `YYYY-MM-DD_名前` に改名する |
+
+## 開発以外のスキル
+
+開発の流れとは別に、普段の作業で使う。
+
+| スキル | エージェント | できること |
+| --- | --- | --- |
+| [`$rename-files-by-content`](.agents/skills/rename-files-by-content/SKILL.md) | Codex | ファイルを内容から `YYYY-MM-DD_名前` に改名する |
 
 ## 実行結果とスキルの追加・変更
 
