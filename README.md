@@ -32,58 +32,37 @@ Claude Code で機能を作り、余裕のあるときに Codex でコードベ�
 
 ## Claude Code 用スキル一覧
 
-スキルが何をするかで分けている。自動で使われるスキルも、`/スキル名` や話しかけて使える。
+自動で使われるスキルも、`/スキル名` や話しかけて使える。
 
-| 用途 | 自動で使われる | `/スキル名` で指定したときだけ使う |
-| --- | --- | --- |
-| [コードを作る](#コードを作る)（設計・実装・確認・レビュー） | design-cross-review・haiku-implementation・haiku-check・implementation-cross-review | なし |
-| [ユーザーに伝える](#ユーザーに伝える)（報告・作業の段階・次の一手） | japanese-report・session-status-emoji | whats-next |
-| [情報を集める](#情報を集める)（環境・GitHub・Web を読むだけ） | なし | skills-preflight・gh-todo・browser-readonly-research |
+### 自動で使われるスキル
 
-### コードを作る
-
-設計 → 実装 → 確認 → レビューの順に並べている。
+条件に当たると、Claude が頼まれなくても使う。作業の流れ（セッション開始 → 設計 → 実装 → 確認 → レビュー → 報告）の順に並べている。
 
 | スキル | できること | 自動で使う条件 | 使い方の例 | 前提 |
 | --- | --- | --- | --- | --- |
+| [session-status-emoji](.claude/skills/session-status-emoji/SKILL.md) | セッション名の先頭に作業の段階の絵文字を付け、並行セッションを見分けやすくする | デスクトップアプリのすべてのセッションの最初のターンから | 「セッション名に状態の絵文字を付けて」 | Claude デスクトップアプリ |
 | [design-cross-review](.claude/skills/design-cross-review/SKILL.md) | 設計を Astra と Fable に同じ依頼でレビューさせ、Claude が採否を判断して修正案を出す。壊れると影響の大きい設計は、壊れ方と戻しやすさも見る | 作り方の判断を含む設計・実装計画を、提示・実装する前（迷ったら使う） | `/design-cross-review docs/design.md`<br>「この設計を Codex にレビューしてもらって」 | `perl`、`~/.claude/agents` のリンク、implementation-cross-review スキル。Astra には `codex` のログインと `jq` |
 | [haiku-implementation](.claude/skills/haiku-implementation/SKILL.md) | 実装を Haiku 5.5（max）に任せ、Claude は分割・指示・レビュー・反映に集中する。手分けできる部分は worktree で同時に実装する。コミットはしない | 指示書に書けて、テストなどで確かめられる実装に取りかかるとき（迷ったら任せる） | `/haiku-implementation CSV エクスポートを追加して`<br>「Haiku に並列で実装させて」 | メインが auto モード、`jq`、`perl`、git リポジトリ、`~/.claude/agents` と `~/.claude/skills/haiku-implementation` のリンク |
 | [haiku-check](.claude/skills/haiku-check/SKILL.md) | テスト・型チェック・lint・ビルド・依存の脆弱性検査・CI の失敗ログなど、出力が長く状態を変えない確認を Haiku 5.5 に任せ、要点と原因だけを受け取る | Claude がこれらの確認を実行するとき（迷ったら任せる。状態を変えるコマンドと本番への接続は除く） | `/haiku-check`<br>「CI が落ちた理由を見て」 | `~/.claude/agents` のリンク（CI のログには `gh` のログイン） |
 | [implementation-cross-review](.claude/skills/implementation-cross-review/SKILL.md) | git の差分を Astra と Opus に、要件と差分だけを渡してレビューさせ、Claude が採否を判断して直す。壊れると影響の大きい変更は、壊れ方も見る | 動作が変わりうる変更（プロンプト・設定を含む）の完了報告・コミット・PR の前（迷ったら使う。README など動作を決めない文書だけなら Opus だけ。Haiku に書かせた変更には必ず使う） | `/implementation-cross-review`<br>`/implementation-cross-review --only opus` | `perl`、git リポジトリ、`~/.claude/agents` のリンク。Astra には `codex` のログインと `jq` |
-
-2 つのレビューは推論レベルを今の Claude に揃え、`--only` で担当を選べる（設計は `astra|sol|fable`、実装は `astra|sol|opus`）。Codex の担当が使えないときは、どちらも Sol で代わりに動かす。
-
-### ユーザーに伝える
-
-| スキル | できること | 自動で使う条件 | 使い方の例 | 前提 |
-| --- | --- | --- | --- | --- |
 | [japanese-report](.claude/skills/japanese-report/SKILL.md) | 報告を見出しまで自然な日本語で書く。英語の出力も日本語で要約する | 結果を報告する前 | 「日本語で報告して」 | なし |
-| [session-status-emoji](.claude/skills/session-status-emoji/SKILL.md) | セッション名の先頭に作業の段階の絵文字を付け、並行セッションを見分けやすくする | デスクトップアプリのすべてのセッションの最初のターンから | 「セッション名に状態の絵文字を付けて」 | Claude デスクトップアプリ |
-| [whats-next](.claude/skills/whats-next/SKILL.md) | 会話とブランチ・PR の状態から、進捗と次のアクションを 1 つ示し、承認後に進める | なし | `/whats-next` | なし |
 
-### 情報を集める
+design-cross-review と implementation-cross-review は推論レベルを今の Claude に揃え、`--only` で担当を選べる（設計は `astra|sol|fable`、実装は `astra|sol|opus`）。Codex の担当が使えないときは、どちらも Sol で代わりに動かす。
 
-どれも調べる先（環境・GitHub・Web）を読むだけで、変えない。
+### `/スキル名` で指定したときだけ使うスキル
 
 | スキル | できること | 使い方の例 | 前提 |
 | --- | --- | --- | --- |
+| [whats-next](.claude/skills/whats-next/SKILL.md) | 会話とブランチ・PR の状態から、進捗と次のアクションを 1 つ示し、承認後に進める | `/whats-next` | なし |
 | [skills-preflight](.claude/skills/skills-preflight/SKILL.md) | 必要なコマンド・ログイン・リンクを確かめ、スキルごとに使えるかをまとめる | `/skills-preflight` | なし |
 | [gh-todo](.claude/skills/gh-todo/SKILL.md) | レビュー依頼・未返信のメンション・自分の Issue / PR を組織ごとの表にする | `/gh-todo` | `gh` のログイン |
 | [browser-readonly-research](.claude/skills/browser-readonly-research/SKILL.md) | Web ページを読み取りだけで調べ、要点と出典をまとめる（Chrome は `--chrome` か頼まれたときだけ） | `/browser-readonly-research <URL> 要点をまとめて` | 組み込みブラウザか Claude in Chrome |
 
+whats-next 以外は、調べる先（環境・GitHub・Web）を読むだけで変えない。
+
 ## Codex 用スキル一覧
 
-スキルが何をするかで分けている。すべて `$スキル名` で指定したときだけ使う。
-
-| 用途 | スキル |
-| --- | --- |
-| [コードを整える](#コードを整える)（依存の更新・整備） | minor-version-upgrade・codebase-cleanup-workflow・design-alignment-refactor・code-structure-refactor・test-suite-refactor・code-order-refactor・docs-align-with-code |
-| [ファイルを整理する](#ファイルを整理する) | rename-files-by-content |
-| [情報を集める](#情報を集める-1) | skills-preflight |
-
-### コードを整える
-
-整備スキルは既存の振る舞いを保ち、対象を省略するとプロジェクト全体を探す。minor-version-upgrade は互換性を確かめたうえで、必要な移行も行う。
+すべて `$スキル名` で指定したときだけ使う。コードを整えるスキル（minor-version-upgrade から docs-align-with-code まで）は既存の振る舞いを保ち、対象を省略するとプロジェクト全体を探す。minor-version-upgrade は互換性を確かめたうえで、必要な移行も行う。
 
 | スキル | できること | 使い方の例 | 前提 |
 | --- | --- | --- | --- |
@@ -94,17 +73,7 @@ Claude Code で機能を作り、余裕のあるときに Codex でコードベ�
 | [test-suite-refactor](.agents/skills/test-suite-refactor/SKILL.md) | 検出力を保ったまま、重複や実装の細部に頼るテストを整理する | `$test-suite-refactor` | テストの実行環境 |
 | [code-order-refactor](.agents/skills/code-order-refactor/SKILL.md) | メソッドや関数を読みやすい順に並べ替える | `$code-order-refactor` | 関連する検証を実行できること |
 | [docs-align-with-code](.agents/skills/docs-align-with-code/SKILL.md) | 実装を正として、利用・開発・運用の文書を更新する | `$docs-align-with-code README.md を現状の実装に合わせて更新して` | なし |
-
-### ファイルを整理する
-
-| スキル | できること | 使い方の例 | 前提 |
-| --- | --- | --- | --- |
 | [rename-files-by-content](.agents/skills/rename-files-by-content/SKILL.md) | フォルダ直下のファイルを、内容から `YYYY-MM-DD_名前.拡張子` に改名する | `$rename-files-by-content /絶対パス/フォルダ` | `bash`、Python 3.9 以降 |
-
-### 情報を集める
-
-| スキル | できること | 使い方の例 | 前提 |
-| --- | --- | --- | --- |
 | [skills-preflight](.agents/skills/skills-preflight/SKILL.md) | スキルの定義・リンク・必要なコマンドと検証環境を確かめる。環境は変えない | `$skills-preflight` | `bash` |
 
 ## 実行結果とスキルの追加・変更
