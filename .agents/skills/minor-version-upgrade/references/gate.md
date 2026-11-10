@@ -1,6 +1,6 @@
 # 静的確認を更新の反映に結びつける
 
-`scripts/supply-chain.py` は Python 3.9 以降の標準ライブラリで動く。供給網・互換性を静的に確認した候補を固定し、対象コードを実行せず反映用 snapshot を保存する。検証方式の選択は不要で、ゲートから executor・依存管理コマンドを起動する機能はない。任意の実行検証は [隔離手順](isolation.md#追加検証) の別 RUN で扱う。
+`scripts/supply-chain.py` は Python 3.9 以降の標準ライブラリで動く。供給網・互換性を静的に確認した候補を固定し、対象コードを実行せず反映用 snapshot を保存する。executor・依存管理コマンドを使う任意の実行検証は、ゲートの外で [隔離手順](isolation.md#追加検証) の別 RUN として扱う。
 
 ## 1. 候補と実行記録を準備する
 
@@ -43,7 +43,7 @@
 
 他のレビューの `--observed-at` は任意で、指定した時刻には同じ鮮度検査を適用する。
 
-残る項目もそれぞれ実際の証拠で記録する。`isolation` の承認項目はなく、隔離環境の成功を静的レビューの代用にしない。静的根拠不足・明確な非互換・未解消の既知問題・実際に判明した更新由来の失敗があれば、該当項目を通さず修正または対象を保留する。
+残る項目もそれぞれ実際の証拠で記録する。隔離環境の成功は静的レビューの根拠に使わない。静的根拠不足・明確な非互換・未解消の既知問題・実際に判明した更新由来の失敗があれば、該当項目を通さず修正または対象を保留する。
 
 監査 JSON を用意できれば `audits` へ含める。提示した npm audit v2・pip-audit・bundler-audit JSON の finding・error・skip・未対応形式・期限切れ・同 component 内の対象版 coverage 不足は停止する。既に得た不都合な結果を除外・加工して通さない。JSON 未収集の component は `automated-checks.json` の `manual_advisory_components`、全更新後依存は `inventory_after` に出る。その全 ID・名前・版を公式告知・advisory DB と照合し、取得日時・URL・対象版・結果を `coverage` / `advisories` の根拠へ対応づける。変更していない依存も省かず、未確認の範囲が残れば保留する。
 
@@ -64,7 +64,7 @@
 
 ## 計画JSONとinventoryの形式
 
-計画・状態は `schema_version: 2` を使う。新規計画の検証モード指定は不要。互換用の `verification_mode: "static"` だけは受け付けるが、別の検証方式や `execution` を含む計画は拒否する。過去の実行付き計画・状態・承認を流用せず、新しい静的計画を作る。JSON の重複キー・未対応キー・不正な型、symlink・hardlink・特殊ファイル・`..` 参照は拒否する。
+計画は `schema_version: 2` の静的計画として RUN ごとに新しく作り、状態は `init` が作る。`verification_mode` は省略するか `"static"` にし、ほかの検証方式や `execution` を含む計画は拒否する。JSON の重複キー・未対応キー・不正な型、symlink・hardlink・特殊ファイル・`..` 参照は拒否する。
 
 以下は構造例で、版・日時・hash・パスを実際に確認した値へ置き換える。
 
