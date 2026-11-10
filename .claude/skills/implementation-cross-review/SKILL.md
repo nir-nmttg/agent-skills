@@ -105,10 +105,10 @@ Astra は Bash ツールを **`run_in_background: true`** で実行する（推�
 bash "${CLAUDE_SKILL_DIR}/scripts/review.sh" --effort ${CLAUDE_EFFORT} <実行フォルダ>
 ```
 
-Fable は Agent ツールで呼ぶ。Fable を動かすときは、呼ぶ前に利用枠を確かめる（Opus で動かすと決まっているときや、Fable を動かさないときは確かめない）。
+Fable は Agent ツールで呼ぶ。Fable を動かす予定なら、呼ぶ前に利用枠を確かめて、Fable と Opus のどちらで動かすかを決める。
 
-- `mcp__ccd_session_mgmt__get_usage` を呼ぶ（読み込まれていなければ ToolSearch で `select:mcp__ccd_session_mgmt__get_usage` を読み込む）。`plan.windows` のうちラベルに Fable を含む枠の `percentUsed` が 1 つでも 90 以上なら、Fable の代わりに Opus で動かす（残りがレビュー 1 回分に足りず、途中で止まるのを避ける）。`--only fable`・「Fable だけ」のときも同じにする。Opus に変えたときは、どの場合もそのことを 1 行伝える。
-- ツールがない（ターミナルの Claude Code など）、呼び出しが失敗した・断られた、`plan.status` が `ok` でない、Fable の枠がないときは、利用枠を確かめられないとして Fable で動かす（この会話で Fable が利用枠の不足で失敗していたときは Opus で動かす）。この確認がうまくいかなくても、レビューも呼び出し元の作業も止めない。
+- `mcp__ccd_session_mgmt__get_usage` を呼ぶ（読み込まれていなければ ToolSearch で `select:mcp__ccd_session_mgmt__get_usage` を読み込む）。`plan.windows` のうちラベルに Fable を含む枠の `percentUsed` が 1 つでも 95 以上なら、Fable の代わりに Opus で動かす（レビューを最後まで終えられる残りを確保するため）。`--only fable`・「Fable だけ」のときも同じにする。Opus に変えたときは、どの場合もそのことを 1 行伝える。
+- ツールがない（ターミナルの Claude Code など）、呼び出しが失敗した・断られた、`plan.status` が `ok` でない、Fable の枠がないときは、利用枠を確かめられないとして Fable で動かす（この会話で Fable が利用枠の不足で失敗していたときは Opus で動かす）。この確認は担当を選ぶためだけに使い、結果によらずレビューと呼び出し元の作業を進める。
 - この確認は担当を動かす前に済ませ、動かす担当はそのあと同じメッセージで動かす。
 
 Agent ツールには次を指定する。
