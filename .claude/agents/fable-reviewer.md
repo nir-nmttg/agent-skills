@@ -1,7 +1,7 @@
 ---
 name: fable-reviewer
 description: design-cross-review から呼ぶ専用。読み取り専用で設計をレビューする
-model: claude-fable-5-1
+model: claude-fable-5-2
 effort: high
 tools: Read, Grep, Glob
 omitClaudeMd: true

@@ -9,7 +9,7 @@ Claude Code で開発し、Codex で整備するための汎用スキル集。\
 | 使い方 | 条件に当たると Claude が自分の判断で使うスキルが中心 | `$スキル名` で指定したときだけ使う |
 
 Claude Code で機能を作り、余裕のあるときに Codex でコードベースを整え（`$codebase-cleanup-workflow`）、また Claude Code で次の開発に進む。\
-Claude は作業の一部を Haiku 5.5・Opus 5.5・Fable 5.1 のサブエージェントや Codex CLI（GPT-6 Astra・GPT-6.1 Sol）に任せ、指示・採否の判断・反映を受け持つ。
+Claude は作業の一部を Haiku 5.5・Opus 5.5・Fable 5.2 のサブエージェントや Codex CLI（GPT-6 Astra・GPT-6.1 Sol）に任せ、指示・採否の判断・反映を受け持つ。
 
 ## はじめに
 
