@@ -10,7 +10,7 @@ allowed-tools: Bash(bash *gh-issue-autofix/scripts/lock.sh*), Bash(bash *gh-issu
 
 引数: $ARGUMENTS
 
-Claude デスクトップアプリのスケジュールタスクに登録し、スケジュール専用の PC で 1 時間ごとに動かす前提のスキル。1 回の実行で Issue を 1 件だけ扱う。ユーザーは Issue にラベルを付けた時点で「Claude が直してよい」と判断しているので、**ユーザーに何も確認しない**（対話から `/gh-issue-autofix` で呼んだときも同じ）。方針は推奨案で決め、判断したことは PR 本文と最終報告に残す。終わりはドラフト PR の作成まで（マージ・Ready への変更・ラベルの変更はしない）。止めたときは Issue に理由をコメントする。
+Claude デスクトップアプリのスケジュールタスクに登録し、スケジュール専用の PC で 1 時間ごとに動かす前提のスキル。1 回の実行で Issue を 1 件だけ扱う。ユーザーは Issue にラベルを付けた時点で「Claude が直してよい」と判断しているので、**ユーザーに何も確認しない**（対話から `/gh-issue-autofix` で呼んだときも同じ）。方針は推奨案で決め、判断したことは PR 本文と最終報告に残す。終わりはドラフト PR の作成まで（マージ・Ready への変更・Issue のラベルの変更はしない。作った PR には、Issue を選ぶのに使ったのと同じラベルを付けて見分けられるようにする）。止めたときは Issue に理由をコメントする。
 
 - 対象は、今のフォルダの git リポジトリ（`origin`）の Issue。fork の checkout と、別のリポジトリの Issue は断る。
 - 作業ブランチは `claude/issue-<番号>`、worktree は `<メインの checkout>/.claude/worktrees/issue-<番号>`。リモートにこのブランチがあることが「着手中」、Issue の停止コメント（`comment.sh` が書く）が「止めた」、再開の記録（`comment.sh --resumed` が書く）が「止めたあと再開して着手した」の印になる。止めた Issue は、ブランチや PR が残っていても、Issue が更新されれば次の実行で自動で再開する（「自動では再開しない」と案内していた旧版の停止コメントで、ブランチや PR が残るものは除く）。
@@ -137,7 +137,7 @@ bash "${CLAUDE_SKILL_DIR}/scripts/start.sh" --new|--resume <番号>
 3. push と PR の作成を行う。本文は標準入力で渡す。
 
    ```bash
-   bash "${CLAUDE_SKILL_DIR}/scripts/publish.sh" <番号> --title "<タイトル>" --body-file - [--closes] <<'__BODY__'
+   bash "${CLAUDE_SKILL_DIR}/scripts/publish.sh" <番号> --title "<タイトル>" --body-file - --label <ラベル> [--closes] [--expect-pr <URL>] <<'__BODY__'
    （PR 本文の Markdown）
    __BODY__
    ```
@@ -146,6 +146,7 @@ bash "${CLAUDE_SKILL_DIR}/scripts/start.sh" --new|--resume <番号>
    - PR 本文の項目: 概要、方針と選ばなかった代案、判断したこと（推奨で決めたこと・採らなかったレビューの指摘）、実装ルールの確認結果、テストの結果、動作確認の結果（確かめた画面・操作・結果を文章で）、作ったデータ、適用したマイグレーションと戻し方、未解決のこと。秘密情報は書かない。
    - タイトルは、プロジェクトの PR の書き方に合わせる。
    - 受け入れ条件を満たせていないときは、ここで「止めるとき」の C の形（本文の先頭に「未解決」と理由、`--closes` なし）で 1 回だけ publish し、C の 3. から進む。
+   - `--label` には、4. で Issue を探すのに使ったラベル（既定 `agent:autofix`。`--label` で変えていればそれ）を、publish.sh を実行するたびに渡す（C の 2. も同じ）。Issue を明示指定したときも同じラベルを渡す（gh-issue-autofix が作った PR だと見分けるため。Issue にそのラベルがなくても付ける）。PR を新しく作ったときだけ付く。リポジトリにそのラベルがなければ作らずに飛ばし、付けられなくても PR の作成は失敗にならない（出力に「注意」が出たら報告に書く）。
    - 4. の出力に「publish に付ける: `--expect-pr <URL>`」があれば、publish.sh を実行するたびに付ける（C の 2. も同じ。作業中に人が閉じたり Ready にしたりしていたら止まる）。
    - コミットメッセージの closing keyword で止まったときだけは、push していないコミットのメッセージを書き換えて（`git commit --amend`・`git rebase`）1 回だけ実行し直す。
    - ほかの理由で失敗したら（push できない、push 済みで PR を作れない、PR の状態が変わったなど）、publish.sh を繰り返さず、「止めるとき」の C の 3. から進む（理由は `env`、段階は `publish`）。

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # 作業ブランチを push し、ドラフト PR を作る（あれば本文を更新する）。worktree の中で実行する。
 #
-# 使い方: publish.sh <Issue の番号> --title <タイトル> --body-file <本文のファイル | -> [--closes] [--expect-pr <PR の URL>]
+# 使い方: publish.sh <Issue の番号> --title <タイトル> --body-file <本文のファイル | -> [--closes] [--expect-pr <PR の URL>] [--label <ラベル>]
 #   --body-file - なら本文を標準入力から読む。
 #   --closes があれば本文の末尾に「Closes #<番号>」、なければ「Refs #<番号>」を付ける。
 #   --closes がなければ、本文の closing keyword（Fixes #12 など）を Refs に置き換え、
@@ -9,6 +9,9 @@
 #   （Issue に PR が紐づくと、find-issue.sh の検索から外れて再開されなくなるため）。
 #   --expect-pr: 自動で再開したときに、選んだときにあったドラフト PR を渡す。それが open のドラフトでなければ止める
 #   （作業中に人が閉じた・Ready にした PR を、作り直したり更新したりしない）。
+#   --label: PR を新しく作ったときに付けるラベル（Issue を選ぶのに使ったもの。PR の一覧で見分けるため）。
+#     既存の PR には付けない（人が外したラベルを付け直さない）。リポジトリにないラベルは作らずに飛ばす。
+#     付けられなくても PR の作成は失敗にしない。
 #   既存の PR は、このスクリプトが書いたマーカーの範囲だけを置き換える（人が足した部分は残す）。
 #   ドラフトでない PR（レビュー中）とマージ済みの PR があれば、push も更新もしない（closed だけなら新しく作る）。
 set -euo pipefail
@@ -19,15 +22,16 @@ END_MARK='<!-- gh-issue-autofix:end -->'
 # GitHub が Issue を紐づける closing keyword と、そのあとの Issue の参照（#12・owner/repo#12・Issue の URL）
 KEYWORD_RE='\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)(\s*:?\s*)(?=(?:[\w.-]+/[\w.-]+)?#\d|https?://github\.com/[^\s/]+/[^\s/]+/issues/\d)'
 
-NUMBER= TITLE= BODY_FILE= CLOSES=false EXPECT_PR=
+NUMBER= TITLE= BODY_FILE= CLOSES=false EXPECT_PR= LABEL=
 while (($#)); do
   case $1 in
-    --title | --body-file | --expect-pr)
+    --title | --body-file | --expect-pr | --label)
       (($# >= 2)) || die "$1 に値を指定してください。"
       case $1 in
         --title) TITLE=$2 ;;
         --body-file) BODY_FILE=$2 ;;
         --expect-pr) EXPECT_PR=$2 ;;
+        --label) LABEL=$2 ;;
       esac
       shift 2
       ;;
@@ -109,6 +113,20 @@ if [[ -z $pr_json ]]; then
     die "push しましたが、PR を作れません。
 $manual"
   echo "ドラフト PR を作りました: $pr"
+  if [[ -n $LABEL ]]; then
+    pr_number=${pr##*/}
+    if ! [[ $pr_number =~ ^[1-9][0-9]*$ ]]; then
+      echo "注意: PR の番号がわからないので、ラベル \`$LABEL\` を付けませんでした（PR は作れています）。"
+    # API は、リポジトリにないラベルを新しく作ってしまうので、あるときだけ付ける
+    elif ! gh label list --repo "$REPO" --limit 1000 --json name --jq '.[].name' | grep -qxF -- "$LABEL"; then
+      echo "注意: リポジトリにラベル \`$LABEL\` がない（または一覧を取得できない）ので、PR に付けませんでした（PR は作れています）。"
+    # gh pr edit --add-label はカンマで複数のラベルに分けるので、ラベル名を 1 つの配列の要素として API に渡す
+    elif gh api --method POST "repos/$REPO/issues/$pr_number/labels" -f "labels[]=$LABEL" >/dev/null; then
+      echo "PR にラベル \`$LABEL\` を付けました。"
+    else
+      echo "注意: PR にラベル \`$LABEL\` を付けられませんでした（PR は作れています）。"
+    fi
+  fi
 else
   pr=$(jq -r .url <<<"$pr_json")
   # push の間に人が編集したり、Ready にしたり閉じたりしたかもしれないので、本文と状態を取り直す。Web で編集された本文は CRLF のことがある
