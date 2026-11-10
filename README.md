@@ -87,7 +87,7 @@ Claude デスクトップアプリのスケジュールタスクに登録し、`
 
 | スキル | できること |
 | --- | --- |
-| [`/gh-issue-autofix`](.claude/skills/gh-issue-autofix/SKILL.md) | `agent:autofix` ラベルの Issue を 1 件、確認なしで直してドラフト PR にし、止めたら Issue に理由を書く |
+| [`/gh-issue-autofix`](.claude/skills/gh-issue-autofix/SKILL.md) | `agent:autofix` ラベルの Issue を 1 件、確認なしで直してドラフト PR にし、止めたら Issue に理由を書いて、Issue が更新されたら続きから再開する |
 
 ## Codex 用スキル一覧
 
