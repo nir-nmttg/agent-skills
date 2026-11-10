@@ -1,6 +1,6 @@
 ---
 name: design-cross-review
-description: Claude が考えた設計（会話中の案や設計書）を Codex CLI の GPT-6 Astra と Fable 5.1 に同じ依頼でレビューさせる。「この設計を Codex にレビューしてもらって」「Fable で設計をレビューして」などの依頼で使う。依頼がなくても、作り方の判断を含む設計や実装計画は、提示や実装の前に使い、迷ったら使う（除外は本文）。
+description: Claude が考えた設計（会話中の案や設計書）を Codex CLI の GPT-6 Astra と Fable 5.2 に同じ依頼でレビューさせる。「この設計を Codex にレビューしてもらって」「Fable で設計をレビューして」などの依頼で使う。依頼がなくても、作り方の判断を含む設計や実装計画は、提示や実装の前に使い、迷ったら使う（除外は本文）。
 argument-hint: "[--only astra|sol|fable] [--cd <dir>] [設計書のパス] [補足]"
 allowed-tools: Bash(bash *design-cross-review/scripts/new-run.sh*), Bash(bash *design-cross-review/scripts/prepare.sh*), Bash(bash *design-cross-review/scripts/review.sh*), Read, Grep, Glob, Write(//**/artifacts/design-cross-review/**), Edit(//**/artifacts/design-cross-review/**)
 ---
@@ -111,7 +111,7 @@ Fable は Agent ツールで呼ぶ。
 
 - `subagent_type`: `fable-reviewer`（必ず指定する。`fork` や省略で会話を引き継ぐ形にしない）
 - `effort`: 上の「Claude の推論レベル」。空や `auto` のときは `high`
-- `model`: **渡さない**（引数は別名しか受け付けず、親と同じ系統なら親のモデルになって、定義の `claude-fable-5-1` の固定が外れる）
+- `model`: **渡さない**（引数は別名しか受け付けず、親と同じ系統なら親のモデルになって、定義の `claude-fable-5-2` の固定が外れる）
 - `prompt`: 次の 1 行だけにする
 
   ```text
