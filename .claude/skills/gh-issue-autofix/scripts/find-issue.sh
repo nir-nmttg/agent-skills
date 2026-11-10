@@ -2,6 +2,10 @@
 # 対応する Issue を 1 件選び、内容を Markdown で出力する。
 #
 # 使い方: find-issue.sh [--label <ラベル>] [<Issue の URL か番号>]
+#         find-issue.sh --check [--label <ラベル>]   # 選ぶだけ（入口の precheck.sh が使う）
+#   --check: ラベルで探すときだけ。選び方は同じで、機械的な行だけを出す（Issue の内容・一覧は出さない）:
+#     check: target <番号> / check: none（どちらも終了コード 0）、check: skipped #a #b / check: waiting #c（あれば）。
+#     ラベルがない・検索の上限など、ほかの理由は今と同じく終了コード 2 で出す。
 #   URL / 番号がなければ、ラベルが付き、自分がアサインされ、PR が紐づいていない open な Issue から、作成の古い順に 1 件選ぶ。
 #   - claude/issue-<番号> のブランチがないもの: それを head とする PR（状態を問わない）がなく、
 #     止めたまま（停止コメントのあとに関係者・作成者のコメントも本文の編集もない）でもないもの
@@ -53,9 +57,10 @@ JQ_DEFS='
 '
 
 LABEL=agent:autofix
-TARGET=
+TARGET= CHECK=false
 while (($#)); do
   case $1 in
+    --check) CHECK=true; shift ;;
     --label)
       [[ -n ${2:-} ]] || die "--label にラベル名を指定してください。"
       LABEL=$2
@@ -70,6 +75,7 @@ while (($#)); do
   esac
 done
 [[ $LABEL != *'"'* && $LABEL != *'\'* ]] || die "ラベル名に \" や \\ は使えません: $LABEL"
+! $CHECK || [[ -z $TARGET ]] || die "--check は Issue の指定と一緒には使えません。"
 
 require_tools
 load_repo
@@ -183,7 +189,16 @@ else
     after=$(jq -r .data.search.pageInfo.endCursor <<<"$page")
   done
 
-  if [[ -n $skipped ]]; then
+  if $CHECK; then
+    [[ -z $skipped ]] || echo "check: skipped$(sed 's/ / #/g' <<<"$skipped")"
+    [[ -z $waiting ]] || echo "check: waiting$(sed 's/ / #/g' <<<"$waiting")"
+    if [[ -n $NUMBER ]]; then
+      echo "check: target $NUMBER"
+      exit 0
+    fi
+  fi
+
+  if [[ -n $skipped ]] && ! $CHECK; then
     echo "## 着手中か、ドラフト PR がある Issue（自動では選ばない）"
     echo
     count=0
@@ -204,7 +219,7 @@ else
     echo
   fi
 
-  if [[ -n $waiting ]]; then
+  if [[ -n $waiting ]] && ! $CHECK; then
     echo "## 止めた Issue（Issue の更新待ち。自動では選ばない）"
     echo
     echo "-$(sed 's/ / #/g' <<<"$waiting")"
@@ -219,6 +234,10 @@ else
       stop "$REPO にラベル \`$LABEL\` がありません。\`gh label create '$LABEL' --repo $REPO --description 'Claude が自動で修正してよい Issue'\` で作ってください。"
     fi
     $truncated && stop "検索結果の先頭 1000 件はすべて着手中か止めたものでした。それより後は調べていません（$REPO、条件: $query）。"
+    if $CHECK; then
+      echo "check: none"
+      exit 0
+    fi
     stop "対応する Issue はありません（$REPO、条件: $query。claude/issue-<番号> のブランチか PR があるもの（止めたあとに Issue が更新され、PR がドラフトのものは除く）、止めたままのものは除く）。"
   fi
 fi
