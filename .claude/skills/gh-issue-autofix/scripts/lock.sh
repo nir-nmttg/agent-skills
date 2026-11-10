@@ -2,6 +2,7 @@
 # 同じ checkout で、定期実行と手動の実行が重ならないようにする（開発 DB・依存フォルダを共有するため）。
 #
 # 使い方: lock.sh acquire          # 取れたらトークンを出す。取れなければ終了コード 2
+#         lock.sh acquire --wait <分> # 取れるまで 60 秒ごとに取り直す。時間切れ・呼び出し元の終了は終了コード 2
 #         lock.sh refresh <トークン> # 動いていることを記録する（手順の区切りごとに呼ぶ）
 #         lock.sh release <トークン> # 自分のロックのときだけ外す
 #   3 時間 refresh されていないロックは、止まった実行の残りとみなして引き継ぐ。
@@ -27,7 +28,31 @@ busy() { stop "別の実行が動いています。この実行は何もせず�
 
 case ${1:-} in
   acquire)
-    (($# == 1)) || die "使い方: lock.sh acquire"
+    if (($# == 3)) && [[ $2 == --wait ]]; then
+      # 取れるまで 60 秒ごとに取り直す。呼び出し元が終わったら、取らずにやめる（受け取る者のいないロックを残さない）
+      [[ $3 =~ ^[1-9][0-9]*$ ]] || die "--wait には待つ分数を指定してください: $3"
+      owner=$PPID
+      deadline=$(($(date +%s) + $3 * 60))
+      while :; do
+        kill -0 "$owner" 2>/dev/null || stop "呼び出し元が終わったので、ロックを待つのをやめます。"
+        if out=$(bash "$0" acquire 2>&1); then
+          # 取った直後に呼び出し元が終わっていたら、受け取る者がいないので外す
+          if ! kill -0 "$owner" 2>/dev/null; then
+            token=$(sed -n 's/^ロックを取りました。トークン: //p' <<<"$out")
+            [[ -z $token ]] || bash "$0" release "$token" >/dev/null
+            stop "呼び出し元が終わったので、取ったロックを外しました。"
+          fi
+          echo "$out"
+          exit 0
+        else
+          rc=$?
+        fi
+        ((rc == 2)) || die "$out"
+        (($(date +%s) < deadline)) || stop "別の実行が動いていて、$3 分待ってもロックを取れませんでした。"
+        sleep 60
+      done
+    fi
+    (($# == 1)) || die "使い方: lock.sh acquire [--wait <分>]"
     take && exit 0
     seen=$(cat "$LOCK/token" 2>/dev/null || true)
     is_stale "$LOCK" || busy
@@ -62,5 +87,5 @@ case ${1:-} in
     fi
     echo "自分のロックではないので外しません（引き継がれたか、すでに外れています）。"
     ;;
-  *) die "使い方: lock.sh acquire | refresh <トークン> | release <トークン>" ;;
+  *) die "使い方: lock.sh acquire [--wait <分>] | refresh <トークン> | release <トークン>" ;;
 esac
