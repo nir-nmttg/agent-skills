@@ -4,7 +4,7 @@
 #   - ドラフト PR を作ったあと: worktree だけを消す（PR があるのでブランチは残る）
 #
 # 使い方: release.sh <Issue の番号>
-#   リモートの claude/issue-<番号> に既定ブランチにないコミットがなく、PR もなければ消す。
+#   リモートの claude/issue-<番号> に既定ブランチにないコミットがなく、PR もなく、ローカルにだけあるコミットもなければ消す。
 #   worktree に変更がなければ、worktree と、既定ブランチにないコミットのないローカルのブランチを消す。
 set -euo pipefail
 source "$(dirname "$0")/lib.sh"
@@ -36,12 +36,14 @@ if [[ -n $wt ]]; then
 fi
 
 # --- ローカルのブランチ ---
+local_ahead=false
 if ! $keep_local && git show-ref -q --verify "$REF"; then
   if git merge-base --is-ancestor "$REF" "origin/$DEFAULT_BRANCH"; then
     git branch -q -D "$BRANCH"
     echo "- ローカルの $BRANCH: 消した"
   else
     echo "- ローカルの $BRANCH: origin/$DEFAULT_BRANCH にないコミットがあるので残した"
+    local_ahead=true
   fi
 fi
 
@@ -63,6 +65,9 @@ if [[ -n $prs ]]; then
   echo "- リモートの $BRANCH: PR（$prs）があるので残した"
 elif ! git merge-base --is-ancestor "$remote" "origin/$DEFAULT_BRANCH"; then
   echo "- リモートの $BRANCH: origin/$DEFAULT_BRANCH にないコミットがあるので残した"
+elif $local_ahead; then
+  # 消すと、次の実行が --new で始めてローカルのコミットとぶつかる。着手の印として残し、続きから再開できるようにする
+  echo "- リモートの $BRANCH: ローカルにだけあるコミットの続きから再開できるように残した"
 else
   # 確かめた sha のままのときだけ消す
   git push -q --no-verify --force-with-lease="$REF:$remote" origin ":$REF" ||
