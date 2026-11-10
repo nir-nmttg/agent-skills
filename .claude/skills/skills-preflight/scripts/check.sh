@@ -62,7 +62,7 @@ check_cmd() {
   fi
 }
 
-# Claude の担当（Opus・Fable）だけなら Codex なしで動くので、クロスレビューは Codex の担当の分だけ Codex を使う
+# Claude の担当（Fable、利用枠が足りないときは Opus）だけなら Codex なしで動くので、クロスレビューは Codex の担当の分だけ Codex を使う
 codex_users="implementation-cross-review（Astra）・design-cross-review（Astra）"
 
 check_cmd git "ほぼすべて" "\`xcode-select --install\`（または \`brew install git\`）" git git --version
@@ -174,9 +174,7 @@ for skill in "$skills_dir"/*/; do
   done
   if ((${#lack[@]} > 0)); then
     blocked+=("$name（${lack[*]}）")
-  elif [[ $name == implementation-cross-review ]] && ! codex_ready; then
-    ready+=("$name（Opus のみ）")
-  elif [[ $name == design-cross-review ]] && ! codex_ready; then
+  elif [[ $name == *-cross-review ]] && ! codex_ready; then
     ready+=("$name（Fable のみ）")
   else
     ready+=("$name")
