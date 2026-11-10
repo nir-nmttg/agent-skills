@@ -3,6 +3,7 @@
 #
 # 使い方: lock.sh acquire          # 取れたらトークンを出す。取れなければ終了コード 2
 #         lock.sh acquire --wait <分> # 取れるまで 60 秒ごとに取り直す。時間切れ・呼び出し元の終了は終了コード 2
+#         lock.sh status            # 読むだけ: 「ロック: なし」「ロック: 使用中（N 分前に更新）」「ロック: 古い（N 分前に更新）」
 #         lock.sh refresh <トークン> # 動いていることを記録する（手順の区切りごとに呼ぶ）
 #         lock.sh release <トークン> # 自分のロックのときだけ外す
 #   3 時間 refresh されていないロックは、止まった実行の残りとみなして引き継ぐ。
@@ -27,6 +28,14 @@ is_stale() { [[ -n $(find "$1" -maxdepth 0 -mmin +"$LOCK_MAX_MINUTES" 2>/dev/nul
 busy() { stop "別の実行が動いています。この実行は何もせずに終えます。"; }
 
 case ${1:-} in
+  status)
+    (($# == 1)) || die "使い方: lock.sh status"
+    [[ -d $LOCK ]] || { echo "ロック: なし"; exit 0; }
+    minutes=$(perl -e 'my @s = stat($ARGV[0]); print @s ? int((time - $s[9]) / 60) : -1' "$LOCK")
+    ((minutes >= 0)) || { echo "ロック: なし"; exit 0; }
+    # 引き継ぐかどうかは acquire と同じ is_stale で決める
+    if is_stale "$LOCK"; then echo "ロック: 古い（${minutes} 分前に更新）"; else echo "ロック: 使用中（${minutes} 分前に更新）"; fi
+    ;;
   acquire)
     if (($# == 3)) && [[ $2 == --wait ]]; then
       # 取れるまで 60 秒ごとに取り直す。呼び出し元が終わったら、取らずにやめる（受け取る者のいないロックを残さない）
@@ -87,5 +96,5 @@ case ${1:-} in
     fi
     echo "自分のロックではないので外しません（引き継がれたか、すでに外れています）。"
     ;;
-  *) die "使い方: lock.sh acquire [--wait <分>] | refresh <トークン> | release <トークン>" ;;
+  *) die "使い方: lock.sh status | acquire [--wait <分>] | refresh <トークン> | release <トークン>" ;;
 esac
