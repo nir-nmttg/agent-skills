@@ -1,22 +1,22 @@
 ---
 name: implementation-cross-review
-description: Claude の実装（git の差分）を Codex CLI の GPT-6 Astra と Opus 5.5 に同じ依頼でレビューさせて直す。「実装を Codex にレビューしてもらって」「Opus でレビューして」などの依頼で使う。依頼がなくても、動作が変わりうる変更と文書の変更は、完了報告・コミット・PR の前に使い、迷ったら使う（除外は本文）。
-argument-hint: "[--only astra|sol|opus] [--base <ref> | --commit <sha> | --uncommitted] [補足]"
-allowed-tools: Bash(bash *implementation-cross-review/scripts/new-run.sh*), Bash(bash *implementation-cross-review/scripts/prepare.sh*), Bash(bash *implementation-cross-review/scripts/review.sh*), Read, Grep, Glob, Write(//**/artifacts/implementation-cross-review/**), Edit(//**/artifacts/implementation-cross-review/**)
+description: Claude の実装（git の差分）を Codex CLI の GPT-6 Astra と Fable 5.2 に同じ依頼でレビューさせて直す。「実装を Codex にレビューしてもらって」「Fable でレビューして」などの依頼で使う。依頼がなくても、動作が変わりうる変更と文書の変更は、完了報告・コミット・PR の前に使い、迷ったら使う（除外は本文）。
+argument-hint: "[--only astra|sol|fable|opus] [--base <ref> | --commit <sha> | --uncommitted] [補足]"
+allowed-tools: Bash(bash *implementation-cross-review/scripts/new-run.sh*), Bash(bash *implementation-cross-review/scripts/prepare.sh*), Bash(bash *implementation-cross-review/scripts/review.sh*), mcp__ccd_session_mgmt__get_usage, Read, Grep, Glob, Write(//**/artifacts/implementation-cross-review/**), Edit(//**/artifacts/implementation-cross-review/**)
 ---
 
-# Astra と Opus による実装レビュー
+# Astra と Fable による実装レビュー
 
 引数: $ARGUMENTS
 Claude の推論レベル: ${CLAUDE_EFFORT}
 
-Claude が実装した変更を、Astra（Codex CLI の GPT-6 Astra）と Opus（`opus-reviewer`）に**同じ依頼で**レビューさせ、その指摘を Claude が吟味する。同じ観点を別のモデルで見て、単一モデルの見落としを補う。どちらも要件と差分から実際の動きを読み解くので、実装者の先入観が入らない。正しさや要件との一致に加えて、データ・認可・お金・外部への送信・移行・並行処理など壊れると影響の大きい部分では、壊れ方も重点的に見る。Astra が使えないときは Sol（GPT-6.1 Sol）で代わりに動かす。差分の取り出し・プロンプトの組み立て・Codex の呼び出しはスクリプトに任せ、Claude は「要件をまとめる」「指摘を判断する」「採用した指摘を直す」だけを行う。結果は `artifacts/implementation-cross-review/` に保存される。
+Claude が実装した変更を、Astra（Codex CLI の GPT-6 Astra）と Fable（`fable-reviewer`）に**同じ依頼で**レビューさせ、その指摘を Claude が吟味する。同じ観点を別のモデルで見て、単一モデルの見落としを補う。どちらも要件と差分から実際の動きを読み解くので、実装者の先入観が入らない。正しさや要件との一致に加えて、データ・認可・お金・外部への送信・移行・並行処理など壊れると影響の大きい部分では、壊れ方も重点的に見る。Astra が使えないときは Sol（GPT-6.1 Sol）で、Fable の利用枠が足りないときは Opus（`opus-reviewer`）で代わりに動かす。差分の取り出し・プロンプトの組み立て・Codex の呼び出しはスクリプトに任せ、Claude は「要件をまとめる」「指摘を判断する」「採用した指摘を直す」だけを行う。結果は `artifacts/implementation-cross-review/` に保存される。
 
 ## 自分の判断で使うとき
 
 ユーザーに頼まれていなくても、積極的に使う。Claude が実装を終えて完了を報告する前、またはコミット・PR を頼まれてまだレビューしていない変更があるときに、次の基準で判断する。**迷ったら使う。**
 
-**使う**: 動作が変わりうる変更すべて。テストだけの変更や、文章が動作を決めるファイル（プロンプト、スキルやエージェントの定義、設定ファイル）の変更も含む。動作を決めない文書（README など）だけの変更は、内容のずれを Opus だけで確かめる。haiku-implementation で Haiku に書かせた変更は、まとめ終えたときに、ユーザーが不要と言ったときを除き必ず使う（Claude のレビューとは別の目で見る）。
+**使う**: 動作が変わりうる変更すべて。テストだけの変更や、文章が動作を決めるファイル（プロンプト、スキルやエージェントの定義、設定ファイル）の変更も含む。動作を決めない文書（README など）だけの変更は、内容のずれを Fable だけで確かめる。haiku-implementation で Haiku に書かせた変更は、まとめ終えたときに、ユーザーが不要と言ったときを除き必ず使う（Claude のレビューとは別の目で見る）。
 
 **使わない**（コードや内容の欠陥が起こりえないか、このレビューでは見つけられない、次の場合だけ）
 
@@ -32,7 +32,7 @@ Claude が実装した変更を、Astra（Codex CLI の GPT-6 Astra）と Opus�
 
 **自分の判断で使うときの違い**
 
-- Astra と Opus は同じ依頼で、別のモデルの見落としを補い合う。テストは回帰を見る。それぞれの条件に当たるものはすべて使う。
+- Astra と Fable は同じ依頼で、別のモデルの見落としを補い合う。テストは回帰を見る。それぞれの条件に当たるものはすべて使う。
 - レビューの前に haiku-check でテストを済ませる。範囲は変更に関係するテストと型チェック・リンター（完了の報告の前には全体）。環境がない・もとから失敗しているなどで実行できないときは、その理由を報告に書いてレビューに進む。テストの結果はレビュアーに渡さない。
 - 始める前に「完了を報告する前に <動かす担当> に要件と差分だけでレビューさせます（effort=<レベル>）」と 1 行だけ伝え、確認は待たずに進める。
 - レビューが動いている間に、テストの実行や完了報告の下書きなど、レビュー結果に左右されない作業を進めてよい（ファイルは編集しない）。
@@ -42,11 +42,13 @@ Claude が実装した変更を、Astra（Codex CLI の GPT-6 Astra）と Opus�
 
 次の順に決める。
 
-1. **指定**: `--only astra`・`--only opus`、または「Astra だけ」「Codex だけ」「Opus だけ」と言われたら、その担当だけを動かす（レビュー済みでも動かす）。`--only` の値が `astra` / `sol` / `opus` 以外なら、そのことを伝えて止める。「Opus でレビューして」「Codex にレビューしてもらって」のように名前を挙げただけの依頼は、指定に数えない。
-2. **直接の依頼**: `/implementation-cross-review` やレビューを頼まれたら、文書だけの変更でも、レビュー済みでも、Astra と Opus を動かす。
-3. **自分の判断で使うとき**: 動作を決めない文書（README など）だけの変更は Opus、それ以外は Astra と Opus を対象にする。そこから、同じ変更の状態をこの会話ですでにレビューして結果を受け取った担当を除く。残りがなければ動かさない。
+1. **指定**: `--only astra`・`--only fable`、または「Astra だけ」「Codex だけ」「Fable だけ」と言われたら、その担当だけを動かす（レビュー済みでも動かす）。`--only` の値が `astra` / `sol` / `fable` / `opus` 以外なら、そのことを伝えて止める。「Fable でレビューして」「Codex にレビューしてもらって」のように名前を挙げただけの依頼は、指定に数えない。
+2. **直接の依頼**: `/implementation-cross-review` やレビューを頼まれたら、文書だけの変更でも、レビュー済みでも、Astra と Fable を動かす。
+3. **自分の判断で使うとき**: 動作を決めない文書（README など）だけの変更は Fable、それ以外は Astra と Fable を対象にする。そこから、同じ変更の状態をこの会話ですでにレビューして結果を受け取った担当を除く。残りがなければ動かさない。
 
-「Sol で」と言われたとき、`--only sol` や「Sol だけ」と言われたとき、この会話で Astra がモデルを使えない・プランの対象外の理由で失敗していたときは、Astra の代わりに Sol で動かす（4. で `--model gpt-6.1-sol` を渡す。`--only sol`・「Sol だけ」なら Opus は動かさない）。
+「Sol で」と言われたとき、`--only sol` や「Sol だけ」と言われたとき、この会話で Astra がモデルを使えない・プランの対象外の理由で失敗していたときは、Astra の代わりに Sol で動かす（4. で `--model gpt-6.1-sol` を渡す。`--only sol`・「Sol だけ」なら Fable は動かさない）。
+
+「Opus で」と言われたとき、`--only opus` や「Opus だけ」と言われたとき、4. で確かめた Fable の利用枠が足りないとき、利用枠を確かめられないうえに、この会話で Fable が利用枠の不足で失敗していたときは、Fable の代わりに Opus（`opus-reviewer`）で動かす（`--only opus`・「Opus だけ」なら Astra は動かさない）。Opus で代わりに動かした回も Fable の担当として数え、レビュー済みの担当を除くときも同じに扱う。
 
 ## 手順
 
@@ -103,11 +105,17 @@ Astra は Bash ツールを **`run_in_background: true`** で実行する（推�
 bash "${CLAUDE_SKILL_DIR}/scripts/review.sh" --effort ${CLAUDE_EFFORT} <実行フォルダ>
 ```
 
-Opus は Agent ツールで呼ぶ。
+Fable は Agent ツールで呼ぶ。Fable を動かす予定なら、呼ぶ前に利用枠を確かめて、Fable と Opus のどちらで動かすかを決める。
 
-- `subagent_type`: `opus-reviewer`（必ず指定する。`fork` や省略で会話を引き継ぐ形にしない）
+- `mcp__ccd_session_mgmt__get_usage` を呼ぶ（読み込まれていなければ ToolSearch で `select:mcp__ccd_session_mgmt__get_usage` を読み込む）。`plan.windows` のうちラベルに Fable を含む枠の `percentUsed` が 1 つでも 95 以上なら、Fable の代わりに Opus で動かす（レビューを最後まで終えられる残りを確保するため）。`--only fable`・「Fable だけ」のときも同じにする。Opus に変えたときは、どの場合もそのことを 1 行伝える。
+- ツールがない（ターミナルの Claude Code など）、呼び出しが失敗した・断られた、`plan.status` が `ok` でない、Fable の枠がないときは、利用枠を確かめられないとして Fable で動かす（この会話で Fable が利用枠の不足で失敗していたときは Opus で動かす）。この確認は担当を選ぶためだけに使い、結果によらずレビューと呼び出し元の作業を進める。
+- この確認は担当を動かす前に済ませ、動かす担当はそのあと同じメッセージで動かす。
+
+Agent ツールには次を指定する。
+
+- `subagent_type`: `fable-reviewer`、Opus で動かすときは `opus-reviewer`（必ず指定する。`fork` や省略で会話を引き継ぐ形にしない）
 - `effort`: 上の「Claude の推論レベル」。空や `auto` のときは `high`
-- `model`: **渡さない**（引数は別名しか受け付けず、親と同じ系統なら親のモデルになって、定義の `claude-opus-5-5` の固定が外れる）
+- `model`: **渡さない**（引数は別名しか受け付けず、親と同じ系統なら親のモデルになって、定義の `claude-fable-5-2`・`claude-opus-5-5` の固定が外れる）
 - `prompt`: 次の 1 行だけにする
 
   ```text
@@ -115,11 +123,12 @@ Opus は Agent ツールで呼ぶ。
   ```
 
 - どちらも終わると通知が来るので、それまで待つ。ポーリングはしない。
-- Opus の返答は、そのまま `<実行フォルダ>/review-opus.md` に Write で保存する。Astra（または Sol）の結果は `<実行フォルダ>/review.md` に保存される。
+- Fable の返答は、そのまま `<実行フォルダ>/review-fable.md`（Opus なら `review-opus.md`）に Write で保存する。Astra（または Sol）の結果は `<実行フォルダ>/review.md` に保存される。
 - `--effort` には上の「Claude の推論レベル」をそのまま渡す。空や `auto` のときは省略してよい（スクリプトが high にする）。
-- Codex（Astra / Sol）は読み取り専用のサンドボックスと 1M コンテキストで動き、個人設定（MCP サーバーやプラグイン）は読み込まない。Opus は Read / Grep / Glob しか使えず、この会話・auto memory・ユーザー用の CLAUDE.md・MCP は読み込まない（作業場所のルートの CLAUDE.md・`.claude/CLAUDE.md`・AGENTS.md は `prompt.md` に入る）。どちらもコードを書き換えない。
+- Codex（Astra / Sol）は読み取り専用のサンドボックスと 1M コンテキストで動き、個人設定（MCP サーバーやプラグイン）は読み込まない。Fable・Opus は Read / Grep / Glob しか使えず、この会話・auto memory・ユーザー用の CLAUDE.md・MCP は読み込まない（作業場所のルートの CLAUDE.md・`.claude/CLAUDE.md`・AGENTS.md は `prompt.md` に入る）。どちらもコードを書き換えない。
 - Astra が、モデルを使えない・プランの対象外・使用量の上限などの理由で失敗したら、同じ実行フォルダに対して `--model gpt-6.1-sol` を加えて、Sol で 1 回だけやり直す（同じく `run_in_background: true`）。やり直すと Astra のログは上書きされるので、先に Astra の失敗の理由（エラーの要点）を控え、5. で `decisions.md` の実行状態に書く。その担当は報告で Sol と書く。モデルによらない失敗（`codex` がない・ログインしていない・ネットワークなど）はやり直さない。
-- `codex` や `opus-reviewer` が失敗しても、全部の結果が出揃ってから、成功した分で判断して失敗を報告で伝える。`codex` が見つからない・ログインしていないときは、`brew install --cask codex` と `codex login` を案内する。`opus-reviewer` が見つからないときは、エージェントがリンクされていない（このスキル集の `scripts/link-skills.sh --claude` で `~/.claude/agents` にリンクする）か、リンクする前に始めたセッション。Haiku に書かせた変更で、動かしたレビューがどれも結果を返さなかったら、未レビューと明記し、完了を保留してユーザーに確認する。
+- Fable が、利用枠・使用量の上限・レート制限などの理由で失敗したら、`opus-reviewer` で同じ 1 行の依頼を 1 回だけやり直す（Agent ツールの指定は Fable と同じ）。先に Fable の失敗の理由（エラーの要点）を控え、5. で `decisions.md` の実行状態に書く。その担当は報告で Opus と書く。利用枠によらない失敗（エージェントが見つからないなど）はやり直さない。
+- `codex` や `fable-reviewer`・`opus-reviewer` が失敗しても、全部の結果が出揃ってから、成功した分で判断して失敗を報告で伝える。`codex` が見つからない・ログインしていないときは、`brew install --cask codex` と `codex login` を案内する。`fable-reviewer`・`opus-reviewer` が見つからないときは、エージェントがリンクされていない（このスキル集の `scripts/link-skills.sh --claude` で `~/.claude/agents` にリンクする）か、リンクする前に始めたセッション。Haiku に書かせた変更で、動かしたレビューがどれも結果を返さなかったら、未レビューと明記し、完了を保留してユーザーに確認する。
 
 ### 5. 指摘を判断する
 
@@ -127,7 +136,7 @@ Opus は Agent ツールで呼ぶ。
 
 - **この変更がしていること**: Claude が意図した実装と照らし合わせる。食い違いがあれば、レビュアーの読み違いか、実装が意図どおりになっていないかのどちらかなので、コードで確かめる。
 - **要件ごとの判定**: どちらかが「一部だけ」「満たさない」「判断できない」としたものを確かめる。判定が食い違えば、R 番号ごとにコードで確かめる。
-- **指摘と要件にない変更**: 原因が同じものは 1 件にまとめ、見つけた担当を頭に書く（`[Astra]`・`[Opus]`・`[Astra・Opus]`。Sol で代わりに動かしたときは Astra を Sol と書く）。
+- **指摘と要件にない変更**: 原因が同じものは 1 件にまとめ、見つけた担当を頭に書く（`[Astra]`・`[Fable]`・`[Astra・Fable]`。Sol・Opus で代わりに動かしたときは、Astra を Sol、Fable を Opus と書く）。
 
 指摘はうのみにしない。両方が挙げたものも同じで、指摘ごとに該当のファイルを Read / Grep で確かめ、「再現」に書かれた条件で本当に問題が起きるかを根拠をもって判断する。誤りなら「不採用」とし、理由を書く。レビュアーは実装の経緯を知らないので、ユーザーとの会話で決めたことに反する指摘は「不採用（決定事項）」としてよい。ただし、その決定事項を 3. の要件に書き漏らしていたなら、それも報告で触れる。
 
@@ -143,7 +152,7 @@ Opus は Agent ツールで呼ぶ。
 
 ### 7. 報告する
 
-Astra（または Sol）を動かしたら、スクリプトの出力の先頭（設定・範囲・所要時間・保存先・`codex resume` の行）をそのまま表示する。Opus を動かしたら、設定（`opus-reviewer` / effort）・範囲（`prepare.sh` の出力）・所要時間とトークン（完了の通知）・保存先を短く添える。続けて次を日本語で簡潔に書く。レビューの全文は貼らない（保存先にある）。
+Astra（または Sol）を動かしたら、スクリプトの出力の先頭（設定・範囲・所要時間・保存先・`codex resume` の行）をそのまま表示する。Fable（または Opus）を動かしたら、設定（`fable-reviewer` または `opus-reviewer` / effort）・範囲（`prepare.sh` の出力）・所要時間とトークン（完了の通知）・保存先を短く添える。続けて次を日本語で簡潔に書く。レビューの全文は貼らない（保存先にある）。
 
 ```markdown
 ## レビューの総評
@@ -155,9 +164,9 @@ Astra（または Sol）を動かしたら、スクリプトの出力の先頭�
 ## 指摘への判断
 | 重要度 | 指摘 | 場所 | 判断 | 理由・対応 |
 | --- | --- | --- | --- | --- |
-| 高 | [Astra・Opus] ... | `path:line` | 採用（修正済み） / 採用（修正案） / 不採用 / 要確認 | ... |
+| 高 | [Astra・Fable] ... | `path:line` | 採用（修正済み） / 採用（修正案） / 不採用 / 要確認 | ... |
 
-両方 n 件、Astra だけ n 件、Opus だけ n 件（うち採用 n 件、不採用 n 件）
+両方 n 件、Astra だけ n 件、Fable だけ n 件（うち採用 n 件、不採用 n 件）
 
 ## 修正内容
 （6. で直したものと、実行したテストの結果。直していなければ修正案を箇条書きで）
@@ -169,7 +178,7 @@ Astra（または Sol）を動かしたら、スクリプトの出力の先頭�
 （「確認したい点」や「要確認」のうち、ユーザーにしか決められないもの。なければ省く）
 ```
 
-- 件数の行は Codex の担当と Opus の両方が成功した回だけ書き、それ以外は「比較なし」と書く。
+- 件数の行は Codex の担当（Astra または Sol）と Claude の担当（Fable または Opus）の両方が成功した回だけ書き、それ以外は「比較なし」と書く。
 - 直したあとは haiku-check でもう一度テストを実行する。
-- 同じレビューについて Opus に追加で確かめたいことがあれば、SendMessage で聞いてよい。
+- 同じレビューについて Fable（または Opus）に追加で確かめたいことがあれば、SendMessage で聞いてよい。
 - もう一度レビューするのは、上の「再レビュー」の条件に当たるときだけにする。そのときは SendMessage で続けず、新しい実行フォルダと新しいエージェントで、同じ要件を書いて 2. からやり直す。前回の指摘や対応は書かない（先入観を渡さないため）。
