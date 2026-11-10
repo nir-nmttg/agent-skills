@@ -20,8 +20,9 @@ BODY_LIMIT=8000
 COMMENT_COUNT=20   # 出力する要件のコメント（マーカーのコメントを除く）
 COMMENT_FETCH=40   # マーカーのコメントを除くために多めに取る
 COMMENT_LIMIT=2000
-STOP_MARK='<!-- gh-issue-autofix:stopped'   # 停止コメントの先頭（read-at=<読んだ時刻> が続くことがある）
-RESUMED_MARK='<!-- gh-issue-autofix:resumed'   # 再開の記録の先頭
+# 停止コメント・再開の記録の先頭に一致する正規表現（改名前の gh-issue-autofix が書いた印も同じものとして読む）
+STOP_MARK='^<!-- gh-issue-(auto-pr|autofix):stopped'   # 停止コメント（read-at=<読んだ時刻> が続くことがある）
+RESUMED_MARK='^<!-- gh-issue-(auto-pr|autofix):resumed'   # 再開の記録
 
 # jq の共通の定義（$stop_mark・$resumed_mark を渡す）
 # - marker: comment.sh が書いたコメント（停止・再開の記録）
@@ -34,8 +35,8 @@ RESUMED_MARK='<!-- gh-issue-autofix:resumed'   # 再開の記録の先頭
 #   legacy-updated（updated のうち、停止コメントが v=2 より前の版。「ブランチや PR が残るものは自動では再開しない」と案内していたので、
 #   ブランチがある Issue では選ばない）
 JQ_DEFS='
-  def stop_marker: (.body // "") | startswith($stop_mark);
-  def resumed_marker: (.body // "") | startswith($resumed_mark);
+  def stop_marker: (.body // "") | test($stop_mark);
+  def resumed_marker: (.body // "") | test($resumed_mark);
   def marker: stop_marker or resumed_marker;
   def stopped_at: ((.body | capture("read-at=(?<t>[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z)") | .t)? // .createdAt);
   def member: .authorAssociation | IN("OWNER", "MEMBER", "COLLABORATOR");
@@ -56,7 +57,7 @@ JQ_DEFS='
       else "legacy-updated" end;
 '
 
-LABEL=agent:autofix
+LABEL=agent:auto-pr
 TARGET= CHECK=false
 while (($#)); do
   case $1 in
@@ -215,7 +216,7 @@ else
       echo "$line"
     done
     echo
-    echo "続きから進めるときは \`/gh-issue-autofix <Issue の URL>\` で指定する。"
+    echo "続きから進めるときは \`/gh-issue-auto-pr <Issue の URL>\` で指定する。"
     echo
   fi
 
@@ -231,7 +232,7 @@ else
   if [[ -z $NUMBER ]]; then
     labels=$(gh label list --repo "$REPO" --limit 1000 --json name --jq '.[].name') || die "ラベルの一覧を取得できません。"
     if ! grep -qxF -- "$LABEL" <<<"$labels"; then
-      stop "$REPO にラベル \`$LABEL\` がありません。\`gh label create '$LABEL' --repo $REPO --description 'Claude が自動で修正してよい Issue'\` で作ってください。"
+      stop "$REPO にラベル \`$LABEL\` がありません。\`gh label create '$LABEL' --repo $REPO --description 'Claude が自動で対応してよい Issue'\` で作ってください。"
     fi
     $truncated && stop "検索結果の先頭 1000 件はすべて着手中か止めたものでした。それより後は調べていません（$REPO、条件: $query）。"
     if $CHECK; then
@@ -284,7 +285,7 @@ fi
 prs=$(prs_of "$NUMBER")
 open_pr=$(jq -c '[.[] | select(.state == "OPEN")][0] // empty' <<<"$prs")
 if [[ -z $open_pr ]] && jq -e 'any(.[]; .state == "MERGED")' <<<"$prs" >/dev/null; then
-  stop "#$NUMBER は $(branch_name "$NUMBER") の PR がマージ済みです。続きを直すなら、リモートとローカルの $(branch_name "$NUMBER") を消してから実行し直してください（新しく作り直します）。"
+  stop "#$NUMBER は $(branch_name "$NUMBER") の PR がマージ済みです。続きから対応するなら、リモートとローカルの $(branch_name "$NUMBER") を消してから実行し直してください（新しく作り直します）。"
 fi
 if [[ -n $open_pr ]]; then
   [[ $(jq -r .isDraft <<<"$open_pr") == true ]] ||

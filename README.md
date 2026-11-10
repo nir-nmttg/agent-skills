@@ -40,15 +40,15 @@ Claude は作業の一部を Haiku 5.5・Opus 5.5・Fable 5.2 のサブエージ
 
    | 前提 | 使うスキル |
    | --- | --- |
-   | `perl` | design-cross-review・implementation-cross-review・haiku-implementation・gh-issue-autofix |
-   | `git` 2.36 以降 | gh-issue-autofix（Auto-fix で push するとき） |
-   | `jq` | haiku-implementation・gh-todo・gh-issue-autofix、クロスレビューの Codex の担当 |
+   | `perl` | design-cross-review・implementation-cross-review・haiku-implementation・gh-issue-auto-pr |
+   | `git` 2.36 以降 | gh-issue-auto-pr（Auto-fix で push するとき） |
+   | `jq` | haiku-implementation・gh-todo・gh-issue-auto-pr、クロスレビューの Codex の担当 |
    | `codex` のログイン | クロスレビューの Codex の担当（Astra。使えないときは Sol） |
-   | メインが auto モード | haiku-implementation・gh-issue-autofix |
-   | `gh` のログイン | gh-todo・gh-issue-autofix、haiku-check で CI のログを見るとき |
+   | メインが auto モード | haiku-implementation・gh-issue-auto-pr |
+   | `gh` のログイン | gh-todo・gh-issue-auto-pr、haiku-check で CI のログを見るとき |
    | Claude デスクトップアプリ | session-status-emoji |
    | 組み込みブラウザか Claude in Chrome | browser-readonly-research |
-   | 組み込みブラウザ | gh-issue-autofix（ないときは動作確認を未検証にする） |
+   | 組み込みブラウザ | gh-issue-auto-pr（ないときは動作確認を未検証にする） |
    | デスクトップアプリが開いていて PC が起きている（専用の PC を勧める） | スケジュールに登録するスキル |
    | Python 3.9 以降 | Codex の minor-version-upgrade・rename-files-by-content |
 
@@ -88,7 +88,7 @@ Claude デスクトップアプリのスケジュールタスクに登録し、`
 
 | スキル | できること |
 | --- | --- |
-| [`/gh-issue-autofix`](.claude/skills/gh-issue-autofix/SKILL.md) | `agent:autofix` ラベルの Issue を 1 件、確認なしで直して同じラベルのドラフト PR にし、止めたら Issue に理由を書いて、Issue が更新されたら続きから再開する。受け入れ条件を満たして作った PR の指摘・CI の失敗・競合には Auto-fix で対応する |
+| [`/gh-issue-auto-pr`](.claude/skills/gh-issue-auto-pr/SKILL.md) | `agent:auto-pr` ラベルの Issue を 1 件、確認なしで対応して同じラベルのドラフト PR にし、止めたら Issue に理由を書いて、Issue が更新されたら続きから再開する。受け入れ条件を満たして作った PR の指摘・CI の失敗・競合には Auto-fix で対応する |
 
 ## Codex 用スキル一覧
 

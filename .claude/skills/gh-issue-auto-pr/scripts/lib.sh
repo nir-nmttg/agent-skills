@@ -1,4 +1,4 @@
-# gh-issue-autofix のスクリプトが共有する処理。実行せず、source して使う。
+# gh-issue-auto-pr のスクリプトが共有する処理。実行せず、source して使う。
 # macOS 標準の bash 3.2 で動くように書く。
 
 die() {
@@ -92,9 +92,12 @@ update_submodules() {
 
 # このスキルの状態（ロック・依存のインストールの記録・前回の結果）の置き場所。
 # git が管理しない共通の .git の中に置き、どの worktree から実行しても同じ場所にする
+# 改名前の gh-issue-autofix の置き場所があれば、移さずに必ずそちらを使う（ロック・PR の Auto-fix の記録などを、どの版から実行しても共有する）
 state_dir() {
-  local d
-  d="$(git rev-parse --path-format=absolute --git-common-dir)/gh-issue-autofix"
+  local common d
+  common=$(git rev-parse --path-format=absolute --git-common-dir)
+  d=$common/gh-issue-auto-pr
+  if [[ -d $common/gh-issue-autofix ]]; then d=$common/gh-issue-autofix; fi
   mkdir -p "$d"
   echo "$d"
 }
