@@ -98,7 +98,7 @@ if $DETAIL; then
     s{(?:https?:)?//\S+}{[URL]}gi; s{\bwww\.\S+}{[URL]}gi;
     s/\@/\x{FF20}/g; s/#(?=\d)/#\x{200B}/g;
     s/\s+/ /g; s/^ //; s/ $//;
-    $_ = substr($_, 0, '"$DETAIL_LIMIT"') . (length($_) > '"$DETAIL_LIMIT"' ? "…" : "");
+    $_ = substr($_, 0, '"$DETAIL_LIMIT"') . (length($_) > '"$DETAIL_LIMIT"' ? "\x{2026}" : "");
   ')
 fi
 

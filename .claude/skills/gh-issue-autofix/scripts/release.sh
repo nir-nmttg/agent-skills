@@ -5,7 +5,8 @@
 #
 # 使い方: release.sh <Issue の番号>
 #   リモートの claude/issue-<番号> に既定ブランチにないコミットがなく、PR もなく、ローカルにだけあるコミットもなければ消す。
-#   worktree に変更がなければ、worktree と、既定ブランチにないコミットのないローカルのブランチを消す。
+#   worktree に変更がなければ、worktree と、既定ブランチかリモートの claude/issue-<番号> に含まれるローカルのブランチを消す
+#   （リモートにあるものは消しても失わない。残すと、人がリモートを rebase したときに start.sh --resume が分岐で止まる）。
 set -euo pipefail
 source "$(dirname "$0")/lib.sh"
 
@@ -36,13 +37,26 @@ if [[ -n $wt ]]; then
 fi
 
 # --- ローカルのブランチ ---
+# リモートの今の sha（追跡の ref ではなく ls-remote）で判定する
+remote=
+if ! $keep_local; then
+  remote=$(remote_sha "$BRANCH")
+  if [[ -n $remote ]]; then
+    git fetch -q origin "+$REF:refs/remotes/origin/$BRANCH"
+    # ls-remote と fetch の間に更新されていたら、fetch した sha を使う（古い sha を根拠にローカルのブランチを消さない）
+    remote=$(git rev-parse -q --verify "refs/remotes/origin/$BRANCH^{commit}" || true)
+  fi
+fi
 local_ahead=false
 if ! $keep_local && git show-ref -q --verify "$REF"; then
   if git merge-base --is-ancestor "$REF" "origin/$DEFAULT_BRANCH"; then
     git branch -q -D "$BRANCH"
     echo "- ローカルの $BRANCH: 消した"
+  elif [[ -n $remote ]] && git merge-base --is-ancestor "$REF" "$remote"; then
+    git branch -q -D "$BRANCH"
+    echo "- ローカルの $BRANCH: リモートの $BRANCH に含まれるので消した"
   else
-    echo "- ローカルの $BRANCH: origin/$DEFAULT_BRANCH にないコミットがあるので残した"
+    echo "- ローカルの $BRANCH: origin/$DEFAULT_BRANCH にもリモートの $BRANCH にもないコミットがあるので残した"
     local_ahead=true
   fi
 fi
@@ -52,12 +66,10 @@ if $keep_local; then
   echo "- リモートの $BRANCH: worktree に変更が残っているので残した"
   exit 0
 fi
-remote=$(remote_sha "$BRANCH")
 if [[ -z $remote ]]; then
   echo "- リモートの $BRANCH: なし"
   exit 0
 fi
-git fetch -q origin "+$REF:refs/remotes/origin/$BRANCH"
 prs=$(gh pr list --repo "$REPO" --head "$BRANCH" --state all --json url,isCrossRepository \
   --jq 'map(select(.isCrossRepository | not) | .url) | join(", ")') ||
   die "PR の一覧を取得できません。"
