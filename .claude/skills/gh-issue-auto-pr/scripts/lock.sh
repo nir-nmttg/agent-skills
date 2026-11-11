@@ -13,7 +13,8 @@ source "$(dirname "$0")/lib.sh"
 LOCK_MAX_MINUTES=180
 
 git rev-parse --show-toplevel >/dev/null 2>&1 || die "git リポジトリの中で実行してください。"
-STATE=$(state_dir)
+# status は読むだけなので、状態のフォルダを作らない（このスキルを使っていないリポジトリにも、親ディレクトリのモードで実行する）
+if [[ ${1:-} == status ]]; then STATE=$(state_dir_path); else STATE=$(state_dir); fi
 LOCK=$STATE/lock
 
 # ロックのフォルダを作り、トークンを書く。mkdir は 1 つしか成功しない

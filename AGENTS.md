@@ -18,7 +18,7 @@ Claude Code・Codex 向けの汎用スキルを管理する。特定プロジェ
 
 ## 別のモデルに任せるとき
 
-- Claude スキルで別の Claude に作業を任せるときは、`.claude/agents/` に定義したサブエージェントを Agent ツールで呼ぶ。`claude -p` で別のセッションを起動しない。
+- Claude スキルで別の Claude に作業を任せるときは、`.claude/agents/` に定義したサブエージェントを Agent ツールで呼ぶ。`claude -p` で別のセッションを起動しない。リポジトリのフォルダのセッションでしかできない作業（worktree への移動、PR の Auto-fix）を任せるときだけは、デスクトップアプリのツール（`mcp__ccd_session__start_session`）でそのフォルダのセッションを起動してよい。
 - Codex CLI（`codex exec`）は、別のモデルの目が欲しいレビューにだけ使う。`codex exec` を使うスキルには `-c model_context_window=1000000 -c model_auto_compact_token_limit=900000` を付け、1M コンテキストで動かす。
 - サブエージェントの定義は、ファイル名と frontmatter の `name` を一致させ、`model` はフルのモデル ID（例: `claude-haiku-5-5`）で固定し、`tools` は必要最小限にする。description には呼び出し元のスキルを書く。
 - スキルから呼ぶときは `subagent_type` を必ず指定し、`model` 引数は渡さない（別名しか受け付けず、親と同じ系統なら親のモデルになって固定が外れる）。推論レベルを親に合わせるときだけ `effort` 引数を渡す。

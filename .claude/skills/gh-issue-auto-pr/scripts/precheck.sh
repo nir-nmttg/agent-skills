@@ -19,6 +19,13 @@ set -euo pipefail
 DIR=$(cd -P "$(dirname "$0")" && pwd)
 source "$DIR/lib.sh"
 
+# 親ディレクトリ（Git リポジトリでないフォルダ）で実行したときは、親ディレクトリのモードの確認に任せる
+mode=$(bash "$DIR/repos.sh" --mode)
+case ${mode%%$'\n'*} in
+  parent) exec bash "$DIR/parent-precheck.sh" "$@" ;;
+  error) echo "- モード: エラー"; echo "${mode#*$'\n'}" >&2; exit 1 ;;
+esac
+
 LIST_LIMIT=240   # pr-feedback.sh --list にかける時間の上限（秒）
 FIND_LIMIT=240   # find-issue.sh --check にかける時間の上限（秒）
 
@@ -40,28 +47,9 @@ while (($#)); do
 done
 git rev-parse --show-toplevel >/dev/null 2>&1 || die "git リポジトリの中で実行してください。"
 
-# 時間の上限を付けて実行する（macOS に timeout はないので perl の alarm。子プロセスごと止める）
-with_limit() {
-  local sec=$1
-  shift
-  perl -e '
-    my $sec = shift;
-    my $pid = fork // die "fork: $!";
-    if ($pid == 0) { setpgrp(0, 0); exec @ARGV or die "exec: $!" }
-    local $SIG{ALRM} = sub { kill "TERM", -$pid; sleep 2; kill "KILL", -$pid; exit 124 };
-    alarm $sec;
-    waitpid($pid, 0);
-    exit($? & 127 ? 128 + ($? & 127) : $? >> 8);
-  ' "$sec" "$@"
-}
-
 verdict= result=
 report=()
 [[ -z $FORCED ]] || { verdict=end; result=$FORCED; }
-
-# 理由を 1 行・200 文字（バイトではなく文字）に切る
-one_line() { grep -v '^[[:space:]]*$' | head -1 | perl -CSD -ne 'chomp; print substr($_, 0, 200)' || true; }
-
 
 # --- ロック（読むだけ） ---
 lock=$(bash "$DIR/lock.sh" status 2>&1) || lock="ロック: 確かめられない（${lock%%$'\n'*}）"
@@ -90,7 +78,7 @@ if [[ -z $verdict ]]; then
   waiting=$(sed -n 's/^check: waiting //p' <<<"$out")
   [[ -z $skipped ]] || report+=("- 着手中か、ドラフト PR がある Issue: $skipped")
   [[ -z $waiting ]] || report+=("- 止めた Issue（更新待ち）: $waiting")
-  if ((rc == 0)) && grep -qE '^check: target [1-9][0-9]*$' <<<"$out"; then
+  if ((rc == 0)) && grep -qE '^check: target [1-9][0-9]*( |$)' <<<"$out"; then
     verdict=go
   elif ((rc == 0)) && grep -qx 'check: none' <<<"$out"; then
     verdict=end result="– 対象なし"

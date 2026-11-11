@@ -2,10 +2,12 @@
 # 対応する Issue を 1 件選び、内容を Markdown で出力する。
 #
 # 使い方: find-issue.sh [--label <ラベル>] [<Issue の URL か番号>]
-#         find-issue.sh --check [--label <ラベル>]   # 選ぶだけ（入口の precheck.sh が使う）
+#         find-issue.sh --check [--no-label-ok] [--label <ラベル>]   # 選ぶだけ（入口の precheck.sh・parent-precheck.sh が使う）
 #   --check: ラベルで探すときだけ。選び方は同じで、機械的な行だけを出す（Issue の内容・一覧は出さない）:
-#     check: target <番号> / check: none（どちらも終了コード 0）、check: skipped #a #b / check: waiting #c（あれば）。
+#     check: target <番号> <作成時刻> / check: none（どちらも終了コード 0）、check: skipped #a #b / check: waiting #c（あれば）。
 #     ラベルがない・検索の上限など、ほかの理由は今と同じく終了コード 2 で出す。
+#   --no-label-ok: --check と一緒に使う。リポジトリにラベルがなければ check: no-label を出して終了コード 0 で終える
+#     （親ディレクトリのモードで、このスキルを使っていないリポジトリを対象なしと見分けるため）。
 #   URL / 番号がなければ、ラベルが付き、自分がアサインされ、PR が紐づいていない open な Issue から、作成の古い順に 1 件選ぶ。
 #   - claude/issue-<番号> のブランチがないもの: それを head とする PR（状態を問わない）がなく、
 #     止めたまま（停止コメントのあとに関係者・作成者のコメントも本文の編集もない）でもないもの
@@ -58,10 +60,11 @@ JQ_DEFS='
 '
 
 LABEL=agent:auto-pr
-TARGET= CHECK=false
+TARGET= CHECK=false NO_LABEL_OK=false
 while (($#)); do
   case $1 in
     --check) CHECK=true; shift ;;
+    --no-label-ok) NO_LABEL_OK=true; shift ;;
     --label)
       [[ -n ${2:-} ]] || die "--label にラベル名を指定してください。"
       LABEL=$2
@@ -77,6 +80,7 @@ while (($#)); do
 done
 [[ $LABEL != *'"'* && $LABEL != *'\'* ]] || die "ラベル名に \" や \\ は使えません: $LABEL"
 ! $CHECK || [[ -z $TARGET ]] || die "--check は Issue の指定と一緒には使えません。"
+! $NO_LABEL_OK || $CHECK || die "--no-label-ok は --check と一緒に使ってください。"
 
 require_tools
 load_repo
@@ -133,14 +137,14 @@ else
   # --- ラベルで探す ---
   query="repo:$REPO is:issue is:open label:\"$LABEL\" assignee:@me -linked:pr sort:created-asc"
   # GitHub の検索は 1000 件までしか返さない（25 件 × 40 ページ）
-  NUMBER= after= skipped= waiting= truncated=false
+  NUMBER= CREATED= after= skipped= waiting= truncated=false
   for page_no in $(seq 1 40); do
     page=$(gh api graphql -F comments="$COMMENT_FETCH" -f query='
       query($q: String!, $after: String, $comments: Int!) {
         viewer { login }
         search(query: $q, type: ISSUE, first: 25, after: $after) {
           pageInfo { hasNextPage endCursor }
-          nodes { ... on Issue { number lastEditedAt author { login } comments(last: $comments) { totalCount nodes { author { login } authorAssociation createdAt body } } } }
+          nodes { ... on Issue { number createdAt lastEditedAt author { login } comments(last: $comments) { totalCount nodes { author { login } authorAssociation createdAt body } } } }
         }
       }' -f q="$query" ${after:+-f after="$after"}) || die "Issue の検索に失敗しました。"
     ME=$(jq -r .data.viewer.login <<<"$page")
@@ -152,8 +156,8 @@ else
       | status($me) as $s
       | "\(.number) \(if $m == null and (covers("") | not) then "partial"
           elif $s == "waiting" and (covers($m | stopped_at) | not) then "partial"
-          else $s end)"' <<<"$page")
-    while read -r n state; do
+          else $s end) \(.createdAt)"' <<<"$page")
+    while read -r n state created; do
       [[ -n $n ]] || continue
       [[ $state != partial ]] || state=$(with_all_comments "$n" 'status($me)')
       if [[ $state == waiting ]]; then
@@ -168,7 +172,7 @@ else
           # 代入にして、PR の取得に失敗したら止める（set -e）
           n_prs=$(prs_of "$n")
           if jq -e 'all(.[]; .state == "OPEN" and .isDraft)' <<<"$n_prs" >/dev/null; then
-            NUMBER=$n
+            NUMBER=$n CREATED=$created
             break
           fi
         fi
@@ -180,7 +184,7 @@ else
       if [[ $n_prs != "[]" ]]; then
         skipped="$skipped $n"
       else
-        NUMBER=$n
+        NUMBER=$n CREATED=$created
         break
       fi
     done <<<"$candidates"
@@ -194,7 +198,7 @@ else
     [[ -z $skipped ]] || echo "check: skipped$(sed 's/ / #/g' <<<"$skipped")"
     [[ -z $waiting ]] || echo "check: waiting$(sed 's/ / #/g' <<<"$waiting")"
     if [[ -n $NUMBER ]]; then
-      echo "check: target $NUMBER"
+      echo "check: target $NUMBER $CREATED"
       exit 0
     fi
   fi
@@ -232,6 +236,10 @@ else
   if [[ -z $NUMBER ]]; then
     labels=$(gh label list --repo "$REPO" --limit 1000 --json name --jq '.[].name') || die "ラベルの一覧を取得できません。"
     if ! grep -qxF -- "$LABEL" <<<"$labels"; then
+      if $NO_LABEL_OK; then
+        echo "check: no-label"
+        exit 0
+      fi
       stop "$REPO にラベル \`$LABEL\` がありません。\`gh label create '$LABEL' --repo $REPO --description 'Claude が自動で対応してよい Issue'\` で作ってください。"
     fi
     $truncated && stop "検索結果の先頭 1000 件はすべて着手中か止めたものでした。それより後は調べていません（$REPO、条件: $query）。"
