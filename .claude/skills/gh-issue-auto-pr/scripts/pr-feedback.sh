@@ -23,8 +23,7 @@ source "$(dirname "$0")/lib.sh"
 
 ATTEMPT_LIMIT=5
 BODY_LIMIT=2000
-# 自分の書き込みの印の先頭に一致する正規表現（改名前の gh-issue-autofix が書いた印も同じものとして読む）
-MARK_PREFIX='^<!-- gh-issue-(auto-pr|autofix):'
+MARK_PREFIX='<!-- gh-issue-auto-pr:'
 
 TARGET= MODE=show MARK=
 while (($#)); do
