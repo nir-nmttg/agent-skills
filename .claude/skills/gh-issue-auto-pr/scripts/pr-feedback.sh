@@ -3,10 +3,16 @@
 #
 # 使い方: pr-feedback.sh <PR の URL か番号>           # 判定と材料を出す
 #         pr-feedback.sh <PR の URL か番号> --begin    # 対応を始めた回数を 1 つ足す（ロックを取ったあと、作業の前）
-#         pr-feedback.sh <PR の URL か番号> --limited  # 上限で Auto-fix をオフにしたことを記録する（--list の対象からも外す）
-#         pr-feedback.sh <PR の URL か番号> --reset    # 上限の記録を消し、回数を 0 に戻す（人が Auto-fix をオンにし直したとき）
-#         pr-feedback.sh <PR の URL か番号> --mark on|off  # Auto-fix をオンにした・オフにしたことを記録する（--list の対象）
-#         pr-feedback.sh --list                       # Auto-fix をオンにした open な PR のうち、対応が要りそうなものを出す（定期実行の報告用）
+#         pr-feedback.sh <PR の URL か番号> --limited  # 上限で自動の対応を止めたことを記録する（--list の対象からも外す）
+#         pr-feedback.sh <PR の URL か番号> --reset    # 上限の記録を消し、回数を 0 に戻す（人が Auto-fix をオンにし直したとき・定期実行を再開するとき）
+#         pr-feedback.sh <PR の URL か番号> --mark on|scheduled|off  # 自動の対応の記録（--list の対象）
+#         pr-feedback.sh --list                       # 自動の対応の記録がある PR のうち、対応が要りそうなものを出す（定期実行の報告用）
+#   自動の対応の記録（.git の gh-issue-auto-pr/pr-<番号>.autofix）の種類:
+#     on = Auto-fix（リポジトリのモード。中身 autofix。空のファイルも autofix）
+#     scheduled = 定期実行（親ディレクトリのモード。中身 scheduled。Auto-fix の記録があれば上書きしない）
+#   --begin・--limited・--reset・--mark はローカルの記録だけを変え、番号で指定すれば gh を呼ばない。
+#   --list は記録のある PR を番号の小さい順に判定し、「- #<番号>: <判定>」を出す（定期実行の PR は末尾に「（定期実行）」）。
+#     判定が「終了」の PR は記録を消す。定期実行の PR は mergeable を取り直す（競合を拾うため）。
 #   判定（「- 判定: 」の行）は次の順で 1 つ:
 #     無効（環境変数 GH_ISSUE_AUTO_PR_AUTOFIX が 0 / off）→ 終了（closed・マージ済み）→ 対象外（このスキルの PR でない・
 #     ベースが既定ブランチでないなど）→ 取得不完全 → レビュー中（自分の下書きのレビューがある）→ なし → 上限 → あり
@@ -29,7 +35,7 @@ TARGET= MODE=show MARK=
 while (($#)); do
   case $1 in
     --mark)
-      [[ ${2:-} == on || ${2:-} == off ]] || die "--mark には on か off を指定してください。"
+      [[ ${2:-} == on || ${2:-} == scheduled || ${2:-} == off ]] || die "--mark には on・scheduled・off のどれかを指定してください。"
       MODE=mark; MARK=$2; shift 2
       ;;
     --begin) MODE=begin; shift ;;
@@ -41,6 +47,66 @@ while (($#)); do
   esac
 done
 
+# 自動の対応の記録の種類（autofix / scheduled）。空・不明は autofix（今までの記録）
+mark_kind() { [[ $(cat "$1" 2>/dev/null) == scheduled ]] && echo scheduled || echo autofix; }
+
+# --- ローカルの記録だけを変える操作（番号なら gh を呼ばない） ---
+if [[ $MODE == begin || $MODE == reset || $MODE == limited || $MODE == mark ]]; then
+  git rev-parse --show-toplevel >/dev/null 2>&1 || die "git リポジトリの中で実行してください。"
+  [[ -n $TARGET ]] || die "PR の URL か番号を指定してください。"
+  TARGET=${TARGET#\#}
+  if [[ $TARGET =~ ^[1-9][0-9]*$ ]]; then
+    NUMBER=$TARGET
+  elif [[ $(tr '[:upper:]' '[:lower:]' <<<"$TARGET") =~ ^https://(www\.)?github\.com/([^/]+/[^/]+)/pull/0*([1-9][0-9]*)([/?#].*)?$ ]]; then
+    t_repo=${BASH_REMATCH[2]} NUMBER=${BASH_REMATCH[3]}
+    # origin の URL の名前と違えば（改名など）、GitHub の今の名前と比べる
+    if [[ $t_repo != "$(github_repo_of "$(git remote get-url origin 2>/dev/null || true)")" ]]; then
+      require_tools
+      load_repo
+      [[ $t_repo == $(tr '[:upper:]' '[:lower:]' <<<"$REPO") ]] || die "今のフォルダのリポジトリ（$REPO）の PR ではありません: $TARGET"
+    fi
+  else
+    die "PR の URL か番号を指定してください: $TARGET"
+  fi
+  S=$(state_dir)
+  ATTEMPTS_FILE=$S/pr-$NUMBER.attempts
+  attempts=$(cat "$ATTEMPTS_FILE" 2>/dev/null || echo 0)
+  [[ $attempts =~ ^[0-9]+$ ]] || attempts=0
+  case $MODE in
+    begin) echo $((attempts + 1)) >"$ATTEMPTS_FILE"; echo "対応の回数: $((attempts + 1)) / $ATTEMPT_LIMIT" ;;
+    reset)
+      if [[ -f $S/pr-$NUMBER.limited ]]; then
+        mark_kind "$S/pr-$NUMBER.limited" >"$S/pr-$NUMBER.autofix"
+        rm -f "$S/pr-$NUMBER.limited"
+      elif [[ ! -f $S/pr-$NUMBER.autofix ]]; then
+        die "PR #$NUMBER には自動の対応の記録も上限の記録もありません（番号を確かめてください）。"
+      fi
+      echo 0 >"$ATTEMPTS_FILE"
+      echo "上限の記録を消し、対応の回数を 0 に戻しました（自動の対応: $(mark_kind "$S/pr-$NUMBER.autofix")）。"
+      ;;
+    limited)
+      mark_kind "$S/pr-$NUMBER.autofix" >"$S/pr-$NUMBER.limited"
+      rm -f "$S/pr-$NUMBER.autofix"
+      echo "上限で自動の対応を止めたことを記録しました。"
+      ;;
+    mark)
+      case $MARK in
+        on) echo autofix >"$S/pr-$NUMBER.autofix"; echo "自動の対応の記録: Auto-fix" ;;
+        scheduled)
+          if [[ -f $S/pr-$NUMBER.autofix && $(mark_kind "$S/pr-$NUMBER.autofix") == autofix ]]; then
+            echo "自動の対応の記録: Auto-fix の記録があるので変えなかった（Auto-fix のセッションが対応する）"
+          else
+            echo scheduled >"$S/pr-$NUMBER.autofix"
+            echo "自動の対応の記録: 定期実行"
+          fi
+          ;;
+        off) rm -f "$S/pr-$NUMBER.autofix"; echo "自動の対応の記録: なし" ;;
+      esac
+      ;;
+  esac
+  exit 0
+fi
+
 require_tools
 load_repo
 OWNER=${REPO%%/*}
@@ -48,17 +114,21 @@ NAME=${REPO#*/}
 
 if [[ $MODE == list ]]; then
   [[ -z $TARGET ]] || die "--list には PR を指定しません。"
-  # Auto-fix をオンにした記録がある PR だけを見る（未解決で止めたドラフト PR などは、Auto-fix の対象ではない）
-  numbers=$(gh pr list --repo "$REPO" --author @me --state open --limit 100 --json number,headRefName,isCrossRepository \
-    --jq '.[] | select((.isCrossRepository | not) and (.headRefName | test("^claude/issue-[1-9][0-9]*$"))) | .number') ||
-    die "PR の一覧を取得できません。"
+  # 自動の対応の記録がある PR だけを見る（未解決で止めたドラフト PR などは対象ではない）。
+  # gh pr list の件数の上限で漏れないように、ローカルの記録から番号を取る
+  S=$(state_dir)
   found=0
-  for n in $numbers; do
-    [[ -f $(state_dir)/pr-$n.autofix ]] || continue
-    line=$(GH_ISSUE_AUTO_PR_AUTOFIX=1 GH_ISSUE_AUTO_PR_QUICK=1 bash "$0" "$n" 2>/dev/null | sed -n 's/^- 判定: //p' | head -1) || line="取得できない"
+  for n in $(for f in "$S"/pr-*.autofix; do [[ -f $f ]] || continue; f=${f##*/pr-}; echo "${f%.autofix}"; done | grep -E '^[1-9][0-9]*$' | sort -n); do
+    kind=$(mark_kind "$S/pr-$n.autofix")
+    if [[ $kind == scheduled ]]; then
+      line=$(GH_ISSUE_AUTO_PR_AUTOFIX=1 bash "$0" "$n" 2>/dev/null | sed -n 's/^- 判定: //p' | head -1) || line=
+    else
+      line=$(GH_ISSUE_AUTO_PR_AUTOFIX=1 GH_ISSUE_AUTO_PR_QUICK=1 bash "$0" "$n" 2>/dev/null | sed -n 's/^- 判定: //p' | head -1) || line=
+    fi
     case ${line:-取得できない} in
-      なし* | 終了* | レビュー中*) ;;
-      *) echo "- #$n: ${line:-取得できない}"; found=$((found + 1)) ;;
+      終了*) rm -f "$S/pr-$n.autofix" ;;
+      なし* | レビュー中*) ;;
+      *) echo "- #$n: ${line:-取得できない}$([[ $kind != scheduled ]] || echo "（定期実行）")"; found=$((found + 1)) ;;
     esac
   done
   ((found > 0)) || echo "- 対応が要りそうな PR: なし"
@@ -77,30 +147,8 @@ else
   die "PR の URL か番号を指定してください: $TARGET"
 fi
 
-ATTEMPTS_FILE=$(state_dir)/pr-$NUMBER.attempts
-attempts=$(cat "$ATTEMPTS_FILE" 2>/dev/null || echo 0)
+attempts=$(cat "$(state_dir)/pr-$NUMBER.attempts" 2>/dev/null || echo 0)
 [[ $attempts =~ ^[0-9]+$ ]] || attempts=0
-case $MODE in
-  begin) echo $((attempts + 1)) >"$ATTEMPTS_FILE"; echo "対応の回数: $((attempts + 1)) / $ATTEMPT_LIMIT"; exit 0 ;;
-  reset)
-    echo 0 >"$ATTEMPTS_FILE"
-    rm -f "$(state_dir)/pr-$NUMBER.limited"
-    : >"$(state_dir)/pr-$NUMBER.autofix"
-    echo "上限の記録を消し、対応の回数を 0 に戻しました。"
-    exit 0
-    ;;
-  limited)
-    : >"$(state_dir)/pr-$NUMBER.limited"
-    rm -f "$(state_dir)/pr-$NUMBER.autofix"
-    echo "上限で Auto-fix をオフにしたことを記録しました。"
-    exit 0
-    ;;
-  mark)
-    if [[ $MARK == on ]]; then : >"$(state_dir)/pr-$NUMBER.autofix"; else rm -f "$(state_dir)/pr-$NUMBER.autofix"; fi
-    echo "Auto-fix の記録: $MARK"
-    exit 0
-    ;;
-esac
 
 case ${GH_ISSUE_AUTO_PR_AUTOFIX:-} in
   0 | off) echo "- 判定: 無効（環境変数 GH_ISSUE_AUTO_PR_AUTOFIX で無効にしている）"; exit 0 ;;

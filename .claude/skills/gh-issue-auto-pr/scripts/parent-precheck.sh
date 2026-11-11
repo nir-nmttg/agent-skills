@@ -1,26 +1,31 @@
 #!/usr/bin/env bash
 # 親ディレクトリのモードの入口の確認（precheck.sh が、親ディレクトリで実行されたときに呼ぶ）。
-# 配下のリポジトリ（repos.sh の REPO_DEPTH 階層まで）を読むだけで調べ、子のセッションに任せるリポジトリを 1 つ決めるか、終えると決める。
+# 配下のリポジトリ（repos.sh の REPO_DEPTH 階層まで）を読むだけで調べ、このセッションが作業するリポジトリと、
+# Issue の手順か PR の対応かを 1 つ決めるか、終えると決める。
 # Issue・ブランチ・リポジトリのファイルは変えない（記録は lib.sh の parent_state_dir に書く）。
 #
 # 使い方: parent-precheck.sh [--label <ラベル>] [--result <結果の 1 行目>]
 #         parent-precheck.sh --check-one <パス> <owner/name> [--label <ラベル>]   # 1 つのリポジトリを調べる（内部用）
 #   出力（固定の形）:
 #     - モード: 親ディレクトリ                 （必ず最初に出す）
-#     - 判定: 子のセッションを起動する | 終える
-#     - リポジトリ: <メインの checkout のパス>   （起動するとき）
-#     - 名前: <owner/name>                     （起動するとき）
-#     - Issue: #<番号>                         （起動するとき。古いロックの引き継ぎのときは出さない）
+#     - 判定: 手順に進む | PR に対応する | 終える
+#     - リポジトリ: <メインの checkout のパス>   （手順に進む・PR に対応するとき）
+#     - 名前: <owner/name>                     （同上）
+#     - Issue: #<番号>                         （手順に進むとき。古いロックの引き継ぎのときは出さない）
+#     - PR: #<番号>                            （PR に対応するとき。定期実行の記録がある PR）
 #     - 結果: <結果の 1 行目>                  （終えるとき。記録済み）
 #     - 通知: する | しない                    （終えるとき）
 #     - 追加の通知: <1 行>                     （ほかにも通知が要る問題があるとき。記録済みなので、入口が必ず送る）
 #     ## 報告
-#   「全体で 1 件」: どれかのリポジトリのロックが使用中なら、新しく起動しない（子のセッション・Auto-fix・手動の実行が動いている）。
-#   リポジトリの問題は、親の記録（record-result.sh --parent --repo）にリポジトリごとに書く。リポジトリの .git の記録は子のセッションだけが書く。
-#   起動すると決めたら、起動の予約（親の記録の delegated）をここで書く。入口は、起動に失敗したら record-result.sh --clear-delegated で消す。
-#   次の回に、予約のあとに子のセッションの記録（リポジトリの .git の last-result）が更新されていなければ「動いた形跡がない」とし、
-#   そのリポジトリには DELEGATE_RETRY のあいだ起動しない。
+#   「全体で 1 件」: どれかのリポジトリのロックが使用中なら、何もしない（手動の実行・Auto-fix の対応が動いている。
+#   配下のリポジトリは DB などのコンテナを共有することがあるので、作業を並行させない）。
+#   選ぶ順: 古いロックの引き継ぎ → 定期実行の PR（前回の結果が 🔧・⏸️ のもの、前に選んだのに記録が進まなかったものを除く）
+#   → Issue（前回の手順の結果が 🔧 のリポジトリは後ろ）→ 除いた定期実行の PR。
+#   環境変数 GH_ISSUE_AUTO_PR_AUTOFIX が 0 / off なら、PR は選ばない（報告にだけ書く）。
+#   リポジトリの問題は、親の記録（record-result.sh --parent --repo）にリポジトリごとに書く。リポジトリの .git の記録は手順だけが書く。
 #   時間内に調べきれなかったリポジトリは、次の回に先頭から調べる（親の記録の cursor）。
+#   選んだら予約（親の記録の reserved）を書く。手順がリポジトリのロックを取るまでの間に別の実行が始まっても、
+#   RESERVE_GRACE のあいだ、そのリポジトリの記録（.git の last-result*）が予約のあとに更新されていなければ何もしない。
 # 終了コード: 0 = 判定を出した、1 = エラー（入口は手順に進まず 🔧 precheck で終える）
 set -euo pipefail
 echo "- モード: 親ディレクトリ"
@@ -29,10 +34,9 @@ source "$DIR/lib.sh"
 
 CHECK_LIMIT=240   # リポジトリごとの確認の上限（秒）
 PHASE_LIMIT=300   # 全部のリポジトリの確認にかける上限（秒）
-LIST_LIMIT=150    # Auto-fix の PR の一覧にかける上限（秒）
+LIST_LIMIT=150    # 自動の対応の記録がある PR の一覧にかける上限（秒）
 JOBS=4            # 同時に調べるリポジトリの数
-START_GRACE=900   # 子のセッションを起動してから、動いた形跡を求めるまでの猶予（秒）
-DELEGATE_RETRY=21600   # 子のセッションが動いた形跡がなかったリポジトリに、次に起動するまでの間隔（秒）
+RESERVE_GRACE=900 # 作業するものを選んでから、そのリポジトリの手順が始まった形跡を待つ時間（秒）
 T=$'\t'
 
 # --- 1 つのリポジトリを調べる（内部用。with_limit から呼ぶ） ---
@@ -56,6 +60,11 @@ check_one() {
     *) printf 'skip\t書き込みの権限がない（%s）\n' "${perm:-不明}"; return ;;
   esac
   dirty=$(git --no-optional-locks -c core.fsmonitor=false status --porcelain 2>/dev/null | head -1 || true)
+  # 定期実行の記録がある PR があれば、未コミットの変更は PR の対応も止めるので問題にする
+  sched=false
+  for f in "$(state_dir_path 2>/dev/null)"/pr-*.autofix; do
+    if [[ -f $f && $(cat "$f" 2>/dev/null) == scheduled ]]; then sched=true; break; fi
+  done
   if out=$(bash "$DIR/find-issue.sh" --check --no-label-ok "$@" 2>&1); then rc=0; else rc=$?; fi
   while IFS= read -r line; do
     case $line in
@@ -73,9 +82,14 @@ check_one() {
     fi
   elif ((rc == 0)) && grep -qx 'check: none' <<<"$out"; then
     echo none
-    [[ -z $dirty ]] || printf 'info\tメインの checkout に未コミットの変更がある\n'
+    if [[ -n $dirty ]] && $sched; then
+      printf 'problem\t🔧 sync: メインの checkout に未コミットの変更がある\n'
+    elif [[ -n $dirty ]]; then
+      printf 'info\tメインの checkout に未コミットの変更がある\n'
+    fi
   elif ((rc == 0)) && grep -qx 'check: no-label' <<<"$out"; then
     echo no-label
+    if [[ -n $dirty ]] && $sched; then printf 'problem\t🔧 sync: メインの checkout に未コミットの変更がある\n'; fi
   else
     reason=$(grep -v '^check: ' <<<"$out" | one_line)
     printf 'problem\t🔧 find: %s\n' "${reason:-Issue を探せなかった（終了コード $rc）}"
@@ -109,7 +123,7 @@ done
 PARENT=$(pwd -P)
 STATE=$(parent_state_dir "$PARENT")
 tmp=$(mktemp -d)
-# 同じ親ディレクトリの実行どうしが重ならないようにする（手動の実行と定期実行が重なると、どちらも予約の前に調べて、子を 2 つ起動するため）。
+# 同じ親ディレクトリの確認どうしが重ならないようにする（手動の実行と定期実行が同時に調べて、同じものを選ばないように）。
 # 止まった実行の残りは、RUN_STALE 分で引き継ぐ
 RUN_STALE=20
 running=
@@ -145,22 +159,16 @@ repo_problem() {
   [[ $n != する && $n != 記録できない ]] || extra+=("$shown")
   [[ $n != 記録できない ]] || report+=("- ${name#*/}: 記録できなかった")
 }
-# 問題がなかったリポジトリの、親が書いた 🔧（子のセッションの形跡の問題は除く）を戻す
+# 問題がなかったリポジトリの、親が書いた 🔧 を戻す（前の版の 🔧 delegate も含む）
 repo_ok() {
-  local prev
-  prev=$(repo_record "$1")
-  [[ $prev == 🔧* && $prev != "🔧 delegate:"* ]] || return 0
+  [[ $(repo_record "$1") == 🔧* ]] || return 0
   record_repo "$1" "– 問題なし" >/dev/null
 }
-# 子のセッションが動いた形跡がなく、まだ起動し直さない間か
-delegate_waiting() {
-  local f
-  f=$STATE/repos/$(repo_key "$1")/last-result
-  [[ $(repo_record "$1") == "🔧 delegate:"* ]] || return 1
-  (($(date +%s) - $(perl -e 'print +(stat $ARGV[0])[9]' "$f") < DELEGATE_RETRY))
-}
-# 子のセッションの前回の結果（リポジトリの .git の last-result）
-child_result() { cat "$(state_dir_path "$1" 2>/dev/null)/last-result" 2>/dev/null || true; }
+# リポジトリの記録のフォルダ（.git の gh-issue-auto-pr）
+repo_state() { state_dir_path "$1" 2>/dev/null; }
+# 前回の手順の結果（リポジトリの .git の last-result）
+prev_result() { cat "$(repo_state "$1")/last-result" 2>/dev/null || true; }
+mtime() { perl -e 'my @s = stat $ARGV[0]; print @s ? $s[9] : 0' "$1"; }
 lock_of() { (cd "$1" && bash "$DIR/lock.sh" status 2>&1) || echo "ロック: 確かめられない"; }
 
 [[ -z $FORCED ]] || { verdict=end result=$FORCED parent_line=$FORCED; }
@@ -201,26 +209,21 @@ if [[ -z $verdict && -f $STATE/cursor ]] && ((${#paths[@]} > 1)); then
   fi
 fi
 
-# --- 前回起動した子のセッションが動いた形跡 ---
-if [[ -z $verdict && -f $STATE/delegated ]]; then
-  IFS=$'\t' read -r d_time d_name d_path <"$STATE/delegated" || true
-  d_lock=$(lock_of "$d_path")
-  if [[ $d_lock != "ロック: 使用中"* ]]; then
-    d_rec="$(state_dir_path "$d_path" 2>/dev/null)/last-result"
-    if [[ -f $d_rec ]] && (($(perl -e 'print +(stat $ARGV[0])[9]' "$d_rec") >= ${d_time:-0})); then
-      [[ $(repo_record "$d_name") != "🔧 delegate:"* ]] || record_repo "$d_name" "– 子のセッションが動いた" >/dev/null
-      rm -f "$STATE/delegated"
-    elif (($(date +%s) - ${d_time:-0} < START_GRACE)); then
-      # 起動した直後（続けて実行したときなど）は、子のセッションがまだロックを取っていないことがある。もう 1 つ起動しない
-      verdict=end result="– 前回起動した子のセッションが始まるのを待っている（${d_name#*/}）"
-    else
-      repo_problem "$d_name" "🔧 delegate: 子のセッションが動いた形跡がない（$(date -r "${d_time:-0}" '+%m/%d %H:%M') に起動）"
-      rm -f "$STATE/delegated"
-    fi
+# 前の版（子のセッションに任せていた版）の起動の予約は使わない
+rm -f "$STATE/delegated"
+
+# --- 前の実行の予約（選んでから、手順がリポジトリのロックを取るまでの間を守る） ---
+if [[ -z $verdict && -f $STATE/reserved ]]; then
+  IFS=$'\t' read -r r_name r_path <"$STATE/reserved" || true
+  if (($(date +%s) - $(mtime "$STATE/reserved") < RESERVE_GRACE)) &&
+    [[ -z $(find "$(repo_state "$r_path")" -maxdepth 1 -name 'last-result*' -newer "$STATE/reserved" 2>/dev/null | head -1) ]]; then
+    verdict=end result="– 前の実行が始まるのを待っている（${r_name#*/}）"
+  else
+    rm -f "$STATE/reserved"
   fi
 fi
 
-# --- ロック（読むだけ）。どれかが使用中なら、新しく起動しない ---
+# --- ロック（読むだけ）。どれかが使用中なら、何もしない ---
 stale_idx=
 if [[ -z $verdict ]]; then
   for i in "${!paths[@]}"; do
@@ -233,12 +236,7 @@ if [[ -z $verdict ]]; then
         ;;
       "ロック: 古い"*)
         report+=("- ${names[$i]#*/}: $l")
-        # 子のセッションが動いた形跡がなかったリポジトリは、間隔をあけるまで引き継がない（ほかのリポジトリを調べる）
-        if delegate_waiting "${names[$i]}"; then
-          report+=("- ${names[$i]#*/}: 子のセッションが動いた形跡がないので、しばらく起動しない")
-        elif [[ -z $stale_idx ]]; then
-          stale_idx=$i
-        fi
+        [[ -n $stale_idx ]] || stale_idx=$i
         ;;
       "ロック: なし"*) ;;
       *) report+=("- ${names[$i]#*/}: $l") ;;
@@ -246,11 +244,9 @@ if [[ -z $verdict ]]; then
   done
 fi
 
+targets=() ok_idx=" "   # Issue の候補・問題のなかったリポジトリの添字（調べなかった回は空）
 # --- 各リポジトリを並列に調べる（古いロックがあれば、調べずにそのリポジトリを引き継ぐ） ---
-chosen= chosen_issue=
-if [[ -z $verdict && -n $stale_idx ]]; then
-  chosen=$stale_idx
-elif [[ -z $verdict ]]; then
+if [[ -z $verdict && -z $stale_idx ]]; then
   start=$(date +%s)
   i=0
   while ((i < ${#paths[@]})); do
@@ -296,7 +292,7 @@ elif [[ -z $verdict ]]; then
   fi
 
   # 分類をまとめる
-  targets=() checked=0 nolabel=0 unchecked_first=
+  checked=0 nolabel=0 unchecked_first=
   for i in "${!paths[@]}"; do
     name=${names[$i]} short=${names[$i]#*/}
     out=$(cat "$tmp/$i" 2>/dev/null || printf 'unchecked\n')
@@ -322,16 +318,13 @@ elif [[ -z $verdict ]]; then
       continue
     fi
     repo_ok "$name"
+    ok_idx="$ok_idx$i "
     if grep -qx no-label <<<"$out"; then
       nolabel=$((nolabel + 1))
     elif row=$(grep "^target$T" <<<"$out"); then
-      if delegate_waiting "$name"; then
-        report+=("- $short: 子のセッションが動いた形跡がないので、しばらく起動しない")
-        continue
-      fi
-      # 並べ替えの鍵: 子のセッションが 🔧 で終えた・形跡がなかったリポジトリは後ろ（1）、作成時刻、添字
+      # 並べ替えの鍵: 前回の手順の結果が 🔧 のリポジトリは後ろ（1）、作成時刻、添字
       back=0
-      [[ $(child_result "${paths[$i]}") != 🔧* && $(repo_record "$name") != "🔧 delegate:"* ]] || back=1
+      [[ $(prev_result "${paths[$i]}") != 🔧* ]] || back=1
       targets+=("$back$T$(cut -f3 <<<"$row")$T$i$T$(cut -f2 <<<"$row")")
     fi
   done
@@ -340,38 +333,89 @@ elif [[ -z $verdict ]]; then
   if ((checked > 0 && nolabel == checked)); then
     parent_line="🔧 find: どのリポジトリにもラベル \`$LABEL\` がない"
   fi
-  if ((${#targets[@]} > 0)); then
-    best=$(printf '%s\n' "${targets[@]}" | sort -t$'\t' -k1,1n -k2,2 -k3,3n | head -1)
-    chosen=$(cut -f3 <<<"$best") chosen_issue=$(cut -f4 <<<"$best")
-  fi
 fi
 
-# --- Auto-fix の PR の一覧（pr-*.autofix の記録があるリポジトリだけ） ---
+# --- 自動の対応の記録がある PR の一覧（pr-*.autofix の記録があるリポジトリだけ。報告と、定期実行の PR の候補） ---
 af=()
 for i in "${!paths[@]}"; do
-  ls "$(state_dir_path "${paths[$i]}" 2>/dev/null)"/pr-*.autofix >/dev/null 2>&1 && af+=("$i")
+  ls "$(repo_state "${paths[$i]}")"/pr-*.autofix >/dev/null 2>&1 && af+=("$i")
 done
+pr_front=() pr_back=()
+case ${GH_ISSUE_AUTO_PR_AUTOFIX:-} in 0 | off) pr_off=true ;; *) pr_off=false ;; esac
 if ((${#af[@]} > 0)); then
   for i in "${af[@]}"; do
-    (cd "${paths[$i]}" && with_limit "$LIST_LIMIT" bash "$DIR/pr-feedback.sh" --list >"$tmp/af$i" 2>/dev/null || echo "- Auto-fix の PR: 確かめきれなかった" >>"$tmp/af$i") &
+    (cd "${paths[$i]}" && with_limit "$LIST_LIMIT" bash "$DIR/pr-feedback.sh" --list >"$tmp/af$i" 2>/dev/null || echo "- 自動の対応の PR: 確かめきれなかった" >>"$tmp/af$i") &
   done
   wait || true
+  mkdir -p "$STATE/chosen"
+  rm -f "$STATE/chosen-pr"   # 前の版の、最後に選んだ PR だけの記録
   for i in "${af[@]}"; do
     while IFS= read -r line; do
-      [[ $line == "- "* ]] && report+=("- ${names[$i]#*/}: Auto-fix ${line#- }")
+      [[ $line == "- "* ]] || continue
+      report+=("- ${names[$i]#*/}: 自動の対応 ${line#- }")
+      # 定期実行の PR の候補: あり・上限・対象外（取得不完全などは報告だけ）
+      [[ $line =~ ^-\ \#([1-9][0-9]*):\ (あり|上限|対象外).*（定期実行）$ ]] || continue
+      n=${BASH_REMATCH[1]}
+      $pr_off && continue
+      # 問題のない（調べきれて、未コミットの変更などがない）リポジトリだけ
+      [[ $ok_idx == *" $i "* ]] || continue
+      # 前回の結果が 🔧・⏸️ の PR、前に選んだのに記録が進まなかった（選んだ時刻より記録が古い）PR は後ろに回す
+      rec=$(repo_state "${paths[$i]}")/last-result-pr-$n
+      ch=$STATE/chosen/$(repo_key "${names[$i]}")__$n
+      t_rec=$(mtime "$rec") t_ch=$(mtime "$ch")
+      back=0
+      case $(cat "$rec" 2>/dev/null || true) in 🔧* | ⏸*) back=1 ;; esac
+      ((t_rec >= t_ch)) || back=1
+      # 後ろに回した PR は、最後に触れた時刻（記録か選んだ時刻の新しいほう）が古いものから選ぶ
+      if ((back)); then pr_back+=("$((t_rec > t_ch ? t_rec : t_ch))$T$i$T$n"); else pr_front+=("$i$T$n"); fi
     done <"$tmp/af$i"
   done
+  $pr_off && ((${#pr_front[@]} + ${#pr_back[@]} == 0)) && grep -q '（定期実行）' "$tmp"/af* 2>/dev/null &&
+    report+=("- 定期実行の PR: 環境変数 GH_ISSUE_AUTO_PR_AUTOFIX で無効にしているので対応しない")
+fi
+
+# --- 選ぶ ---
+chosen= chosen_issue= chosen_pr=
+if [[ -z $verdict && -n $stale_idx ]]; then
+  chosen=$stale_idx
+elif [[ -z $verdict ]]; then
+  if ((${#pr_front[@]} > 0)); then
+    chosen=$(cut -f1 <<<"${pr_front[0]}") chosen_pr=$(cut -f2 <<<"${pr_front[0]}")
+  elif ((${#targets[@]} > 0)); then
+    best=$(printf '%s\n' "${targets[@]}" | sort -t$'\t' -k1,1n -k2,2 -k3,3n | head -1)
+    chosen=$(cut -f3 <<<"$best") chosen_issue=$(cut -f4 <<<"$best")
+  elif ((${#pr_back[@]} > 0)); then
+    # 後ろに回した PR は、前回の結果が古いものから順に（同じ PR ばかり選ばないように）
+    best=$(printf '%s\n' "${pr_back[@]}" | sort -t$'\t' -k1,1n -k2,2n -k3,3n | head -1)
+    chosen=$(cut -f2 <<<"$best") chosen_pr=$(cut -f3 <<<"$best")
+  fi
 fi
 
 # --- 判定と記録 ---
 if [[ -z $verdict && -n $chosen ]]; then
-  echo "- 判定: 子のセッションを起動する"
+  short=${names[$chosen]#*/}
+  if [[ -n $chosen_pr ]]; then
+    echo "- 判定: PR に対応する"
+    line="– $short の PR #$chosen_pr に対応した"
+    # 次の回から、この PR の記録が進んだか（対応が動いたか）を確かめるために、PR ごとに選んだ時刻を残す
+    : >"$STATE/chosen/$(repo_key "${names[$chosen]}")__$chosen_pr"
+  else
+    echo "- 判定: 手順に進む"
+    if [[ -n $chosen_issue ]]; then line="– $short の Issue #$chosen_issue に進んだ"; else line="– $short の前の実行のロックを引き継いだ"; fi
+  fi
   echo "- リポジトリ: ${paths[$chosen]}"
   echo "- 名前: ${names[$chosen]}"
   [[ -z $chosen_issue ]] || echo "- Issue: #$chosen_issue"
-  # 起動の予約。子のセッションがすぐに終えて記録しても、次の回にその記録を「予約のあと」と判定できるように、起動の前に書く
-  printf '%s\t%s\t%s\n' "$(date +%s)" "${names[$chosen]}" "${paths[$chosen]}" >"$STATE/delegated"
-  # 親の問題（ラベルの有無など）は、起動する回には起きない。親の記録は入口が起動の結果で書く
+  [[ -z $chosen_pr ]] || echo "- PR: #$chosen_pr"
+  # 選んだことを予約として残す（手順がロックを取るまでの間に、別の実行が別のリポジトリを選ばないように）
+  printf '%s\t%s\n' "${names[$chosen]}" "${paths[$chosen]}" >"$STATE/reserved"
+  # 親の記録。親の問題（PR を選んだ回の「どこにもラベルがない」など）があればそれを書き、なければ選んだことを書いて
+  # 親の 🔧 の重複の抑止を戻す。結果の記録と通知は、手順がリポジトリの記録で行う
+  if [[ -n $parent_line ]]; then
+    [[ $(record_parent "$parent_line") != する ]] || extra+=("$parent_line")
+  else
+    record_parent "$line" >/dev/null
+  fi
   for e in ${extra[@]+"${extra[@]}"}; do echo "- 追加の通知: $e"; done
 else
   if [[ -z $verdict ]]; then
