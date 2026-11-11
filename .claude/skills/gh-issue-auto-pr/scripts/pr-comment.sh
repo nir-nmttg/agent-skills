@@ -4,13 +4,14 @@
 # 使い方: pr-comment.sh <PR の URL か番号> --reply <スレッドの最初のコメントの ID> --read <読んだ最後のコメントの ID> --read-at <読んだ時刻>  # 本文は標準入力
 #         pr-comment.sh <PR の URL か番号> --summary --read-at <読んだ時刻> --result done|stopped [--reason <理由>] [--answered <ID,…>]
 #                       [--ci-checked <ID,…>] [--conflict-checked <head>-<base>]                             # 本文は標準入力
-#         pr-comment.sh <PR の URL か番号> --limit
+#         pr-comment.sh <PR の URL か番号> --limit [--scheduled]
 #   --reply: レビューのスレッドに返信する（1000 文字まで）。--read と --read-at は pr-feedback.sh が出した値
 #     （読んだ時刻より後に編集された書き込みは、pr-feedback.sh がもう一度未対応として出す）。
 #   --summary: 会話欄に対応のまとめを書く（3000 文字まで）。--answered は、このまとめで答えたレビューの本文（r…）と会話欄のコメント（c…）の ID。
 #     --ci-checked は調べた CI の失敗の ID、--conflict-checked は解消できなかった競合（pr-feedback.sh が出した値）。
 #   --reason（--result stopped のとき）: checks | review | verify | spec | unclear | denied | env | other
 #   --limit: 自動の対応が上限に達して Auto-fix をオフにしたことを、定型文で書く。
+#     --scheduled: 親ディレクトリのモードの定期実行での対応を止めたとき（再開のしかたの文言が違う）。
 #   本文は、HTML コメントを取り除き、URL・画像・リンクの記法を [URL] にし、@ をメンションにならない形にする（コミットの sha と #番号は残す）。
 set -euo pipefail
 source "$(dirname "$0")/lib.sh"
@@ -18,7 +19,7 @@ source "$(dirname "$0")/lib.sh"
 REPLY_LIMIT=1000
 SUMMARY_LIMIT=3000
 
-TARGET= MODE= REPLY_TO= READ= READ_AT= RESULT= REASON= ANSWERED= CI_CHECKED= CONFLICT_CHECKED=
+SCHEDULED=false TARGET= MODE= REPLY_TO= READ= READ_AT= RESULT= REASON= ANSWERED= CI_CHECKED= CONFLICT_CHECKED=
 while (($#)); do
   case $1 in
     --reply | --read | --read-at | --result | --reason | --answered | --ci-checked | --conflict-checked)
@@ -37,11 +38,13 @@ while (($#)); do
       ;;
     --summary) [[ -z $MODE ]] || die "--reply・--summary・--limit は 1 つだけ指定してください。"; MODE=summary; shift ;;
     --limit) [[ -z $MODE ]] || die "--reply・--summary・--limit は 1 つだけ指定してください。"; MODE=limit; shift ;;
+    --scheduled) SCHEDULED=true; shift ;;
     -*) die "不明なオプション: $1" ;;
     *) [[ -z $TARGET ]] || die "PR は 1 つだけ指定してください。"; TARGET=$1; shift ;;
   esac
 done
 [[ -n $MODE ]] || die "--reply・--summary・--limit のどれかを指定してください。"
+[[ $MODE == limit ]] || ! $SCHEDULED || die "--scheduled は --limit と一緒に使ってください。"
 
 require_tools
 command -v perl >/dev/null 2>&1 || die "perl がありません。"
@@ -121,8 +124,13 @@ $(read_body "$SUMMARY_LIMIT")"
     ;;
   limit)
     [[ -z $READ$READ_AT$REPLY_TO$RESULT$REASON$ANSWERED$CI_CHECKED$CONFLICT_CHECKED ]] || die "--limit には、ほかのオプションを付けません。"
-    body="<!-- gh-issue-auto-pr:pr-limit -->
+    if $SCHEDULED; then
+      body="<!-- gh-issue-auto-pr:pr-limit -->
+🤖 gh-issue-auto-pr の自動の対応が上限に達したので、この PR への定期実行での対応を止めました。続けるときは、gh-issue-auto-pr を動かしている PC で、このリポジトリのフォルダから \`bash ~/.claude/skills/gh-issue-auto-pr/scripts/pr-feedback.sh $NUMBER --reset\` を実行してください。"
+    else
+      body="<!-- gh-issue-auto-pr:pr-limit -->
 🤖 gh-issue-auto-pr の自動の対応が上限に達したので、この PR の Auto-fix をオフにしました。続けるときは、Claude デスクトップアプリでこの PR のセッションの Auto-fix をオンにし直してください。"
+    fi
     url=$(gh pr comment "$NUMBER" --repo "$REPO" --body-file - <<<"$body") || die "PR #$NUMBER に上限の案内をコメントできませんでした。"
     echo "上限の案内をコメントしました: $url"
     ;;
