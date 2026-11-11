@@ -114,8 +114,7 @@ NAME=${REPO#*/}
 
 if [[ $MODE == list ]]; then
   [[ -z $TARGET ]] || die "--list には PR を指定しません。"
-  # 自動の対応の記録がある PR だけを見る（未解決で止めたドラフト PR などは対象ではない）。
-  # gh pr list の件数の上限で漏れないように、ローカルの記録から番号を取る
+  # 自動の対応の記録がある PR を、ローカルの記録の番号からすべて見る（未解決で止めたドラフト PR などは対象ではない）
   S=$(state_dir)
   found=0
   for n in $(for f in "$S"/pr-*.autofix; do [[ -f $f ]] || continue; f=${f##*/pr-}; echo "${f%.autofix}"; done | grep -E '^[1-9][0-9]*$' | sort -n); do

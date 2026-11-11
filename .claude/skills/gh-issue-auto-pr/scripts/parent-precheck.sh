@@ -159,7 +159,7 @@ repo_problem() {
   [[ $n != する && $n != 記録できない ]] || extra+=("$shown")
   [[ $n != 記録できない ]] || report+=("- ${name#*/}: 記録できなかった")
 }
-# 問題がなかったリポジトリの、親が書いた 🔧 を戻す（前の版の 🔧 delegate も含む）
+# 問題がなかったリポジトリの、親が書いた 🔧 を戻す
 repo_ok() {
   [[ $(repo_record "$1") == 🔧* ]] || return 0
   record_repo "$1" "– 問題なし" >/dev/null
@@ -208,9 +208,6 @@ if [[ -z $verdict && -f $STATE/cursor ]] && ((${#paths[@]} > 1)); then
     paths=("${rp[@]}") names=("${rn[@]}")
   fi
 fi
-
-# 前の版（子のセッションに任せていた版）の起動の予約は使わない
-rm -f "$STATE/delegated"
 
 # --- 前の実行の予約（選んでから、手順がリポジトリのロックを取るまでの間を守る） ---
 if [[ -z $verdict && -f $STATE/reserved ]]; then
@@ -348,7 +345,6 @@ if ((${#af[@]} > 0)); then
   done
   wait || true
   mkdir -p "$STATE/chosen"
-  rm -f "$STATE/chosen-pr"   # 前の版の、最後に選んだ PR だけの記録
   for i in "${af[@]}"; do
     while IFS= read -r line; do
       [[ $line == "- "* ]] || continue

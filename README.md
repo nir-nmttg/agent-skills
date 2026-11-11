@@ -88,7 +88,7 @@ Claude デスクトップアプリのスケジュールタスクに登録し、`
 
 | スキル | できること |
 | --- | --- |
-| [`/gh-issue-auto-pr`](.claude/skills/gh-issue-auto-pr/SKILL.md) | `agent:auto-pr` ラベルの Issue を 1 件、確認なしで対応して同じラベルのドラフト PR にし、止めたら Issue に理由を書いて、Issue が更新されたら続きから再開する。受け入れ条件を満たして作った PR の指摘・CI の失敗・競合には Auto-fix で対応する。リポジトリの親ディレクトリに登録すると、配下から Issue か PR を選んでそのセッションで対応し、PR の指摘は Auto-fix の代わりに定期実行で拾う |
+| [`/gh-issue-auto-pr`](.claude/skills/gh-issue-auto-pr/SKILL.md) | `agent:auto-pr` ラベルの Issue を 1 件、確認なしで対応して同じラベルのドラフト PR にし、止めたら Issue に理由を書いて、Issue が更新されたら続きから再開する。受け入れ条件を満たして作った PR の指摘・CI の失敗・競合には Auto-fix で対応する。リポジトリの親ディレクトリに登録すると、配下から Issue か PR を選んでそのセッションで対応し、PR の指摘・CI の失敗・競合は定期実行で拾う |
 
 ## Codex 用スキル一覧
 
