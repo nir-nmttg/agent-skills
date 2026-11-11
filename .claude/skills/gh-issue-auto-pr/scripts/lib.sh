@@ -1,4 +1,4 @@
-# gh-issue-autofix のスクリプトが共有する処理。実行せず、source して使う。
+# gh-issue-auto-pr のスクリプトが共有する処理。実行せず、source して使う。
 # macOS 標準の bash 3.2 で動くように書く。
 
 die() {
@@ -94,7 +94,50 @@ update_submodules() {
 # git が管理しない共通の .git の中に置き、どの worktree から実行しても同じ場所にする
 state_dir() {
   local d
-  d="$(git rev-parse --path-format=absolute --git-common-dir)/gh-issue-autofix"
+  d=$(state_dir_path)
   mkdir -p "$d"
   echo "$d"
 }
+
+# state_dir と同じ場所を、フォルダを作らずに返す（読むだけの確認に使う）。引数があれば、そのフォルダのリポジトリについて
+state_dir_path() {
+  echo "$(git ${1:+-C "$1"} rev-parse --path-format=absolute --git-common-dir)/gh-issue-auto-pr"
+}
+
+# 時間の上限を付けて実行する（macOS に timeout はないので perl の alarm。子プロセスごと止める）。
+# 時間切れは終了コード 124。自分が TERM・INT で止められたときも、子のプロセスグループごと止める
+with_limit() {
+  local sec=$1
+  shift
+  perl -e '
+    my $sec = shift;
+    my $pid = fork // die "fork: $!";
+    if ($pid == 0) { setpgrp(0, 0); exec @ARGV or die "exec: $!" }
+    my $stop = sub { my $code = shift; kill "TERM", -$pid; sleep 2; kill "KILL", -$pid; exit $code };
+    local $SIG{ALRM} = sub { $stop->(124) };
+    local $SIG{TERM} = sub { $stop->(143) };
+    local $SIG{INT} = sub { $stop->(130) };
+    alarm $sec;
+    waitpid($pid, 0);
+    exit($? & 127 ? 128 + ($? & 127) : $? >> 8);
+  ' "$sec" "$@"
+}
+
+# 理由を 1 行・200 文字（バイトではなく文字）に切る
+one_line() { grep -v '^[[:space:]]*$' | head -1 | perl -CSD -ne 'chomp; print substr($_, 0, 200)' || true; }
+
+# 親ディレクトリのモードの記録の置き場所（このスキル集のリポジトリの artifacts/gh-issue-auto-pr/parents/<ハッシュ>）。
+# 親ディレクトリには .git がないので、スクリプトの実体のパスからこのスキル集のリポジトリを特定して置く。フォルダを作る
+parent_state_dir() {
+  local real root d
+  real=$(cd -P "$1" 2>/dev/null && pwd) || die "親ディレクトリが見つかりません: $1"
+  root=$(git -C "$(cd -P "$(dirname "${BASH_SOURCE[0]}")" && pwd)" rev-parse --show-toplevel) ||
+    die "このスキル集のリポジトリを特定できません。"
+  d=$root/artifacts/gh-issue-auto-pr/parents/$(printf '%s' "$real" | git hash-object --stdin)
+  mkdir -p "$d"
+  printf '%s\n' "$real" >"$d/path"
+  echo "$d"
+}
+
+# 親ディレクトリのモードで、リポジトリごとの記録のフォルダ名（owner/name の / を __ にする）
+repo_key() { sed 's#/#__#' <<<"$1"; }

@@ -114,7 +114,7 @@ update_submodules "$WORKTREE" || die "worktree の submodule を更新できま�
 
 # 依存フォルダはリンクし（書き込まない）、.env* はコピーする
 linked= copied=
-link_names=" ${GH_ISSUE_AUTOFIX_LINK_DIRS:-node_modules .venv venv .bundle vendor} "
+link_names=" ${GH_ISSUE_AUTO_PR_LINK_DIRS:-node_modules .venv venv .bundle vendor} "
 while IFS= read -r -d '' p; do
   p=${p%/}
   name=${p##*/}

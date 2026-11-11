@@ -8,13 +8,13 @@
 #         pr-feedback.sh <PR の URL か番号> --mark on|off  # Auto-fix をオンにした・オフにしたことを記録する（--list の対象）
 #         pr-feedback.sh --list                       # Auto-fix をオンにした open な PR のうち、対応が要りそうなものを出す（定期実行の報告用）
 #   判定（「- 判定: 」の行）は次の順で 1 つ:
-#     無効（環境変数 GH_ISSUE_AUTOFIX_PR_AUTOFIX が 0 / off）→ 終了（closed・マージ済み）→ 対象外（このスキルの PR でない・
+#     無効（環境変数 GH_ISSUE_AUTO_PR_AUTOFIX が 0 / off）→ 終了（closed・マージ済み）→ 対象外（このスキルの PR でない・
 #     ベースが既定ブランチでないなど）→ 取得不完全 → レビュー中（自分の下書きのレビューがある）→ なし → 上限 → あり
 #   対応済みの印は、自分（viewer）が書いた、マーカーで始まる書き込み:
-#     まとめ  <!-- gh-issue-autofix:pr-handled v=1 read-at=<読んだ時刻> result=... answered=... ci-checked=... conflict-checked=... -->
-#     返信    <!-- gh-issue-autofix:pr-reply v=1 read-at=<読んだ時刻> read=<読んだ最後のコメントの ID> -->
+#     まとめ  <!-- gh-issue-auto-pr:pr-handled v=1 read-at=<読んだ時刻> result=... answered=... ci-checked=... conflict-checked=... -->
+#     返信    <!-- gh-issue-auto-pr:pr-reply v=1 read-at=<読んだ時刻> read=<読んだ最後のコメントの ID> -->
 #   読んだ時刻より後に編集された書き込みは、答えたあとでも、もう一度対応する。
-#     上限    <!-- gh-issue-autofix:pr-limit -->
+#     上限    <!-- gh-issue-auto-pr:pr-limit -->
 #   同じアカウントでもマーカーのない書き込みは人のものとして扱う。
 #   関係者は、リポジトリに write 以上の権限がある人（bot は除く）。それ以外の書き込みは要件として扱わない。
 # 終了コード: 0 = 判定を出した、1 = エラー
@@ -23,7 +23,7 @@ source "$(dirname "$0")/lib.sh"
 
 ATTEMPT_LIMIT=5
 BODY_LIMIT=2000
-MARK_PREFIX='<!-- gh-issue-autofix:'
+MARK_PREFIX='<!-- gh-issue-auto-pr:'
 
 TARGET= MODE=show MARK=
 while (($#)); do
@@ -55,7 +55,7 @@ if [[ $MODE == list ]]; then
   found=0
   for n in $numbers; do
     [[ -f $(state_dir)/pr-$n.autofix ]] || continue
-    line=$(GH_ISSUE_AUTOFIX_PR_AUTOFIX=1 GH_ISSUE_AUTOFIX_QUICK=1 bash "$0" "$n" 2>/dev/null | sed -n 's/^- 判定: //p' | head -1) || line="取得できない"
+    line=$(GH_ISSUE_AUTO_PR_AUTOFIX=1 GH_ISSUE_AUTO_PR_QUICK=1 bash "$0" "$n" 2>/dev/null | sed -n 's/^- 判定: //p' | head -1) || line="取得できない"
     case ${line:-取得できない} in
       なし* | 終了* | レビュー中*) ;;
       *) echo "- #$n: ${line:-取得できない}"; found=$((found + 1)) ;;
@@ -102,8 +102,8 @@ case $MODE in
     ;;
 esac
 
-case ${GH_ISSUE_AUTOFIX_PR_AUTOFIX:-} in
-  0 | off) echo "- 判定: 無効（環境変数 GH_ISSUE_AUTOFIX_PR_AUTOFIX で無効にしている）"; exit 0 ;;
+case ${GH_ISSUE_AUTO_PR_AUTOFIX:-} in
+  0 | off) echo "- 判定: 無効（環境変数 GH_ISSUE_AUTO_PR_AUTOFIX で無効にしている）"; exit 0 ;;
 esac
 
 tmp=$(mktemp -d)
@@ -129,8 +129,8 @@ for try in 1 2 3 4; do
     die "PR #$NUMBER を取得できません。
 $(cat "$tmp/err")"
   }
-  # --list（GH_ISSUE_AUTOFIX_QUICK）では待たない
-  [[ $(jq -r '.data.repository.pullRequest.mergeable' "$tmp/pr.json") == UNKNOWN && $try -lt 4 && -z ${GH_ISSUE_AUTOFIX_QUICK:-} ]] || break
+  # --list（GH_ISSUE_AUTO_PR_QUICK）では待たない
+  [[ $(jq -r '.data.repository.pullRequest.mergeable' "$tmp/pr.json") == UNKNOWN && $try -lt 4 && -z ${GH_ISSUE_AUTO_PR_QUICK:-} ]] || break
   sleep 5
 done
 
