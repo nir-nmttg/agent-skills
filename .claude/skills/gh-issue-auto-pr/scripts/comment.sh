@@ -78,8 +78,7 @@ esac
 [[ $RESUME == new || $RESUME == continue ]] || die "--resume は new か continue です: ${RESUME:-（なし）}"
 [[ -z $READ_AT || $READ_AT =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$ ]] ||
   die "--read-at は find-issue.sh が出した時刻（例 2026-11-10T01:00:00Z）にしてください: $READ_AT"
-# v=2: ブランチや PR が残っていても、Issue の更新で自動で再開する版の停止コメント（find-issue.sh が旧版と見分ける）
-STOP_MARK="<!-- gh-issue-auto-pr:stopped v=2${READ_AT:+ read-at=$READ_AT} -->"
+STOP_MARK="<!-- gh-issue-auto-pr:stopped${READ_AT:+ read-at=$READ_AT} -->"
 
 require_tools
 command -v perl >/dev/null 2>&1 || die "perl がありません。"

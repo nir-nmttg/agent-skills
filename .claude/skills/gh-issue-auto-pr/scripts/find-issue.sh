@@ -5,7 +5,7 @@
 #         find-issue.sh --check [--no-label-ok] [--label <ラベル>]   # 選ぶだけ（入口の precheck.sh・parent-precheck.sh が使う）
 #   --check: ラベルで探すときだけ。選び方は同じで、機械的な行だけを出す（Issue の内容・一覧は出さない）:
 #     check: target <番号> <作成時刻> / check: none（どちらも終了コード 0）、check: skipped #a #b / check: waiting #c（あれば）。
-#     ラベルがない・検索の上限など、ほかの理由は今と同じく終了コード 2 で出す。
+#     ラベルがない・検索の上限など、ほかの理由は通常の実行と同じく終了コード 2 で出す。
 #   --no-label-ok: --check と一緒に使う。リポジトリにラベルがなければ check: no-label を出して終了コード 0 で終える
 #     （親ディレクトリのモードで、このスキルを使っていないリポジトリを対象なしと見分けるため）。
 #   URL / 番号がなければ、ラベルが付き、自分がアサインされ、PR が紐づいていない open な Issue から、作成の古い順に 1 件選ぶ。
@@ -33,9 +33,7 @@ RESUMED_MARK='^<!-- gh-issue-(auto-pr|autofix):resumed'   # 再開の記録
 #   （読んだあと、止めるまでの間に足された更新を、停止より後のものとして扱うため）
 # - last_mark($me): 自分の最新のマーカー（投稿順。同じ実行の再開と停止は read-at が同じなので、作成時刻で比べる）
 # - status($me): none（マーカーなし）・resumed（最新が再開の記録）・
-#   waiting（最新が停止で、そのあとに関係者・作成者のマーカーのないコメントも本文の編集もない）・updated（最新が停止で、そのあとに更新がある）・
-#   legacy-updated（updated のうち、停止コメントが v=2 より前の版。「ブランチや PR が残るものは自動では再開しない」と案内していたので、
-#   ブランチがある Issue では選ばない）
+#   waiting（最新が停止で、そのあとに関係者・作成者のマーカーのないコメントも本文の編集もない）・updated（最新が停止で、そのあとに更新がある）
 JQ_DEFS='
   def stop_marker: (.body // "") | test($stop_mark);
   def resumed_marker: (.body // "") | test($resumed_mark);
@@ -55,8 +53,7 @@ JQ_DEFS='
     | if $m == null then "none"
       elif ($m | resumed_marker) then "resumed"
       elif (updated_after($m | stopped_at) | not) then "waiting"
-      elif ($m.body | split("\n")[0] | test(" v=2[ ]")) then "updated"
-      else "legacy-updated" end;
+      else "updated" end;
 '
 
 LABEL=agent:auto-pr
@@ -166,8 +163,7 @@ else
       fi
       if has_branch "$n"; then
         # ブランチがあるものは、止めたあとに Issue が更新され（updated）、PR がすべて open のドラフト（PR なしも可）のときだけ、
-        # 続きから再開する。着手中・途中で止まった実行の残り・再開して着手したもの・ドラフト PR を作り終えたもの・
-        # 旧版の停止コメント（legacy-updated）のものは選ばない
+        # 続きから再開する（着手中のもの・ドラフト PR を作り終えたものは選ばない）
         if [[ $state == updated ]]; then
           # 代入にして、PR の取得に失敗したら止める（set -e）
           n_prs=$(prs_of "$n")
