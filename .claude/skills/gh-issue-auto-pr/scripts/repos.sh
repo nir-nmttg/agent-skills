@@ -2,7 +2,7 @@
 # 親ディレクトリのモード（Git リポジトリの親ディレクトリで実行したとき）の、モードの判定と対象のリポジトリ（読むだけ）。
 #
 # 使い方: repos.sh --mode         # repo / parent / error を 1 行で出す
-#         repos.sh                # 親ディレクトリの直下のリポジトリの一覧（機械的な行）
+#         repos.sh                # 親ディレクトリの配下（REPO_DEPTH 階層まで）のリポジトリの一覧（機械的な行）
 #         repos.sh --find <Issue の URL>   # その Issue のリポジトリの checkout と、組み直した URL を出す
 #   --mode:
 #     repo   = 今のフォルダが Git の作業ツリーの中（そのリポジトリで手順を行う）
@@ -48,25 +48,31 @@ mode() {
   echo parent
 }
 
-# 直下の子フォルダのうち、メインの checkout を「<実体のパス><TAB><owner/name>」で、ほかを skip の行で出す
-list() {
-  local parent child real top gitdir common super origin repo seen=
-  parent=$(pwd -P)
-  for child in "$parent"/* "$parent"/.[!.]* "$parent"/..?*; do
+# 親ディレクトリから何階層下までリポジトリを探すか（例: <親>/<グループ>/<リポジトリ> は 2 階層）
+REPO_DEPTH=2
+
+# <フォルダ> の子フォルダのうち、メインの checkout を「<実体のパス><TAB><owner/name>」で、ほかを skip の行で出す。
+# Git リポジトリでない実体の子フォルダは、リポジトリをまとめたグループのフォルダとみなし、REPO_DEPTH 階層まで中を探す。
+# 依存を置く node_modules は、数が多く対象のリポジトリを含まないので、グループのフォルダとみなさない
+walk() {
+  local dir=$1 depth=$2 child real top gitdir common super origin repo
+  for child in "$dir"/* "$dir"/.[!.]* "$dir"/..?*; do
     [[ -d $child ]] || continue
-    real=$(cd -P "$child" 2>/dev/null && pwd) || continue
-    case $real in
+    case $child in
       *$'\t'* | *$'\n'*) printf 'skip\t%s\t%s\n' "（名前にタブか改行を含むフォルダ）" "パスにタブか改行を含む"; continue ;;
     esac
-    # 外を指すシンボリックリンクは対象外（作業フォルダの外になる）
-    if [[ $(dirname "$real") != "$parent" ]]; then
-      [[ -e $child/.git || -e $real/.git ]] && printf 'skip\t%s\t%s\n' "$child" "親ディレクトリの外を指すシンボリックリンク"
+    # シンボリックリンクの実体は、親ディレクトリの中なら本来の場所で調べ、外なら対象外にする（外のリポジトリは報告に書く）
+    if [[ -L $child ]]; then
+      real=$(cd -P "$child" 2>/dev/null && pwd) || continue
+      if [[ $real != "$PARENT"/* && -e $real/.git ]]; then printf 'skip\t%s\t%s\n' "$child" "親ディレクトリの外を指すシンボリックリンク"; fi
       continue
     fi
-    # 実体のパスで重複を除く
-    case "$seen" in *$'\n'"$real"$'\n'*) continue ;; esac
-    seen="$seen"$'\n'"$real"$'\n'
-    [[ -e $real/.git ]] || continue
+    # 親ディレクトリの実体のパスから実体のフォルダだけをたどってきたので、$child がそのまま実体のパス
+    real=$child
+    if [[ ! -e $real/.git ]]; then
+      if ((depth < REPO_DEPTH)) && [[ ${child##*/} != node_modules ]]; then walk "$real" $((depth + 1)); fi
+      continue
+    fi
     top=$(gitr -C "$real" rev-parse --show-toplevel 2>/dev/null) || { printf 'skip\t%s\t%s\n' "$real" "git がリポジトリとして読めない"; continue; }
     top=$(cd -P "$top" && pwd)
     [[ $top == "$real" ]] || continue
@@ -80,6 +86,11 @@ list() {
     if [[ -z $repo ]]; then printf 'skip\t%s\t%s\n' "$real" "origin が GitHub ではない"; continue; fi
     printf '%s\t%s\n' "$real" "$repo"
   done
+}
+
+list() {
+  PARENT=$(pwd -P)
+  walk "$PARENT" 1
 }
 
 # 一覧を作り、同じ owner/name の checkout をまとめて dup にする
@@ -108,7 +119,7 @@ find_repo() {
       ;;
     parent)
       row=$(repos | awk -F'\t' -v r="$t_repo" '($1 == "repo" && $3 == r) || ($1 == "dup" && $2 == r)')
-      [[ -n $row ]] || stop "$t_repo の checkout が、このフォルダの直下にありません。"
+      [[ -n $row ]] || stop "$t_repo の checkout が、このフォルダの配下（$REPO_DEPTH 階層まで）にありません。"
       [[ $row == repo* ]] || stop "$t_repo の checkout が複数あります（$(cut -f3 <<<"$row")）。どれで対応するか決められません。"
       path=$(cut -f2 <<<"$row")
       ;;

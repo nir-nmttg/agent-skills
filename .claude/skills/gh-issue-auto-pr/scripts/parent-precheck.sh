@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # 親ディレクトリのモードの入口の確認（precheck.sh が、親ディレクトリで実行されたときに呼ぶ）。
-# 直下のリポジトリを読むだけで調べ、子のセッションに任せるリポジトリを 1 つ決めるか、終えると決める。
+# 配下のリポジトリ（repos.sh の REPO_DEPTH 階層まで）を読むだけで調べ、子のセッションに任せるリポジトリを 1 つ決めるか、終えると決める。
 # Issue・ブランチ・リポジトリのファイルは変えない（記録は lib.sh の parent_state_dir に書く）。
 #
 # 使い方: parent-precheck.sh [--label <ラベル>] [--result <結果の 1 行目>]
@@ -176,16 +176,16 @@ fi
 # --- 対象のリポジトリ ---
 paths=() names=()
 if [[ -z $verdict ]]; then
-  rows=$(bash "$DIR/repos.sh") || { verdict=end result="🔧 repos: 直下のリポジトリを調べられない" parent_line=$result; rows=; }
+  rows=$(bash "$DIR/repos.sh") || { verdict=end result="🔧 repos: 配下のリポジトリを調べられない" parent_line=$result; rows=; }
   while IFS=$'\t' read -r kind a b; do
     case $kind in
       repo) paths+=("$a") names+=("$b") ;;
       skip) report+=("- 対象外: $a（$b）") ;;
-      dup) repo_problem "$a" "🔧 repos: checkout が複数ある（$(tr ',' '\n' <<<"$b" | awk -F/ '{ printf "%s%s", (NR > 1 ? "、" : ""), $NF }')）" ;;
+      dup) repo_problem "$a" "🔧 repos: checkout が複数ある（$(tr ',' '\n' <<<"$b" | P="$PARENT/" awk '{ s = (index($0, ENVIRON["P"]) == 1 ? substr($0, length(ENVIRON["P"]) + 1) : $0); printf "%s%s", (NR > 1 ? "、" : ""), s }')）" ;;
     esac
   done <<<"$rows"
   if [[ -z $verdict ]] && ((${#paths[@]} == 0)) && ((${#extra[@]} == 0)); then
-    verdict=end result="🔧 repos: 対象のリポジトリがない（直下に GitHub のリポジトリの checkout がない）" parent_line=$result
+    verdict=end result="🔧 repos: 対象のリポジトリがない（配下に GitHub のリポジトリの checkout がない）" parent_line=$result
   fi
 fi
 
