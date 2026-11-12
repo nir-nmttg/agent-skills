@@ -24,9 +24,6 @@ source "$(dirname "$0")/lib.sh"
 
 START_MARK='<!-- gh-issue-autofix:start -->'
 END_MARK='<!-- gh-issue-autofix:end -->'
-# 改名前の gh-issue-auto-pr が PR の本文に書いた範囲の印（その範囲も差し替え、今の印に書き換える）
-OLD_START_MARK='<!-- gh-issue-auto-pr:start -->'
-OLD_END_MARK='<!-- gh-issue-auto-pr:end -->'
 # GitHub が Issue を紐づける closing keyword と、そのあとの Issue の参照（#12・owner/repo#12・Issue の URL）
 KEYWORD_RE='\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)(\s*:?\s*)(?=(?:[\w.-]+/[\w.-]+)?#\d|https?://github\.com/[^\s/]+/[^\s/]+/issues/\d)'
 
@@ -189,17 +186,11 @@ else
   [[ $(jq -r '"\(.state) \(.isDraft)"' <<<"$view") == "OPEN true" ]] ||
     die "push しましたが、PR（$pr）がドラフトの open ではなくなったので、本文は更新しません。"
   old=$(jq -r '.body // "" | gsub("\r"; "")' <<<"$view")
-  # マーカー（今の印か改名前の印のどちらか一組）が 1 つずつ、start → end の順にあるときだけ差し替える
-  marks=$(grep -nxF -e "$START_MARK" -e "$END_MARK" -e "$OLD_START_MARK" -e "$OLD_END_MARK" <<<"$old" | cut -d: -f2- | paste -sd'|' - || true)
-  start= end=
+  # マーカーが 1 つずつ、start → end の順にあるときだけ差し替える
+  marks=$(grep -nxF -e "$START_MARK" -e "$END_MARK" <<<"$old" | cut -d: -f2- | paste -sd'|' - || true)
   if [[ $marks == "$START_MARK|$END_MARK" ]]; then
-    start=$START_MARK end=$END_MARK
-  elif [[ $marks == "$OLD_START_MARK|$OLD_END_MARK" ]]; then
-    start=$OLD_START_MARK end=$OLD_END_MARK
-  fi
-  if [[ -n $start ]]; then
     # マーカーの範囲だけを差し替える
-    awk -v s="$start" -v e="$end" -v f="$section" '
+    awk -v s="$START_MARK" -v e="$END_MARK" -v f="$section" '
       $0 == s { while ((getline line < f) > 0) print line; skip = 1; next }
       $0 == e { skip = 0; next }
       !skip

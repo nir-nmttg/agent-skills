@@ -7,7 +7,7 @@
 #         pr-feedback.sh <PR の URL か番号> --reset    # 上限の記録を消し、回数を 0 に戻す（人が Auto-fix をオンにし直したとき・定期実行を再開するとき）
 #         pr-feedback.sh <PR の URL か番号> --mark on|scheduled|off  # 自動の対応の記録（--list の対象）
 #         pr-feedback.sh --list                       # 自動の対応の記録がある PR のうち、対応が要りそうなものを出す（定期実行の報告用）
-#   自動の対応の記録（.git の gh-issue-autofix/pr-<番号>.autofix。改名前の .git/gh-issue-auto-pr があればその中）の種類:
+#   自動の対応の記録（.git の gh-issue-autofix/pr-<番号>.autofix）の種類:
 #     on = Auto-fix（リポジトリのモード。中身 autofix。空のファイルも autofix）
 #     scheduled = 定期実行（親ディレクトリのモード。中身 scheduled。Auto-fix の記録があれば上書きしない）
 #   --begin・--limited・--reset・--mark はローカルの記録だけを変え、番号で指定すれば gh を呼ばない。
@@ -29,8 +29,7 @@ source "$(dirname "$0")/lib.sh"
 
 ATTEMPT_LIMIT=5
 BODY_LIMIT=2000
-# 自分の書き込みの印の先頭に一致する正規表現（改名前の gh-issue-auto-pr が書いた印も同じものとして読む）
-MARK_PREFIX='^<!-- gh-issue-(autofix|auto-pr):'
+MARK_PREFIX='<!-- gh-issue-autofix:'
 
 TARGET= MODE=show MARK=
 while (($#)); do

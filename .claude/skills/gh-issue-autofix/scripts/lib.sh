@@ -100,13 +100,8 @@ state_dir() {
 }
 
 # state_dir と同じ場所を、フォルダを作らずに返す（読むだけの確認に使う）。引数があれば、そのフォルダのリポジトリについて
-# 改名前の gh-issue-auto-pr の置き場所があれば、移さずに必ずそちらを使う（ロック・PR の Auto-fix の記録などを、どの版から実行しても共有する）
 state_dir_path() {
-  local common d
-  common=$(git ${1:+-C "$1"} rev-parse --path-format=absolute --git-common-dir)
-  d=$common/gh-issue-autofix
-  if [[ -d $common/gh-issue-auto-pr ]]; then d=$common/gh-issue-auto-pr; fi
-  echo "$d"
+  echo "$(git ${1:+-C "$1"} rev-parse --path-format=absolute --git-common-dir)/gh-issue-autofix"
 }
 
 # 時間の上限を付けて実行する（macOS に timeout はないので perl の alarm。子プロセスごと止める）。
@@ -133,15 +128,12 @@ one_line() { grep -v '^[[:space:]]*$' | head -1 | perl -CSD -ne 'chomp; print su
 
 # 親ディレクトリのモードの記録の置き場所（このスキル集のリポジトリの artifacts/gh-issue-autofix/parents/<ハッシュ>）。
 # 親ディレクトリには .git がないので、スクリプトの実体のパスからこのスキル集のリポジトリを特定して置く。フォルダを作る
-# 改名前の gh-issue-auto-pr の置き場所があれば、移さずにそちらを使う（前回の結果・起動の記録を引き継ぐ）
 parent_state_dir() {
-  local real root d old
+  local real root d
   real=$(cd -P "$1" 2>/dev/null && pwd) || die "親ディレクトリが見つかりません: $1"
   root=$(git -C "$(cd -P "$(dirname "${BASH_SOURCE[0]}")" && pwd)" rev-parse --show-toplevel) ||
     die "このスキル集のリポジトリを特定できません。"
   d=$root/artifacts/gh-issue-autofix/parents/$(printf '%s' "$real" | git hash-object --stdin)
-  old=$root/artifacts/gh-issue-auto-pr/parents/${d##*/}
-  if [[ -d $old ]]; then d=$old; fi
   mkdir -p "$d"
   printf '%s\n' "$real" >"$d/path"
   echo "$d"

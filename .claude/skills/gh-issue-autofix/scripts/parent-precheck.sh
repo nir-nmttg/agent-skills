@@ -164,7 +164,7 @@ repo_ok() {
   [[ $(repo_record "$1") == 🔧* ]] || return 0
   record_repo "$1" "– 問題なし" >/dev/null
 }
-# リポジトリの記録のフォルダ（.git の gh-issue-autofix。改名前の gh-issue-auto-pr があればそちら）
+# リポジトリの記録のフォルダ（.git の gh-issue-autofix）
 repo_state() { state_dir_path "$1" 2>/dev/null; }
 # 前回の手順の結果（リポジトリの .git の last-result）
 prev_result() { cat "$(repo_state "$1")/last-result" 2>/dev/null || true; }
