@@ -21,7 +21,7 @@
 #   配下のリポジトリは DB などのコンテナを共有することがあるので、作業を並行させない）。
 #   選ぶ順: 古いロックの引き継ぎ → 定期実行の PR（前回の結果が 🔧・⏸️ のもの、前に選んだのに記録が進まなかったものを除く）
 #   → Issue（前回の手順の結果が 🔧 のリポジトリは後ろ）→ 除いた定期実行の PR。
-#   環境変数 GH_ISSUE_AUTO_PR_AUTOFIX が 0 / off なら、PR は選ばない（報告にだけ書く）。
+#   環境変数 GH_ISSUE_AUTOFIX_PR_AUTOFIX が 0 / off なら、PR は選ばない（報告にだけ書く）。
 #   リポジトリの問題は、親の記録（record-result.sh --parent --repo）にリポジトリごとに書く。リポジトリの .git の記録は手順だけが書く。
 #   時間内に調べきれなかったリポジトリは、次の回に先頭から調べる（親の記録の cursor）。
 #   選んだら予約（親の記録の reserved）を書く。手順がリポジトリのロックを取るまでの間に別の実行が始まっても、
@@ -103,7 +103,7 @@ if [[ ${1:-} == --check-one ]]; then
   exit 0
 fi
 
-LABEL_ARGS=() LABEL=agent:auto-pr FORCED=
+LABEL_ARGS=() LABEL=agent:autofix FORCED=
 while (($#)); do
   case $1 in
     --result)
@@ -164,7 +164,7 @@ repo_ok() {
   [[ $(repo_record "$1") == 🔧* ]] || return 0
   record_repo "$1" "– 問題なし" >/dev/null
 }
-# リポジトリの記録のフォルダ（.git の gh-issue-auto-pr）
+# リポジトリの記録のフォルダ（.git の gh-issue-autofix）
 repo_state() { state_dir_path "$1" 2>/dev/null; }
 # 前回の手順の結果（リポジトリの .git の last-result）
 prev_result() { cat "$(repo_state "$1")/last-result" 2>/dev/null || true; }
@@ -338,7 +338,7 @@ for i in "${!paths[@]}"; do
   ls "$(repo_state "${paths[$i]}")"/pr-*.autofix >/dev/null 2>&1 && af+=("$i")
 done
 pr_front=() pr_back=()
-case ${GH_ISSUE_AUTO_PR_AUTOFIX:-} in 0 | off) pr_off=true ;; *) pr_off=false ;; esac
+case ${GH_ISSUE_AUTOFIX_PR_AUTOFIX:-} in 0 | off) pr_off=true ;; *) pr_off=false ;; esac
 if ((${#af[@]} > 0)); then
   for i in "${af[@]}"; do
     (cd "${paths[$i]}" && with_limit "$LIST_LIMIT" bash "$DIR/pr-feedback.sh" --list >"$tmp/af$i" 2>/dev/null || echo "- 自動の対応の PR: 確かめきれなかった" >>"$tmp/af$i") &
@@ -367,7 +367,7 @@ if ((${#af[@]} > 0)); then
     done <"$tmp/af$i"
   done
   $pr_off && ((${#pr_front[@]} + ${#pr_back[@]} == 0)) && grep -q '（定期実行）' "$tmp"/af* 2>/dev/null &&
-    report+=("- 定期実行の PR: 環境変数 GH_ISSUE_AUTO_PR_AUTOFIX で無効にしているので対応しない")
+    report+=("- 定期実行の PR: 環境変数 GH_ISSUE_AUTOFIX_PR_AUTOFIX で無効にしているので対応しない")
 fi
 
 # --- 選ぶ ---

@@ -22,8 +22,8 @@
 set -euo pipefail
 source "$(dirname "$0")/lib.sh"
 
-START_MARK='<!-- gh-issue-auto-pr:start -->'
-END_MARK='<!-- gh-issue-auto-pr:end -->'
+START_MARK='<!-- gh-issue-autofix:start -->'
+END_MARK='<!-- gh-issue-autofix:end -->'
 # GitHub が Issue を紐づける closing keyword と、そのあとの Issue の参照（#12・owner/repo#12・Issue の URL）
 KEYWORD_RE='\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)(\s*:?\s*)(?=(?:[\w.-]+/[\w.-]+)?#\d|https?://github\.com/[^\s/]+/[^\s/]+/issues/\d)'
 

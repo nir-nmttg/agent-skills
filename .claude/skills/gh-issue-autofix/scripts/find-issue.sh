@@ -22,8 +22,8 @@ BODY_LIMIT=8000
 COMMENT_COUNT=20   # 出力する要件のコメント（マーカーのコメントを除く）
 COMMENT_FETCH=40   # マーカーのコメントを除くために多めに取る
 COMMENT_LIMIT=2000
-STOP_MARK='<!-- gh-issue-auto-pr:stopped'   # 停止コメントの先頭（read-at=<読んだ時刻> が続くことがある）
-RESUMED_MARK='<!-- gh-issue-auto-pr:resumed'   # 再開の記録の先頭
+STOP_MARK='<!-- gh-issue-autofix:stopped'   # 停止コメントの先頭（read-at=<読んだ時刻> が続くことがある）
+RESUMED_MARK='<!-- gh-issue-autofix:resumed'   # 再開の記録の先頭
 
 # jq の共通の定義（$stop_mark・$resumed_mark を渡す）
 # - marker: comment.sh が書いたコメント（停止・再開の記録）
@@ -55,7 +55,7 @@ JQ_DEFS='
       else "updated" end;
 '
 
-LABEL=agent:auto-pr
+LABEL=agent:autofix
 TARGET= CHECK=false NO_LABEL_OK=false
 while (($#)); do
   case $1 in
@@ -215,7 +215,7 @@ else
       echo "$line"
     done
     echo
-    echo "続きから進めるときは \`/gh-issue-auto-pr <Issue の URL>\` で指定する。"
+    echo "続きから進めるときは \`/gh-issue-autofix <Issue の URL>\` で指定する。"
     echo
   fi
 
