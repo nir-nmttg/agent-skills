@@ -105,7 +105,7 @@ Claude デスクトップアプリのスケジュールタスクに登録し、`
 | [`$test-suite-refactor`](.agents/skills/test-suite-refactor/SKILL.md) | 検出力を保ったまま、テストの重複を整理する |
 | [`$code-order-refactor`](.agents/skills/code-order-refactor/SKILL.md) | メソッドや関数を読みやすい順に並べ替える |
 | [`$docs-align-with-code`](.agents/skills/docs-align-with-code/SKILL.md) | 実装に合わせて文書を更新する |
-| [`$security-audit-issues`](.agents/skills/security-audit-issues/SKILL.md) | フル監査の中断箇所を記録して進められる作業を続け、確認した所見を修正 Issue に反映し、自動修正できる項目にラベルを付ける |
+| [`$security-audit-issues`](.agents/skills/security-audit-issues/SKILL.md) | 自律監査で確定所見の修正 Issue と全判定の集約 Issue を作成・更新し、自動修正できる項目にラベルを付ける |
 
 ## 開発以外のスキル
 
