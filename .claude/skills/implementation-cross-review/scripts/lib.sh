@@ -19,3 +19,15 @@ print_project_instructions() {
     printf '\n</project-instructions>\n'
   done
 }
+
+# snapshot <dir>  作業ツリーの状態（未コミット・未追跡を含む、.gitignore 対象は除く）を、本物のインデックスに
+# 触れずにツリーとして記録し、そのツリー ID を出力する。確認のレビューで、前回からの変更だけを取り出すのに使う。
+snapshot() {
+  local dir=$1 idx real rc=0
+  idx=$(mktemp "${TMPDIR:-/tmp}/implementation-cross-review-index.XXXXXX") || return 1
+  real=$(git -C "$dir" rev-parse --path-format=absolute --git-path index) || { rm -f "$idx"; return 1; }
+  if [[ -f $real ]]; then cp "$real" "$idx" || rc=1; else rm -f "$idx"; fi
+  ((rc == 0)) && GIT_INDEX_FILE=$idx git -C "$dir" add -A -- . && GIT_INDEX_FILE=$idx git -C "$dir" write-tree || rc=1
+  rm -f "$idx"
+  return "$rc"
+}

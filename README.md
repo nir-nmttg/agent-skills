@@ -67,10 +67,10 @@ Claude は作業の一部を Haiku 5.5・Opus 5.5・Fable 5.2 のサブエージ
 | スキル | できること | 使う場面 |
 | --- | --- | --- |
 | [session-status-emoji](.claude/skills/session-status-emoji/SKILL.md) | セッション名に作業の段階の絵文字を付ける | デスクトップアプリの全セッション |
-| [design-cross-review](.claude/skills/design-cross-review/SKILL.md) | 設計を Astra と Fable にレビューさせる | 設計・実装計画を示す前 |
+| [design-cross-review](.claude/skills/design-cross-review/SKILL.md) | 設計を Astra と Fable にレビューさせる（直したあとは Astra が確認） | 設計・実装計画を示す前 |
 | [haiku-implementation](.claude/skills/haiku-implementation/SKILL.md) | 実装を Haiku 5.5 に任せ、手分けして進める | 指示書に書けて確かめられる実装 |
 | [haiku-check](.claude/skills/haiku-check/SKILL.md) | テスト・lint・CI ログの確認を Haiku 5.5 に任せる | 状態を変えない確認 |
-| [implementation-cross-review](.claude/skills/implementation-cross-review/SKILL.md) | 差分を Astra と Fable にレビューさせて直す | 完了報告・コミット・PR の前 |
+| [implementation-cross-review](.claude/skills/implementation-cross-review/SKILL.md) | 差分を Astra と Fable にレビューさせて直す（直したあとは Astra が確認） | 完了報告・コミット・PR の前 |
 | [japanese-report](.claude/skills/japanese-report/SKILL.md) | 報告を自然な日本語で書く | 結果を報告する前 |
 
 ### `/スキル名` で指定したときだけ使うスキル

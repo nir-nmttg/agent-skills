@@ -196,7 +196,7 @@ __DETAIL__
 
 `--read-at` には、4. の find-issue.sh が出した「読んだ時刻」を渡す。`--resume` は案内文の切り替えで、どちらも Issue が更新されれば次の実行で再開する: `new`（ブランチも PR も残らず、最初からやり直す）・`continue`（ブランチか PR が残り、その続きから再開する）。
 
-- 理由: `unclear`（対応の方針を決められない）・`spec`（受け入れ条件か仕様を変えないと対応できない）・`checks`（テスト・lint・型チェックが 3 回直しても通らない）・`review`（再レビュー 2 回のあとも重要度「高」が残る）・`verify`（動作確認で 2 回直しても受け入れ条件を満たさない）・`unreviewed`（Haiku の変更をレビューできない）・`denied`（分類器に断られた）・`env`（環境の問題）・`other`
+- 理由: `unclear`（対応の方針を決められない）・`spec`（受け入れ条件か仕様を変えないと対応できない）・`checks`（テスト・lint・型チェックが 3 回直しても通らない）・`review`（再レビューのあとも、仕組みを足さないと直せない重要度「高」が残る）・`verify`（動作確認で 2 回直しても受け入れ条件を満たさない）・`unreviewed`（Haiku の変更をレビューできない）・`denied`（分類器に断られた）・`env`（環境の問題）・`other`
 - 段階: `investigate`・`implement`・`check`・`review`・`verify`・`publish`
 
 **A. 設定の問題**（Issue を選ぶ前の失敗、start.sh の終了コード 1、gh のログイン切れ・権限モードなど Issue に関係しないもの）: Issue にはコメントしない。結果は `🔧 <コード>: <説明>`。コードは `permission`・`sync`・`deps`・`find`・`start`・`gh`・`other` のどれか（record-result.sh はコードで前回と比べて、同じ問題の通知を毎時繰り返さない）。
