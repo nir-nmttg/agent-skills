@@ -36,6 +36,32 @@ for cmd in git rg; do
   fi
 done
 
+cloudflare_skill="$link_dir/security-audit"
+printf '\n| 状態 | 外部スキル | 確認結果 |\n'
+printf '| --- | --- | --- |\n'
+if [[ -L $cloudflare_skill && ! -e $cloudflare_skill ]]; then
+  printf '| ⚠️ | Cloudflare `security-audit` | リンク先を参照できません（%s） |\n' "$(cell "$cloudflare_skill")"
+elif [[ ! -e $cloudflare_skill ]]; then
+  printf '| ⚠️ | Cloudflare `security-audit` | 標準の配置先にありません（%s） |\n' "$(cell "$cloudflare_skill")"
+elif [[ ! -d $cloudflare_skill ]]; then
+  printf '| ⚠️ | Cloudflare `security-audit` | 配置先がディレクトリではありません（%s） |\n' "$(cell "$cloudflare_skill")"
+else
+  missing_files=''
+  for required_file in SKILL.md RECONNAISSANCE.md HUNTING.md ATTACK-CLASSES.md \
+    VALIDATION-AND-REPORTING.md report-schema.json validate-coverage-ledger.cjs validate-findings.cjs; do
+    path="$cloudflare_skill/$required_file"
+    if [[ ! -f $path || ! -r $path || ! -s $path ]]; then
+      missing_files+="${missing_files:+、}$required_file"
+    fi
+  done
+  if [[ -n $missing_files ]]; then
+    printf '| ⚠️ | Cloudflare `security-audit` | 配置が不完全です（%s）。不足・読み取り不可・空のファイル: %s |\n' \
+      "$(cell "$cloudflare_skill")" "$missing_files"
+  else
+    printf '| ✅ | Cloudflare `security-audit` | 主要ファイルを参照可能（%s） |\n' "$(cell "$cloudflare_skill")"
+  fi
+fi
+
 printf '\n| スキル | 定義 | UI・呼び出し設定 | ユーザー用リンク（任意） |\n'
 printf '| --- | --- | --- | --- |\n'
 count=0

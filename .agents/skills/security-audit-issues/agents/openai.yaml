@@ -1,0 +1,6 @@
+interface:
+  short_description: "フル監査を実行し、確認済みの所見を非公開リポジトリの修正 Issue に反映する"
+  default_prompt: "$security-audit-issues --profile standard を使って、このリポジトリをフル監査し、独立検証済みの所見を同じリポジトリの修正 Issue に反映してください。"
+
+policy:
+  allow_implicit_invocation: false
