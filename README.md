@@ -117,8 +117,8 @@ Claude デスクトップアプリのスケジュールタスクに登録し、`
 
 ## 実行結果とスキルの追加・変更
 
-- レポートなどは、このリポジトリの `artifacts/<スキル名>/`（gitignore 済み）に保存される。\
-  `security-audit-issues` の監査結果は、Cloudflare の `security-audit` と同じ保存先を使う。
+- スキルの作業用ファイルは、このリポジトリの `artifacts/<スキル名>/`（gitignore 済み）に置く。
+- `security-audit-issues` の監査成果物は、Cloudflare の `security-audit` と同じ `~/security-audit-skill/<repo-name>/run-<N>/` に保存される。
 - 作り方のルールは [AGENTS.md](AGENTS.md) にある。\
   変更したら `scripts/check-descriptions.sh` と `git diff --check` を実行し、追加・改名・削除のあとは `scripts/link-skills.sh` を実行する。
 
