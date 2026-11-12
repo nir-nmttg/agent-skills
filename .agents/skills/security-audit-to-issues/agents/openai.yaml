@@ -1,0 +1,6 @@
+interface:
+  short_description: "[--profile quick|standard|deep] 自律監査し、非公開リポジトリに修正 Issue と調査・判定一覧を残す"
+  default_prompt: "$security-audit-to-issues --profile standard を使って、このリポジトリを自律監査し、確定所見の修正 Issue と実行環境のタイムゾーンの日付を付けた調査・判定一覧を作成・更新してください。"
+
+policy:
+  allow_implicit_invocation: false
