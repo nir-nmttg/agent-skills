@@ -85,8 +85,8 @@ case $MODE in
     [[ $REPLY_TO =~ ^[1-9][0-9]*$ ]] || die "--reply にはコメントの ID（数字）を指定してください: $REPLY_TO"
     [[ $READ =~ ^[1-9][0-9]*$ ]] || die "--read には pr-feedback.sh が出した ID（数字）を指定してください: ${READ:-（なし）}"
     [[ -z $RESULT$REASON$ANSWERED$CI_CHECKED$CONFLICT_CHECKED ]] || die "--reply には --read のほかのオプションを付けません。"
-    body="<!-- gh-issue-auto-pr:pr-reply v=1 read-at=$READ_AT read=$READ -->
-🤖 gh-issue-auto-pr: $(read_body "$REPLY_LIMIT")"
+    body="<!-- gh-issue-autofix:pr-reply v=1 read-at=$READ_AT read=$READ -->
+🤖 gh-issue-autofix: $(read_body "$REPLY_LIMIT")"
     url=$(gh api --method POST "repos/$REPO/pulls/$NUMBER/comments/$REPLY_TO/replies" -f body="$body" --jq .html_url) ||
       die "スレッド（コメント $REPLY_TO）に返信できませんでした。"
     echo "返信しました: $url"
@@ -99,7 +99,7 @@ case $MODE in
     [[ -z $CONFLICT_CHECKED || $CONFLICT_CHECKED =~ ^[0-9a-f]{7,40}-[0-9a-f]{7,40}$ ]] || die "--conflict-checked は pr-feedback.sh が出した値にしてください: $CONFLICT_CHECKED"
     if [[ $RESULT == done ]]; then
       [[ -z $REASON ]] || die "--reason は --result stopped のときだけ付けます。"
-      head="🤖 gh-issue-auto-pr が、この PR への指摘・CI・競合に対応しました。"
+      head="🤖 gh-issue-autofix が、この PR への指摘・CI・競合に対応しました。"
     else
       case $REASON in
         checks) reason_text="テスト・lint・型チェックが通りませんでした。" ;;
@@ -112,9 +112,9 @@ case $MODE in
         other) reason_text="上のどれにも当てはまらない理由で止めました。" ;;
         *) die "--reason は checks | review | verify | spec | unclear | denied | env | other のどれかです: ${REASON:-（なし）}" ;;
       esac
-      head="🤖 gh-issue-auto-pr が、この PR への対応を途中で止めました。理由: $reason_text"
+      head="🤖 gh-issue-autofix が、この PR への対応を途中で止めました。理由: $reason_text"
     fi
-    mark="<!-- gh-issue-auto-pr:pr-handled v=1 read-at=$READ_AT result=$RESULT${ANSWERED:+ answered=$ANSWERED}${CI_CHECKED:+ ci-checked=$CI_CHECKED}${CONFLICT_CHECKED:+ conflict-checked=$CONFLICT_CHECKED} -->"
+    mark="<!-- gh-issue-autofix:pr-handled v=1 read-at=$READ_AT result=$RESULT${ANSWERED:+ answered=$ANSWERED}${CI_CHECKED:+ ci-checked=$CI_CHECKED}${CONFLICT_CHECKED:+ conflict-checked=$CONFLICT_CHECKED} -->"
     body="$mark
 $head
 
@@ -125,11 +125,11 @@ $(read_body "$SUMMARY_LIMIT")"
   limit)
     [[ -z $READ$READ_AT$REPLY_TO$RESULT$REASON$ANSWERED$CI_CHECKED$CONFLICT_CHECKED ]] || die "--limit には、ほかのオプションを付けません。"
     if $SCHEDULED; then
-      body="<!-- gh-issue-auto-pr:pr-limit -->
-🤖 gh-issue-auto-pr の自動の対応が上限に達したので、この PR への定期実行での対応を止めました。続けるときは、gh-issue-auto-pr を動かしている PC で、このリポジトリのフォルダから \`bash ~/.claude/skills/gh-issue-auto-pr/scripts/pr-feedback.sh $NUMBER --reset\` を実行してください。"
+      body="<!-- gh-issue-autofix:pr-limit -->
+🤖 gh-issue-autofix の自動の対応が上限に達したので、この PR への定期実行での対応を止めました。続けるときは、gh-issue-autofix を動かしている PC で、このリポジトリのフォルダから \`bash ~/.claude/skills/gh-issue-autofix/scripts/pr-feedback.sh $NUMBER --reset\` を実行してください。"
     else
-      body="<!-- gh-issue-auto-pr:pr-limit -->
-🤖 gh-issue-auto-pr の自動の対応が上限に達したので、この PR の Auto-fix をオフにしました。続けるときは、Claude デスクトップアプリでこの PR のセッションの Auto-fix をオンにし直してください。"
+      body="<!-- gh-issue-autofix:pr-limit -->
+🤖 gh-issue-autofix の自動の対応が上限に達したので、この PR の Auto-fix をオフにしました。続けるときは、Claude デスクトップアプリでこの PR のセッションの Auto-fix をオンにし直してください。"
     fi
     url=$(gh pr comment "$NUMBER" --repo "$REPO" --body-file - <<<"$body") || die "PR #$NUMBER に上限の案内をコメントできませんでした。"
     echo "上限の案内をコメントしました: $url"

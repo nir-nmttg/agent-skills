@@ -6,8 +6,8 @@ def clip($n): if length > $n then .[:$n] + "\n…（\($n) 文字で切った）"
 def safe: gsub("<\\s*/?\\s*pr-content[^>]*>"; "[pr-content]"; "i");
 def text: (.body // "");
 # 自分が書いた、マーカーで始まる書き込み（ほかの人がマーカーを真似たものと、自分がマーカーなしで書いたものは人の書き込み）
-def mine: (.author.login // "") == $me and (text | startswith($mark));
-def marker($kind): mine and (text | startswith($mark + $kind));
+def mine: (.author.login // "") == $me and (text | test($mark));
+def marker($kind): mine and (text | test($mark + $kind));
 # マーカーの行（1 行目）の key=value
 def field($k): ((text | split("\n")[0] | capture("[ ]" + $k + "=(?<v>[^ ]*)") | .v)? // "");
 def ids($k): field($k) | split(",") | map(select(. != ""));

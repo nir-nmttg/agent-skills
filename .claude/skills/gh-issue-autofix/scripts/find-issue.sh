@@ -22,8 +22,9 @@ BODY_LIMIT=8000
 COMMENT_COUNT=20   # 出力する要件のコメント（マーカーのコメントを除く）
 COMMENT_FETCH=40   # マーカーのコメントを除くために多めに取る
 COMMENT_LIMIT=2000
-STOP_MARK='<!-- gh-issue-auto-pr:stopped'   # 停止コメントの先頭（read-at=<読んだ時刻> が続くことがある）
-RESUMED_MARK='<!-- gh-issue-auto-pr:resumed'   # 再開の記録の先頭
+# 停止コメント・再開の記録の先頭に一致する正規表現（改名前の gh-issue-auto-pr が書いた印も同じものとして読む）
+STOP_MARK='^<!-- gh-issue-(autofix|auto-pr):stopped'   # 停止コメント（read-at=<読んだ時刻> が続くことがある）
+RESUMED_MARK='^<!-- gh-issue-(autofix|auto-pr):resumed'   # 再開の記録
 
 # jq の共通の定義（$stop_mark・$resumed_mark を渡す）
 # - marker: comment.sh が書いたコメント（停止・再開の記録）
@@ -34,8 +35,8 @@ RESUMED_MARK='<!-- gh-issue-auto-pr:resumed'   # 再開の記録の先頭
 # - status($me): none（マーカーなし）・resumed（最新が再開の記録）・
 #   waiting（最新が停止で、そのあとに関係者・作成者のマーカーのないコメントも本文の編集もない）・updated（最新が停止で、そのあとに更新がある）
 JQ_DEFS='
-  def stop_marker: (.body // "") | startswith($stop_mark);
-  def resumed_marker: (.body // "") | startswith($resumed_mark);
+  def stop_marker: (.body // "") | test($stop_mark);
+  def resumed_marker: (.body // "") | test($resumed_mark);
   def marker: stop_marker or resumed_marker;
   def stopped_at: ((.body | capture("read-at=(?<t>[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z)") | .t)? // .createdAt);
   def member: .authorAssociation | IN("OWNER", "MEMBER", "COLLABORATOR");
@@ -55,7 +56,7 @@ JQ_DEFS='
       else "updated" end;
 '
 
-LABEL=agent:auto-pr
+LABEL=agent:autofix
 TARGET= CHECK=false NO_LABEL_OK=false
 while (($#)); do
   case $1 in
@@ -215,7 +216,7 @@ else
       echo "$line"
     done
     echo
-    echo "続きから進めるときは \`/gh-issue-auto-pr <Issue の URL>\` で指定する。"
+    echo "続きから進めるときは \`/gh-issue-autofix <Issue の URL>\` で指定する。"
     echo
   fi
 

@@ -7,20 +7,20 @@
 #         pr-feedback.sh <PR の URL か番号> --reset    # 上限の記録を消し、回数を 0 に戻す（人が Auto-fix をオンにし直したとき・定期実行を再開するとき）
 #         pr-feedback.sh <PR の URL か番号> --mark on|scheduled|off  # 自動の対応の記録（--list の対象）
 #         pr-feedback.sh --list                       # 自動の対応の記録がある PR のうち、対応が要りそうなものを出す（定期実行の報告用）
-#   自動の対応の記録（.git の gh-issue-auto-pr/pr-<番号>.autofix）の種類:
+#   自動の対応の記録（.git の gh-issue-autofix/pr-<番号>.autofix。改名前の .git/gh-issue-auto-pr があればその中）の種類:
 #     on = Auto-fix（リポジトリのモード。中身 autofix。空のファイルも autofix）
 #     scheduled = 定期実行（親ディレクトリのモード。中身 scheduled。Auto-fix の記録があれば上書きしない）
 #   --begin・--limited・--reset・--mark はローカルの記録だけを変え、番号で指定すれば gh を呼ばない。
 #   --list は記録のある PR を番号の小さい順に判定し、「- #<番号>: <判定>」を出す（定期実行の PR は末尾に「（定期実行）」）。
 #     判定が「終了」の PR は記録を消す。定期実行の PR は mergeable を取り直す（競合を拾うため）。
 #   判定（「- 判定: 」の行）は次の順で 1 つ:
-#     無効（環境変数 GH_ISSUE_AUTO_PR_AUTOFIX が 0 / off）→ 終了（closed・マージ済み）→ 対象外（このスキルの PR でない・
+#     無効（環境変数 GH_ISSUE_AUTOFIX_PR_AUTOFIX が 0 / off）→ 終了（closed・マージ済み）→ 対象外（このスキルの PR でない・
 #     ベースが既定ブランチでないなど）→ 取得不完全 → レビュー中（自分の下書きのレビューがある）→ なし → 上限 → あり
 #   対応済みの印は、自分（viewer）が書いた、マーカーで始まる書き込み:
-#     まとめ  <!-- gh-issue-auto-pr:pr-handled v=1 read-at=<読んだ時刻> result=... answered=... ci-checked=... conflict-checked=... -->
-#     返信    <!-- gh-issue-auto-pr:pr-reply v=1 read-at=<読んだ時刻> read=<読んだ最後のコメントの ID> -->
+#     まとめ  <!-- gh-issue-autofix:pr-handled v=1 read-at=<読んだ時刻> result=... answered=... ci-checked=... conflict-checked=... -->
+#     返信    <!-- gh-issue-autofix:pr-reply v=1 read-at=<読んだ時刻> read=<読んだ最後のコメントの ID> -->
 #   読んだ時刻より後に編集された書き込みは、答えたあとでも、もう一度対応する。
-#     上限    <!-- gh-issue-auto-pr:pr-limit -->
+#     上限    <!-- gh-issue-autofix:pr-limit -->
 #   同じアカウントでもマーカーのない書き込みは人のものとして扱う。
 #   関係者は、リポジトリに write 以上の権限がある人（bot は除く）。それ以外の書き込みは要件として扱わない。
 # 終了コード: 0 = 判定を出した、1 = エラー
@@ -29,7 +29,8 @@ source "$(dirname "$0")/lib.sh"
 
 ATTEMPT_LIMIT=5
 BODY_LIMIT=2000
-MARK_PREFIX='<!-- gh-issue-auto-pr:'
+# 自分の書き込みの印の先頭に一致する正規表現（改名前の gh-issue-auto-pr が書いた印も同じものとして読む）
+MARK_PREFIX='^<!-- gh-issue-(autofix|auto-pr):'
 
 TARGET= MODE=show MARK=
 while (($#)); do
@@ -120,9 +121,9 @@ if [[ $MODE == list ]]; then
   for n in $(for f in "$S"/pr-*.autofix; do [[ -f $f ]] || continue; f=${f##*/pr-}; echo "${f%.autofix}"; done | grep -E '^[1-9][0-9]*$' | sort -n); do
     kind=$(mark_kind "$S/pr-$n.autofix")
     if [[ $kind == scheduled ]]; then
-      line=$(GH_ISSUE_AUTO_PR_AUTOFIX=1 bash "$0" "$n" 2>/dev/null | sed -n 's/^- 判定: //p' | head -1) || line=
+      line=$(GH_ISSUE_AUTOFIX_PR_AUTOFIX=1 bash "$0" "$n" 2>/dev/null | sed -n 's/^- 判定: //p' | head -1) || line=
     else
-      line=$(GH_ISSUE_AUTO_PR_AUTOFIX=1 GH_ISSUE_AUTO_PR_QUICK=1 bash "$0" "$n" 2>/dev/null | sed -n 's/^- 判定: //p' | head -1) || line=
+      line=$(GH_ISSUE_AUTOFIX_PR_AUTOFIX=1 GH_ISSUE_AUTOFIX_QUICK=1 bash "$0" "$n" 2>/dev/null | sed -n 's/^- 判定: //p' | head -1) || line=
     fi
     case ${line:-取得できない} in
       終了*) rm -f "$S/pr-$n.autofix" ;;
@@ -149,8 +150,8 @@ fi
 attempts=$(cat "$(state_dir)/pr-$NUMBER.attempts" 2>/dev/null || echo 0)
 [[ $attempts =~ ^[0-9]+$ ]] || attempts=0
 
-case ${GH_ISSUE_AUTO_PR_AUTOFIX:-} in
-  0 | off) echo "- 判定: 無効（環境変数 GH_ISSUE_AUTO_PR_AUTOFIX で無効にしている）"; exit 0 ;;
+case ${GH_ISSUE_AUTOFIX_PR_AUTOFIX:-} in
+  0 | off) echo "- 判定: 無効（環境変数 GH_ISSUE_AUTOFIX_PR_AUTOFIX で無効にしている）"; exit 0 ;;
 esac
 
 tmp=$(mktemp -d)
@@ -176,8 +177,8 @@ for try in 1 2 3 4; do
     die "PR #$NUMBER を取得できません。
 $(cat "$tmp/err")"
   }
-  # --list（GH_ISSUE_AUTO_PR_QUICK）では待たない
-  [[ $(jq -r '.data.repository.pullRequest.mergeable' "$tmp/pr.json") == UNKNOWN && $try -lt 4 && -z ${GH_ISSUE_AUTO_PR_QUICK:-} ]] || break
+  # --list（GH_ISSUE_AUTOFIX_QUICK）では待たない
+  [[ $(jq -r '.data.repository.pullRequest.mergeable' "$tmp/pr.json") == UNKNOWN && $try -lt 4 && -z ${GH_ISSUE_AUTOFIX_QUICK:-} ]] || break
   sleep 5
 done
 

@@ -45,8 +45,8 @@ if $RESUMED; then
   require_tools
   load_repo
   body=$(
-    echo "<!-- gh-issue-auto-pr:resumed -->"
-    echo "🤖 gh-issue-auto-pr がこの Issue の対応を再開しました。結果は、ドラフト PR か、このあとのコメントでお知らせします。"
+    echo "<!-- gh-issue-autofix:resumed -->"
+    echo "🤖 gh-issue-autofix がこの Issue の対応を再開しました。結果は、ドラフト PR か、このあとのコメントでお知らせします。"
   )
   url=$(gh issue comment "$NUMBER" --repo "$REPO" --body-file - <<<"$body") ||
     die "#$NUMBER に再開の記録をコメントできませんでした。"
@@ -78,7 +78,7 @@ esac
 [[ $RESUME == new || $RESUME == continue ]] || die "--resume は new か continue です: ${RESUME:-（なし）}"
 [[ -z $READ_AT || $READ_AT =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$ ]] ||
   die "--read-at は find-issue.sh が出した時刻（例 2026-11-10T01:00:00Z）にしてください: $READ_AT"
-STOP_MARK="<!-- gh-issue-auto-pr:stopped${READ_AT:+ read-at=$READ_AT} -->"
+STOP_MARK="<!-- gh-issue-autofix:stopped${READ_AT:+ read-at=$READ_AT} -->"
 
 require_tools
 command -v perl >/dev/null 2>&1 || die "perl がありません。"
@@ -102,7 +102,7 @@ if $DETAIL; then
 fi
 
 # 再開の条件（ラベル・担当・PR）。PR へのコメントや、PR を Issue に手で紐づけたときは再開しない
-conditions="\`agent:auto-pr\` ラベルと担当者の設定が残っている場合"
+conditions="\`agent:autofix\` ラベルと担当者の設定が残っている場合"
 if [[ $RESUME == new ]]; then
   resume_text="この Issue の本文を編集するか、コメントで情報を足すと、次の定期実行で最初からやり直します（$conditions）。"
 elif [[ -n $PR ]]; then
@@ -113,7 +113,7 @@ fi
 
 body=$(
   echo "$STOP_MARK"
-  echo "🤖 gh-issue-auto-pr がこの Issue の対応を止めました。"
+  echo "🤖 gh-issue-autofix がこの Issue の対応を止めました。"
   echo
   echo "- 理由: $reason_text"
   echo "- 止めた段階: $stage_text"

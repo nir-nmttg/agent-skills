@@ -1,9 +1,9 @@
 ---
-name: gh-issue-auto-pr
-description: 定期実行で、agent:auto-pr ラベル付きで自分にアサインされた Issue を 1 件、確認なしでドラフト PR にする。PR の指摘と CI には、リポジトリでは Auto-fix、親ディレクトリでは定期実行で対応する。
+name: gh-issue-autofix
+description: 定期実行で、agent:autofix ラベル付きで自分にアサインされた Issue を 1 件、確認なしでドラフト PR にする。PR の指摘と CI には、リポジトリでは Auto-fix、親ディレクトリでは定期実行で対応する。
 disable-model-invocation: true
 argument-hint: "[<Issue の URL か番号>] [--label <ラベル>]"
-allowed-tools: Bash(bash *gh-issue-auto-pr/scripts/precheck.sh*), Bash(bash *gh-issue-auto-pr/scripts/repos.sh*), Bash(bash *gh-issue-auto-pr/scripts/lock.sh*), Bash(bash *gh-issue-auto-pr/scripts/sync-base.sh*), Bash(bash *gh-issue-auto-pr/scripts/find-issue.sh*), Bash(bash *gh-issue-auto-pr/scripts/start.sh*), Bash(bash *gh-issue-auto-pr/scripts/publish.sh*), Bash(bash *gh-issue-auto-pr/scripts/comment.sh*), Bash(bash *gh-issue-auto-pr/scripts/release.sh*), Bash(bash *gh-issue-auto-pr/scripts/record-result.sh*), Bash(bash *gh-issue-auto-pr/scripts/pr-feedback.sh*), Bash(bash *gh-issue-auto-pr/scripts/pr-comment.sh*)
+allowed-tools: Bash(bash *gh-issue-autofix/scripts/precheck.sh*), Bash(bash *gh-issue-autofix/scripts/repos.sh*), Bash(bash *gh-issue-autofix/scripts/lock.sh*), Bash(bash *gh-issue-autofix/scripts/sync-base.sh*), Bash(bash *gh-issue-autofix/scripts/find-issue.sh*), Bash(bash *gh-issue-autofix/scripts/start.sh*), Bash(bash *gh-issue-autofix/scripts/publish.sh*), Bash(bash *gh-issue-autofix/scripts/comment.sh*), Bash(bash *gh-issue-autofix/scripts/release.sh*), Bash(bash *gh-issue-autofix/scripts/record-result.sh*), Bash(bash *gh-issue-autofix/scripts/pr-feedback.sh*), Bash(bash *gh-issue-autofix/scripts/pr-comment.sh*)
 ---
 
 # ラベル付きの Issue を定期実行でドラフト PR にする（入口）
