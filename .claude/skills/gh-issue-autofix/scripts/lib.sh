@@ -92,7 +92,6 @@ update_submodules() {
 
 # このスキルの状態（ロック・依存のインストールの記録・前回の結果）の置き場所。
 # git が管理しない共通の .git の中に置き、どの worktree から実行しても同じ場所にする
-# 改名前の gh-issue-auto-pr の置き場所があれば、移さずに必ずそちらを使う（ロック・PR の Auto-fix の記録などを、どの版から実行しても共有する）
 state_dir() {
   local d
   d=$(state_dir_path)
@@ -101,6 +100,7 @@ state_dir() {
 }
 
 # state_dir と同じ場所を、フォルダを作らずに返す（読むだけの確認に使う）。引数があれば、そのフォルダのリポジトリについて
+# 改名前の gh-issue-auto-pr の置き場所があれば、移さずに必ずそちらを使う（ロック・PR の Auto-fix の記録などを、どの版から実行しても共有する）
 state_dir_path() {
   local common d
   common=$(git ${1:+-C "$1"} rev-parse --path-format=absolute --git-common-dir)
