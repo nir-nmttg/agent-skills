@@ -55,7 +55,7 @@ if [[ -e $run_dir/previous.txt ]]; then
   prev=$(cd -P "$prev" && pwd)
   [[ $prev != "$run_dir" ]] || { echo "エラー: 前回の実行フォルダが今回と同じです" >&2; exit 1; }
   for f in snapshot.txt repo.txt head.txt; do
-    [[ -s $prev/$f ]] || { echo "エラー: 前回の $f がありません（前回のスナップショットを取れなかったか、古い版で作ったフォルダです）。1 回目と同じ形でレビューしてください" >&2; exit 1; }
+    [[ -s $prev/$f ]] || { echo "エラー: 前回の $f がありません（前回のスナップショットを取れなかったか、古い版で作ったフォルダです）。確認のレビューは使えないので、--followup を付けずに全体の差分でレビューしてください" >&2; exit 1; }
   done
   [[ -s $run_dir/fixes.md ]] || { echo "エラー: $run_dir/fixes.md がないか空です" >&2; exit 1; }
   # --cd を省いたら前回のリポジトリを使う（別の worktree の変更を、直したこととして読まないため）
@@ -81,13 +81,13 @@ if [[ -n $followup ]]; then
     { echo "エラー: 前回のリポジトリ（$(cat "$prev/repo.txt")）と違う場所です。--cd を省くか、前回と同じ場所を指定してください" >&2; exit 1; }
   prev_tree=$(cat "$prev/snapshot.txt") prev_head=$(cat "$prev/head.txt")
   g rev-parse -q --verify "$prev_tree^{tree}" >/dev/null ||
-    { echo "エラー: 前回のスナップショットが見つかりません（git gc で消えた可能性があります）。1 回目と同じ形でレビューしてください" >&2; exit 1; }
+    { echo "エラー: 前回のスナップショットが見つかりません（git gc で消えた可能性があります）。確認のレビューは使えないので、--followup を付けずに全体の差分でレビューしてください" >&2; exit 1; }
   # rebase・ブランチの切り替え・マージを挟むと、直したこと以外の変更が差分に入るので止める。
-  # fast-forward で入ったコミットは止めず、<scope> にコミットの件名を出して、レビュアーが見分けられるようにする
+  # fast-forward で入ったコミットは通し、<scope> にコミットの件名を出して、レビュアーが直したことと見分けられるようにする
   g merge-base --is-ancestor "$prev_head" HEAD 2>/dev/null ||
-    { echo "エラー: 前回のレビューのあとに rebase かブランチの切り替えがありました。1 回目と同じ形でレビューしてください" >&2; exit 1; }
+    { echo "エラー: 前回のレビューのあとに rebase かブランチの切り替えがありました。確認のレビューは使えないので、--followup を付けずに全体の差分でレビューしてください" >&2; exit 1; }
   [[ -z $(g rev-list --merges "$prev_head..HEAD") ]] ||
-    { echo "エラー: 前回のレビューのあとにマージコミットがあります。1 回目と同じ形でレビューしてください" >&2; exit 1; }
+    { echo "エラー: 前回のレビューのあとにマージコミットがあります。確認のレビューは使えないので、--followup を付けずに全体の差分でレビューしてください" >&2; exit 1; }
   cur_tree=$(snapshot "$workdir") || { echo "エラー: 今の作業ツリーのスナップショットを取れませんでした" >&2; exit 1; }
   g diff "$prev_tree" "$cur_tree" >"$run_dir/fix.patch"
   [[ -s $run_dir/fix.patch ]] || { echo "エラー: 前回のレビューから変更がありません" >&2; exit 1; }
@@ -190,7 +190,7 @@ lines=$(grep -E '^[+-]' "$run_dir/diff.patch" | grep -cvE '^(\+\+\+|---) ' || tr
 size=$(wc -c <"$run_dir/diff.patch" | tr -d ' ')
 
 # 確認のレビューに備えて、今の作業ツリーを記録する（直したことは作業ツリーに入るので、--commit でも作業ツリーで取る）。
-# 取れなくてもこのレビューは続け、確認のレビューは 1 回目と同じ形にしてもらう
+# 取れなくてもこのレビューは続ける（そのときの再レビューは、--followup を付けずに全体の差分で行う）
 tree_id=$(snapshot "$workdir" 2>/dev/null) || { tree_id=""; echo "注意: 作業ツリーのスナップショットを取れませんでした。確認のレビューは使えません" >&2; }
 
 {
