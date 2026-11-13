@@ -3,14 +3,21 @@
 #   - コミットせずに止めたとき: 着手（リモートの claude/issue-<番号>）を取り消す
 #   - ドラフト PR を作ったあと: worktree だけを消す（PR があるのでブランチは残る）
 #
-# 使い方: release.sh <Issue の番号>
+# 使い方: release.sh [--keep-claim] <Issue の番号>
+#   --keep-claim: 着手（リモートの claude/issue-<番号>）を消さずに残す。全自動モードで PR にできずにやめたとき、
+#     次の引数なしの実行で同じ Issue を選び直さないようにする（find-issue.sh の「着手中」の一覧に出る）。
 #   リモートの claude/issue-<番号> に既定ブランチにないコミットがなく、PR もなく、ローカルにだけあるコミットもなければ消す。
 #   worktree に変更がなければ、worktree と、既定ブランチかリモートの claude/issue-<番号> に含まれるローカルのブランチを消す
 #   （リモートにあるものは消しても失わない。残すと、人がリモートを rebase したときに start.sh --resume が分岐で止まる）。
 set -euo pipefail
 source "$(dirname "$0")/lib.sh"
 
-(($# == 1)) || die "使い方: release.sh <Issue の番号>"
+KEEP_CLAIM=false
+if [[ ${1:-} == --keep-claim ]]; then
+  KEEP_CLAIM=true
+  shift
+fi
+(($# == 1)) || die "使い方: release.sh [--keep-claim] <Issue の番号>"
 NUMBER=$1
 require_number "$NUMBER"
 require_tools
@@ -77,6 +84,8 @@ if [[ -n $prs ]]; then
   echo "- リモートの $BRANCH: PR（$prs）があるので残した"
 elif ! git merge-base --is-ancestor "$remote" "origin/$DEFAULT_BRANCH"; then
   echo "- リモートの $BRANCH: origin/$DEFAULT_BRANCH にないコミットがあるので残した"
+elif $KEEP_CLAIM; then
+  echo "- リモートの $BRANCH: --keep-claim なので着手を残した（次の引数なしの実行では選ばれない）"
 elif $local_ahead; then
   # 消すと、次の実行が --new で始めてローカルのコミットとぶつかる。着手の印として残し、続きから再開できるようにする
   echo "- リモートの $BRANCH: ローカルにだけあるコミットの続きから再開できるように残した"
