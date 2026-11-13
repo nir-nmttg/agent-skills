@@ -96,7 +96,7 @@ Codex 用は `$スキル名` で指定したときだけ使う。
 
 ## 組み合わせて使う
 
-Codex の security-audit-to-issues と Claude Code の gh-issue-autofix をつなぐと、監査 → Issue 化 → 自動対応 → ドラフト PR まで進められる。
+Codex の [security-audit-to-issues](.agents/skills/security-audit-to-issues/SKILL.md) と Claude Code の [gh-issue-autofix](.claude/skills/gh-issue-autofix/SKILL.md) をつなぐと、監査 → Issue 化 → 自動対応 → ドラフト PR まで進められる。
 
 1. 監査するプロジェクトの直下で、Codex から `$security-audit-to-issues` を呼ぶ。\
    確定所見が修正 Issue になり、自動で直せるものに `agent:autofix` が付く。
