@@ -10,7 +10,7 @@
 #   違うときはリンクせず、前に張ったリンクも外す（worktree にインストールし直す）。
 # 終了コード: 0 = 用意できた、1 = エラー（ネットワーク・権限など、環境の問題。--new で着手を確保したあとなら「着手は確保済み」と出す）
 #   2 = 止める。出力の先頭で区分する:
-#     claimed:  別の人かセッションが着手済み
+#     claimed:  別のセッションが着手済み
 #     busy:     その Issue の worktree に未コミットの変更がある（作業中の可能性）
 #     conflict: その Issue に固有の問題（ローカルのブランチに独自のコミット、分岐、worktree の置き場所の衝突、
 #               メインの checkout でそのブランチを開いている）
@@ -48,7 +48,7 @@ fi
 
 remote=$(remote_sha "$BRANCH")
 if [[ $MODE == new ]]; then
-  [[ -z $remote ]] || stop "claimed: #$NUMBER は別の人かセッションが着手済みです（リモートに $BRANCH があります）。"
+  [[ -z $remote ]] || stop "claimed: #$NUMBER は別のセッションが着手済みです（リモートに $BRANCH があります）。"
   created=false
   if git show-ref -q --verify "$REF"; then
     # 前回 push の前に止まったものだけ使い直す。独自のコミットがあるブランチは公開しない
@@ -67,7 +67,7 @@ if [[ $MODE == new ]]; then
   out=$(git push --porcelain --no-verify --force-with-lease="$REF:" origin "$REF:$REF" 2>&1) && pushed=true || pushed=false
   if ! $pushed || ! grep -q "^\*	$REF:$REF	" <<<"$out"; then
     # 別のセッションが着手していれば、ローカルのブランチはそのセッションが使うかもしれないので残す
-    [[ -z $(remote_sha "$BRANCH") ]] || stop "claimed: #$NUMBER は別の人かセッションが着手済みです（リモートに $BRANCH ができました）。"
+    [[ -z $(remote_sha "$BRANCH") ]] || stop "claimed: #$NUMBER は別のセッションが着手済みです（リモートに $BRANCH ができました）。"
     ! $created || git branch -q -D "$BRANCH" 2>/dev/null || true
     die "$BRANCH を push できません（権限・ブランチの保護・ネットワークを確かめてください）。
 $out"
