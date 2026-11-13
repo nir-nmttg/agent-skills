@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Master が Parent の停止を見張るための記録と判定。出力は決まった語・数・ハッシュ・URL と、Parent が記録した保留の理由（短い文）だけにする。
+// 監督役が取りまとめ役の停止を見張るための記録と判定。出力は決まった語・数・ハッシュ・URL と、取りまとめ役が記録した保留の理由（短い文）だけにする。
 import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
@@ -9,7 +9,7 @@ const MAX_AUTO_RESUMES = 8;
 const MAX_NO_PROGRESS = 2;
 const MAX_UNKNOWN = 3;
 const STAGES = ["starting", "auditing", "self_auditing", "gave_up", "done"];
-const EVENT_KINDS = ["stopped", "malformed", "unknown", "resuming", "human_resume", "followup_failed", "run_dir_mismatch", "unsupported", "returned", "master_resume"];
+const EVENT_KINDS = ["stopped", "malformed", "unknown", "resuming", "human_resume", "followup_failed", "run_dir_mismatch", "unsupported", "returned", "supervisor_resume"];
 const AUDITING_ONLY = ["stopped", "malformed", "unknown", "resuming", "human_resume", "followup_failed", "run_dir_mismatch", "returned"];
 const DECISION_KINDS = ["stopped", "malformed", "unknown", "followup_failed", "run_dir_mismatch"];
 const LEDGER_STATUSES = ["planned", "in_progress", "candidate", "covered", "blocked", "deferred", "not_applicable", "out_of_scope"];
@@ -104,7 +104,7 @@ function cmdInit(dir) {
     version: 1,
     run_dir: dir,
     stage: "starting",
-    parent_id: null,
+    coordinator_id: null,
     auto_resumes: 0,
     max_auto_resumes: MAX_AUTO_RESUMES,
     consecutive_no_progress: 0,
@@ -117,11 +117,11 @@ function cmdInit(dir) {
   return "starting";
 }
 
-function cmdAttach(dir, parentId) {
-  if (!parentId || parentId.length > 256 || /[\s"'`]/.test(parentId)) fail("parent_id が正しくありません");
+function cmdAttach(dir, coordinatorId) {
+  if (!coordinatorId || coordinatorId.length > 256 || /[\s"'`]/.test(coordinatorId)) fail("coordinator_id が正しくありません");
   const state = loadState(dir);
   if (state.stage !== "starting") fail(`段階が starting ではありません: ${state.stage}`);
-  state.parent_id = parentId;
+  state.coordinator_id = coordinatorId;
   state.stage = "auditing";
   state.last_progress = progress(dir);
   pushEvent(state, { kind: "attach" });
@@ -306,7 +306,7 @@ function cmdSummary(dir) {
         malformed: count("malformed"),
         auto_resumes: count("resuming"),
         human_resumes: count("human_resume"),
-        master_resumes: count("master_resume"),
+        supervisor_resumes: count("supervisor_resume"),
         error_kinds: [...new Set(events.map((e) => e?.error_kind).filter((k) => typeof k === "string"))],
         gave_up_reasons: reasons("finish_gave_up"),
         returned_reasons: reasons("returned"),
@@ -344,7 +344,7 @@ function cmdFinish(dir, stage, reason) {
 
 function cmdState(dir) {
   const state = loadState(dir);
-  return `stage=${state.stage} parent_id=${state.parent_id ?? "none"} auto_resumes=${state.auto_resumes}/${state.max_auto_resumes} no_progress=${state.consecutive_no_progress}`;
+  return `stage=${state.stage} coordinator_id=${state.coordinator_id ?? "none"} auto_resumes=${state.auto_resumes}/${state.max_auto_resumes} no_progress=${state.consecutive_no_progress}`;
 }
 
 const COMMANDS = {

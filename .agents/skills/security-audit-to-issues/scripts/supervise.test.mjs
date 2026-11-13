@@ -28,7 +28,7 @@ test("段階は starting から auditing、gave_up、auditing、done へ移る",
   assert.equal(main(["finish", dir, "gave_up"]), "gave_up");
   assert.equal(main(["resume", dir]), "auditing");
   assert.equal(main(["finish", dir, "done"]), "done");
-  assert.match(main(["state", dir]), /^stage=done parent_id=agent-1 /);
+  assert.match(main(["state", dir]), /^stage=done coordinator_id=agent-1 /);
 });
 
 test("進まない停止が2回続くと give_up", () => {
@@ -122,7 +122,7 @@ test("段階に合わない記録と終わり方は断る", () => {
   main(["init", dir]);
   assert.throws(() => main(["record", dir, "stopped"]), /段階 starting/);
   assert.throws(() => main(["finish", dir, "done"]), /段階 starting/);
-  assert.throws(() => main(["attach", dir, "bad id"]), /parent_id/);
+  assert.throws(() => main(["attach", dir, "bad id"]), /coordinator_id/);
   assert.equal(main(["record", dir, "unsupported"]).startsWith("unsupported"), true);
   assert.throws(() => main(["record", dir, "unsupported"]), /段階 self_auditing/);
   main(["finish", dir, "done"]);
@@ -250,14 +250,14 @@ test("summary は件数と URL だけを出し、未検証は fingerprint の重
   assert.deepEqual(s.supervisor.error_kinds, ["cyber_policy"]);
 });
 
-test("Master の再開の記録は、記録済みの停止の判定を隠さない", () => {
+test("監督役の再開の記録は、記録済みの停止の判定を隠さない", () => {
   const dir = runDir();
   started(dir);
   main(["record", dir, "stopped", "cyber_policy"]);
-  main(["record", dir, "master_resume"]);
+  main(["record", dir, "supervisor_resume"]);
   assert.equal(main(["next", dir]), "continue");
   const s = JSON.parse(main(["summary", dir]));
-  assert.equal(s.supervisor.master_resumes, 1);
+  assert.equal(s.supervisor.supervisor_resumes, 1);
   assert.equal(s.supervisor.stops, 1);
 });
 
