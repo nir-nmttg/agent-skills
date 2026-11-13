@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Supervisor が Coordinator の停止を見張るための記録と判定。出力は決まった語・数・ハッシュ・URL と、Coordinator が記録した保留の理由（短い文）だけにする。
+// Supervisor が Coordinator の停止を見張るための記録と判定。出力は決まった語・数・ハッシュ・URL、Coordinator が記録した保留の理由（短い文）と、Coordinator に送る決まった文面だけにする。
 import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
@@ -18,13 +18,13 @@ const ISSUE_SYNC_DONE = ["complete", "partial", "blocked"];
 const SAFE_TOKEN = /^[a-z0-9][a-z0-9_.:-]{0,63}$/;
 const REASON_TOKEN = /^[a-z0-9][a-z0-9_.:-]{0,127}$/;
 
-// Coordinator に送る文面。Supervisor は自分で書かず、ここで出した文面をそのまま送る。
+// Coordinator に送る文面。Supervisor はここで出した文面をそのまま送る。
 const MESSAGES = {
   // 審査などでターンが途中で終わったあと
   continue: [
     "前のターンは途中で終わりました。実行フォルダの記録を読み直してください。",
     "- 動いている Worker や、終わった Worker の結果は受け取ってください。",
-    "- 項目に分かれる作業（監査単位・候補・所見・個別 Issue）は、止まる直前に扱っていた項目だけをやり直さずに保留とし、理由を台帳（Issue 反映は issue_sync）に記録してください。",
+    "- 項目に分かれる作業（監査単位・候補・所見・個別 Issue）は、止まる直前に扱っていた項目だけを保留とし、理由を台帳（Issue 反映は issue_sync）に記録してください。",
     "- 項目に分かれない作業（初期調査、findings.json・報告書・集約 Issue の作成）は、保存済みの記録をもとに1回だけ進め直してください。同じところでまた止まったら、そこまでの結果を保存し、未完了として理由を記録してください。",
     "- そのほかの作業は、止まる前の続きから進めてください。",
     "ターンを終えるときは、SKILL.md の状態報告の JSON だけを最終回答にしてください。",
@@ -165,7 +165,7 @@ function cmdRecord(dir, kind, detail) {
   if (AUDITING_ONLY.includes(kind) && state.stage !== "auditing") fail(`段階 ${state.stage} では ${kind} を記録できません`);
   if (kind === "unsupported" && !["starting", "auditing"].includes(state.stage)) fail(`段階 ${state.stage} では unsupported を記録できません`);
   if (kind === "returned") {
-    // 利用者に返すのは、判定が report を出したときだけ（Supervisor の独自の判断で打ち切らない）
+    // 利用者に返すのは、判定が report を出したときだけ。理由も判定の reason だけを残す
     const d = decide(state);
     if (d.action !== "report") fail(`判定が report ではないので returned は記録できません: ${formatDecision(d, state)}`);
     if (detail === undefined || token(detail) !== d.reason) fail(`returned の理由は判定の reason（${d.reason}）にしてください`);

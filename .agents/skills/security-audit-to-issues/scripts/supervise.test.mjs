@@ -293,7 +293,7 @@ test("停止を記録すると、次の動きと送る文面を続けて示す",
   assert.match(lines[0], /^stopped auto_resumes=0\/8/);
   assert.equal(lines[1], "continue");
   assert.equal(lines[2], "送る文面:");
-  assert.match(out, /止まる直前に扱っていた項目だけをやり直さずに保留/);
+  assert.match(out, /止まる直前に扱っていた項目だけを保留/);
   assert.match(out, /1回だけ進め直してください/);
   assert.doesNotMatch(out, /Daybreak|flagged|担当/);
   assert.equal(main(["next", dir]), lines.slice(1).join("\n"));

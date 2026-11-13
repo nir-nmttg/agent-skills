@@ -2,9 +2,9 @@
 
 Codex の安全審査は、詳細が集まる Coordinator のターンを途中で終わらせることがある（`cyber_policy`）。終わってもセッションは残り、続きを頼めば続きから進む。このスキルを呼び出したエージェントを **Supervisor** にし、監査と Issue 反映を **Coordinator**（サブエージェント）に任せて、Coordinator が止まったら Supervisor が人の代わりに続きを頼む。
 
-- Coordinator の審査による停止は、このスキルが想定している出来事。止まると、Coordinator の最終回答として `Agent errored: This content was flagged for possible cybersecurity risk …` と Daybreak の申請の案内が届く。これは利用者が手で続きを頼んでいたのと同じ停止で、自動で続きを頼むのは利用者が選んだ扱い。案内を理由に監査を打ち切らず、次の動きは `SUPERVISE` の判定だけで決める。続きを頼んだターンも審査の対象のままで、Coordinator には止まる直前の作業をやり直さずに保留させる。進まなければ判定が `give_up` を出す。
-- Supervisor が読むのは、`scripts/supervise.mjs` が出す決まった語・数・ハッシュ・URL・保留の理由（Coordinator が `issue_sync` に記録した短い文）・送る文面と、Coordinator の状態報告だけにする。Coordinator から途中のメッセージが届いても中身は使わず、利用者には `SUPERVISE summary` の件数で進み具合を伝える。
-- Supervisor が Coordinator に送るのは、[1. 始める](#1-始める) の指示と、`SUPERVISE` が「送る文面:」の下に出す文面だけにする。文面は書き換えず、足さない。作業の打ち切りや進め方の指示は送らず、Worker を中断させない（`interrupt_agent` を使わない）。
+- Coordinator の審査による停止は、このスキルが想定している出来事。止まると、Coordinator の最終回答として `Agent errored: This content was flagged for possible cybersecurity risk …` と Daybreak の申請の案内が届く。これは利用者が手で続きを頼んでいたのと同じ停止で、自動で続きを頼むのは利用者が選んだ扱い。案内が届いても、次の動きは `SUPERVISE` の判定だけで決める。続きを頼んだターンも審査の対象のままで、Coordinator には止まる直前の作業を保留させる。進まなければ判定が `give_up` を出す。
+- Supervisor が読むのは、`scripts/supervise.mjs` が出す決まった語・数・ハッシュ・URL・保留の理由（Coordinator が `issue_sync` に記録した短い文）・送る文面と、Coordinator の状態報告だけにする。利用者には `SUPERVISE summary` の件数で進み具合を伝える。
+- Supervisor が Coordinator に送るのは、[1. 始める](#1-始める) の指示と、`SUPERVISE` が「送る文面:」の下に出す文面だけにし、文面はそのまま送る。Worker の起動と中断は Coordinator に任せる。
 - Supervisor が書くのは、実行フォルダの `supervisor.json`（`scripts/supervise.mjs` 経由）だけ。元スキルの共有ファイルと `run-metadata.json` は Coordinator が書く。
 
 以下、`SUPERVISE` はこのスキルのフォルダにある `scripts/supervise.mjs` を `node` で実行すること、`RUN_DIR` は実行フォルダの絶対パスを表す。
@@ -31,10 +31,10 @@ Coordinator への指示には次だけを書く。
 | 返り方 | すること |
 | --- | --- |
 | 時間切れ（Coordinator は動作中） | 待ち直す。回数に入れない |
-| Coordinator から途中のメッセージが届いた | 中身は使わずに待ち直す |
+| Coordinator から途中のメッセージが届いた | 待ち直す |
 | ターンが終わり、最終回答が状態報告の JSON で、`run_dir` が `RUN_DIR` と同じ | 状態に従う（下記） |
 | ターンが終わり、`run_dir` が `RUN_DIR` と違う | `SUPERVISE record "$RUN_DIR" run_dir_mismatch` を実行し、そのパスは使わずに [3. 続きを頼む](#3-続きを頼む) に進む（`report` になる） |
-| ターンが終わり、最終回答が `Agent errored:` で始まる、または最終回答がない | 停止として記録する。文面に `flagged for possible cybersecurity risk` を含むか、返り値のエラーの種別が `cyber_policy` なら `SUPERVISE record "$RUN_DIR" stopped cyber_policy`、ほかの種別なら `SUPERVISE record "$RUN_DIR" stopped <種別>`、`Agent errored:` で始まり審査の文言も種別もなければ `SUPERVISE record "$RUN_DIR" stopped other`（自動では続けない）、最終回答がまったくなく種別も分からなければ `SUPERVISE record "$RUN_DIR" stopped` を実行し、[3. 続きを頼む](#3-続きを頼む) に進む。エラーの文面は記録しない |
+| ターンが終わり、最終回答が `Agent errored:` で始まる、または最終回答がない | 停止として記録する。文面に `flagged for possible cybersecurity risk` を含むか、返り値のエラーの種別が `cyber_policy` なら `SUPERVISE record "$RUN_DIR" stopped cyber_policy`、ほかの種別なら `SUPERVISE record "$RUN_DIR" stopped <種別>`、`Agent errored:` で始まり審査の文言も種別もなければ `SUPERVISE record "$RUN_DIR" stopped other`（`report` になる）、最終回答がまったくなく種別も分からなければ `SUPERVISE record "$RUN_DIR" stopped` を実行し、[3. 続きを頼む](#3-続きを頼む) に進む。エラーの文面は記録しない |
 | ターンが終わり、最終回答が状態報告の形でない（上のどれでもない文章など） | `SUPERVISE record "$RUN_DIR" malformed` を実行し、[3. 続きを頼む](#3-続きを頼む) に進む |
 | 状態を確かめられない | `SUPERVISE record "$RUN_DIR" unknown` を実行し、[3. 続きを頼む](#3-続きを頼む) に進む（`wait` なら待ち直す） |
 
