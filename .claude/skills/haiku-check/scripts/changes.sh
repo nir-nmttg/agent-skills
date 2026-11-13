@@ -7,7 +7,7 @@
 #
 # 状態は未コミット・未追跡を含み（.gitignore 対象は除く）、本物のインデックスに触れずに記録する。
 # git リポジトリでないフォルダでは、実行フォルダだけを作り、変わったファイルは確かめられないと知らせる。
-# 保存先は $HAIKU_CHECK_DIR（既定: このリポジトリ直下の artifacts/haiku-check）/<日時>-<リポジトリ名>/。
+# 保存先は ${HAIKU_CHECK_DIR}（既定: このリポジトリ直下の artifacts/haiku-check）/<日時>-<リポジトリ名>/。
 set -euo pipefail
 
 usage() { sed -n '4,6p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 1; }

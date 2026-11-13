@@ -61,7 +61,7 @@ if [[ -n $TARGET ]]; then
     NUMBER=${BASH_REMATCH[5]}
     [[ $host == github.com || $host == www.github.com ]] || stop "github.com 以外の URL は扱いません: $TARGET"
     [[ $(tr '[:upper:]' '[:lower:]' <<<"$t_repo") == $(tr '[:upper:]' '[:lower:]' <<<"$REPO") ]] ||
-      stop "今のフォルダのリポジトリ（$REPO）と違うリポジトリの Issue なので対応しません: $TARGET。対象のリポジトリの checkout で実行してください。"
+      stop "今のフォルダのリポジトリ（${REPO}）と違うリポジトリの Issue なので対応しません: ${TARGET}。対象のリポジトリの checkout で実行してください。"
     [[ $kind == issues ]] || stop "PR の URL です。Issue を指定してください: $TARGET"
   else
     die "Issue の URL か番号を指定してください: $TARGET"
@@ -112,7 +112,7 @@ else
       prs=$(prs_of "$n")
       line="- #$n:"
       has_branch "$n" && line="$line ブランチ \`$(branch_name "$n")\`"
-      [[ $prs == "[]" ]] && line="$line、PR なし" || line="$line PR $(describe_prs "$prs")"
+      [[ $prs == "[]" ]] && line="${line}、PR なし" || line="$line PR $(describe_prs "$prs")"
       echo "$line"
     done
     echo
@@ -124,8 +124,8 @@ else
     labels=$(gh label list --repo "$REPO" --limit 1000 --json name --jq '.[].name') || die "ラベルの一覧を取得できません。"
     grep -qxF -- "$LABEL" <<<"$labels" ||
       stop "$REPO にラベル \`$LABEL\` がありません。\`gh label create '$LABEL' --repo $REPO --description 'Claude が対応してよい Issue'\` で作ってください。"
-    $truncated && stop "検索結果の先頭 1000 件はすべて着手中かドラフト PR があるものでした。それより後は調べていません（$REPO、条件: $query）。"
-    stop "対応する Issue はありません（$REPO、条件: $query。claude/issue-<番号> のブランチか PR があるものは除く）。"
+    $truncated && stop "検索結果の先頭 1000 件はすべて着手中かドラフト PR があるものでした。それより後は調べていません（${REPO}、条件: ${query}）。"
+    stop "対応する Issue はありません（${REPO}、条件: ${query}。claude/issue-<番号> のブランチか PR があるものは除く）。"
   fi
 fi
 

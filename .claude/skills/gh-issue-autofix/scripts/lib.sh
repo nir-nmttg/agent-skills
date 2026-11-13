@@ -40,7 +40,7 @@ load_repo() {
   DEFAULT_BRANCH=$(jq -r '.defaultBranchRef.name // empty' <<<"$info")
   [[ -n $DEFAULT_BRANCH ]] || die "$REPO の既定ブランチを取得できません。"
   [[ $(jq -r .isFork <<<"$info") == false ]] ||
-    stop "origin（$REPO）は fork です。fork の checkout は対象外なので、元のリポジトリの checkout で実行してください。"
+    stop "origin（${REPO}）は fork です。fork の checkout は対象外なので、元のリポジトリの checkout で実行してください。"
   # push 先（pushurl を含む）がすべて同じリポジトリを指すこと
   while IFS= read -r url; do
     [[ $(github_repo_of "$url") == "$(tr '[:upper:]' '[:lower:]' <<<"$REPO")" ]] ||

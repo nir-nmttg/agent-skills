@@ -3,7 +3,7 @@
 #
 # 使い方: review.sh [--model <id>] --effort <low|medium|high|xhigh|max> <実行フォルダ>
 #   --model   Codex のモデル（既定: gpt-6-astra）。使えないときは gpt-6.1-sol を渡す
-#   --effort  Codex の推論レベル。Claude の推論レベルをそのまま渡す（省略時は $CLAUDE_EFFORT、それもなければ high）
+#   --effort  Codex の推論レベル。Claude の推論レベルをそのまま渡す（省略時は ${CLAUDE_EFFORT}、それもなければ high）
 #
 # 環境変数 IMPLEMENTATION_CROSS_REVIEW_TITLE で出力の見出しを変えられる（design-cross-review が使う）。
 set -euo pipefail

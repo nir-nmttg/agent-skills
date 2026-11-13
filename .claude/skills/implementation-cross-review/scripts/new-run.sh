@@ -5,7 +5,7 @@
 #   --followup  確認のレビュー（再レビュー）にする。前回の要件を写し、前回のフォルダを previous.txt に、今回のフォルダを前回の followup.txt に残す
 #   slug        変更の短い名前（英数字・ハイフン）。フォルダ名に使う
 #
-# 保存先は $IMPLEMENTATION_CROSS_REVIEW_DIR（既定: このリポジトリ直下の artifacts/implementation-cross-review）/<日時>-<slug>.<乱数>/。
+# 保存先は ${IMPLEMENTATION_CROSS_REVIEW_DIR}（既定: このリポジトリ直下の artifacts/implementation-cross-review）/<日時>-<slug>.<乱数>/。
 set -euo pipefail
 
 usage() { sed -n '4,6p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 1; }

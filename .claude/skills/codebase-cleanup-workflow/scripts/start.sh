@@ -6,7 +6,7 @@
 #   slug  整備の短い名前（英数字・ハイフン）。実行フォルダ名に使う
 #
 # 止まる条件（終了コード 1）: git リポジトリでない、未コミットの変更（未追跡を含む）がある、実行フォルダか作業ブランチ（codebase-cleanup/<日時>）を作れない。
-# 保存先は $CODEBASE_CLEANUP_WORKFLOW_DIR（既定: このリポジトリ直下の artifacts/codebase-cleanup-workflow）/<日時>-<slug>.<乱数>/。
+# 保存先は ${CODEBASE_CLEANUP_WORKFLOW_DIR}（既定: このリポジトリ直下の artifacts/codebase-cleanup-workflow）/<日時>-<slug>.<乱数>/。
 set -euo pipefail
 
 usage() { sed -n '4,6p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 1; }
@@ -99,7 +99,7 @@ if ! git switch --quiet -c "$branch"; then
 fi
 
 echo "対象: $top"
-echo "作業ブランチ: $branch（元: ${orig_branch:-detached HEAD}）"
+echo "作業ブランチ: ${branch}（元: ${orig_branch:-detached HEAD}）"
 echo "開始時の SHA: $start_sha"
 echo "実行フォルダ: $dir"
 echo "進捗: $dir/progress.md"
