@@ -1,6 +1,8 @@
 ---
 name: docs-align-with-code
 description: README.md などを現状の実装に合わせて更新する。実装を正として記述を照合し、有用な情報を残しながら、古い説明・重複・不足を整理する。
+disable-model-invocation: true
+argument-hint: "[対象のパス・範囲]"
 ---
 
 # 実装に合わせてドキュメントを整える

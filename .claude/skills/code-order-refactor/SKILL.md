@@ -1,6 +1,8 @@
 ---
 name: code-order-refactor
 description: プロジェクト全体のメソッド・関数などの宣言順を見直し、振る舞いと既存の規約を保ちながら読みやすい配置に整える。
+disable-model-invocation: true
+argument-hint: "[対象のパス・範囲]"
 ---
 
 # ファイル内の宣言を読みやすい順番に整える

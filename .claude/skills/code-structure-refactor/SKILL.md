@@ -1,6 +1,8 @@
 ---
 name: code-structure-refactor
 description: プロジェクトを探索して責務の混在や重複を見つけ、既存の振る舞いを保ちながら責務分割・共通化を行い、保守性・可読性・拡張性を改善する。
+disable-model-invocation: true
+argument-hint: "[対象のパス・範囲]"
 ---
 
 # 責務分割と共通化でプロジェクトを整える
