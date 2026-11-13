@@ -1,5 +1,5 @@
 ---
-name: security-audit-issues
+name: security-audit-to-issues
 description: Cloudflare の security-audit で自律監査し、非公開リポジトリに確定所見の修正 Issue と実行ごとの調査・判定一覧を作成・更新する。
 ---
 
@@ -15,7 +15,7 @@ description: Cloudflare の security-audit で自律監査し、非公開リポ�
 ## 引数を確かめる
 
 ```text
-$security-audit-issues [--profile quick|standard|deep]
+$security-audit-to-issues [--profile quick|standard|deep]
 ```
 
 - `--profile` の既定値は `standard`。指定があれば `quick`・`standard`・`deep` のいずれかを、そのまま元スキルに渡す。それ以外の値が指定された場合は使える値を案内し、監査を保留する。

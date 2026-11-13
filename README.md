@@ -45,13 +45,13 @@ Claude は作業の一部を Haiku 5.5・Opus 5.5・Fable 5.2 のサブエージ
    | `jq` | haiku-implementation・gh-todo・gh-issue-autofix、クロスレビューの Codex の担当 |
    | `codex` のログイン | クロスレビューの Codex の担当（Astra。使えないときは Sol） |
    | メインが auto モード | haiku-implementation・gh-issue-autofix |
-   | `gh` のログイン | gh-todo・gh-issue-autofix・security-audit-issues、haiku-check で CI のログを見るとき |
+   | `gh` のログイン | gh-todo・gh-issue-autofix・security-audit-to-issues、haiku-check で CI のログを見るとき |
    | Claude デスクトップアプリ | session-status-emoji |
    | 組み込みブラウザか Claude in Chrome | browser-readonly-research |
    | 組み込みブラウザ | gh-issue-autofix（ないときは動作確認を未検証にする） |
    | デスクトップアプリが開いていて PC が起きている（専用の PC を勧める） | スケジュールに登録するスキル |
    | Python 3.9 以降 | Codex の minor-version-upgrade・rename-files-by-content |
-   | `node`・Cloudflare の `security-audit`・サブエージェント | security-audit-issues |
+   | `node`・Cloudflare の `security-audit`・サブエージェント | security-audit-to-issues |
 
 3. 下の一覧から選ぶ。\
    名前のリンク先に、手順とオプションがある。
@@ -105,7 +105,7 @@ Claude デスクトップアプリのスケジュールタスクに登録し、`
 | [`$test-suite-refactor`](.agents/skills/test-suite-refactor/SKILL.md) | 検出力を保ったまま、テストの重複を整理する |
 | [`$code-order-refactor`](.agents/skills/code-order-refactor/SKILL.md) | メソッドや関数を読みやすい順に並べ替える |
 | [`$docs-align-with-code`](.agents/skills/docs-align-with-code/SKILL.md) | 実装に合わせて文書を更新する |
-| [`$security-audit-issues`](.agents/skills/security-audit-issues/SKILL.md) | 自律監査で確定所見の修正 Issue と全判定の集約 Issue を作成・更新し、自動修正できる項目にラベルを付ける |
+| [`$security-audit-to-issues`](.agents/skills/security-audit-to-issues/SKILL.md) | 自律監査で確定所見の修正 Issue と全判定の集約 Issue を作成・更新し、自動修正できる項目にラベルを付ける |
 
 ## 開発以外のスキル
 
@@ -118,7 +118,7 @@ Claude デスクトップアプリのスケジュールタスクに登録し、`
 ## 実行結果とスキルの追加・変更
 
 - スキルの作業用ファイルは、このリポジトリの `artifacts/<スキル名>/`（gitignore 済み）に置く。
-- `security-audit-issues` の監査成果物は、Cloudflare の `security-audit` と同じ `~/security-audit-skill/<repo-name>/run-<N>/` に保存される。
+- `security-audit-to-issues` の監査成果物は、Cloudflare の `security-audit` と同じ `~/security-audit-skill/<repo-name>/run-<N>/` に保存される。
 - 作り方のルールは [AGENTS.md](AGENTS.md) にある。\
   変更したら `scripts/check-descriptions.sh` と `git diff --check` を実行し、追加・改名・削除のあとは `scripts/link-skills.sh` を実行する。
 
