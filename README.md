@@ -9,7 +9,8 @@ Claude は作業の一部を Haiku 5.5・Fable 5.2（利用枠が足りなけれ
 1. メインの checkout の直下でリンクする（git worktree からは実行できない）。\
    Claude Code は `~/.claude/skills/`・`~/.claude/agents/`（`CLAUDE_CONFIG_DIR` があればその配下）、Codex は `~/.agents/skills/` にリンクされ、`--claude` / `--codex` で片方だけにできる。\
    既存の同名ファイルや、別の場所への有効なリンクは上書きしない。\
-   スキルの追加・改名・削除のあとも再実行し、反映されなければ新しいセッションを始めるか Codex を再起動する。
+   スキルの追加・改名・削除のあとも再実行し、反映されなければ新しいセッションを始めるか Codex を再起動する。\
+   導入したあとは、Claude Code から skills-update を呼べば、取り込み・リンク・確認を 1 回で済ませられる。
 
    ```bash
    scripts/link-skills.sh
@@ -66,7 +67,7 @@ Claude は作業の一部を Haiku 5.5・Fable 5.2（利用枠が足りなけれ
 
 ### 指定して使うスキル
 
-次の作業の提案、GitHub の Issue / PR の対応、Web での調査など、必要なときに呼ぶ。
+次の作業の提案、GitHub の Issue / PR の対応、Web での調査、このスキル集の更新など、必要なときに呼ぶ。
 
 | スキル | できること |
 | --- | --- |
@@ -74,6 +75,7 @@ Claude は作業の一部を Haiku 5.5・Fable 5.2（利用枠が足りなけれ
 | [gh-todo](.claude/skills/gh-todo/SKILL.md) | レビュー依頼・メンション・自分の Issue / PR を一覧にする |
 | [browser-readonly-research](.claude/skills/browser-readonly-research/SKILL.md) | Web ページを読むだけで調べてまとめる |
 | [gh-issue-autofix](.claude/skills/gh-issue-autofix/SKILL.md) | `agent:autofix` ラベルの Issue を 1 件対応し、質問しながら、または全自動で、同じラベルのドラフト PR にする |
+| [skills-update](.claude/skills/skills-update/SKILL.md) | このスキル集を最新に取り込み、Claude Code・Codex へリンクし直して、使えるスキルを確かめる |
 
 ## Codex 用スキル一覧
 
