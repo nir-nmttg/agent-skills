@@ -15,7 +15,7 @@ Claude は作業の一部を Haiku 5.5・Fable 5.2（利用枠が足りなけれ
    scripts/link-skills.sh
    ```
 
-2. [skills-preflight](.claude/skills/skills-preflight/SKILL.md)（Claude Code）・[`$skills-preflight`](.agents/skills/skills-preflight/SKILL.md)（Codex）で、必要なコマンド・ログイン・リンクを確かめる（Claude Code では足りないコマンドとリンクを了承を得てから入れる）。\
+2. skills-preflight（[Claude Code](.claude/skills/skills-preflight/SKILL.md)・[Codex](.agents/skills/skills-preflight/SKILL.md)）で、必要なコマンド・ログイン・リンクを確かめる（Claude Code では足りないコマンドとリンクを了承を得てから入れる）。\
    主な前提は次のとおり（細かい条件は各 SKILL.md にある）。
 
    | 前提 | 使うスキル |
@@ -80,14 +80,16 @@ Claude は作業の一部を Haiku 5.5・Fable 5.2（利用枠が足りなけれ
 
 | スキル | できること |
 | --- | --- |
-| [`$minor-version-upgrade`](.agents/skills/minor-version-upgrade/SKILL.md) | ランタイムと依存を、互換性を保つ範囲で更新する |
-| [`$security-audit-to-issues`](.agents/skills/security-audit-to-issues/SKILL.md) | 自律監査で確定所見の修正 Issue と全判定の集約 Issue を作成・更新し、自動修正できる項目にラベルを付ける |
+| [minor-version-upgrade](.agents/skills/minor-version-upgrade/SKILL.md) | ランタイムと依存を、互換性を保つ範囲で更新する |
+| [security-audit-to-issues](.agents/skills/security-audit-to-issues/SKILL.md) | 自律監査で確定所見の修正 Issue と全判定の集約 Issue を作成・更新し、自動修正できる項目にラベルを付ける |
 
 ## 開発以外のスキル
 
+Codex 用は `$スキル名` で指定したときだけ使う。
+
 | スキル | エージェント | できること |
 | --- | --- | --- |
-| [`$rename-files-by-content`](.agents/skills/rename-files-by-content/SKILL.md) | Codex | ファイルを内容から `YYYY-MM-DD_名前` に改名する |
+| [rename-files-by-content](.agents/skills/rename-files-by-content/SKILL.md) | Codex | ファイルを内容から `YYYY-MM-DD_名前` に改名する |
 
 ## スキルの追加・変更
 
