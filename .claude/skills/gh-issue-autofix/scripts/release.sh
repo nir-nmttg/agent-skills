@@ -32,14 +32,14 @@ wt=$(worktree_of "$BRANCH")
 keep_local=false
 if [[ -n $wt ]]; then
   if [[ $wt == "$(git rev-parse --show-toplevel)" ]]; then
-    die "worktree（$wt）の中から実行しています。メインの checkout に戻ってから実行してください。"
+    die "worktree（${wt}）の中から実行しています。メインの checkout に戻ってから実行してください。"
   elif [[ -n $(git -C "$wt" status --porcelain) ]]; then
-    echo "- worktree: 未コミットの変更があるので残した（$wt）"
+    echo "- worktree: 未コミットの変更があるので残した（${wt}）"
     keep_local=true
   else
     # 変更がないことを確かめたので --force で消す（submodule を含む worktree は --force がないと消せない）
   git worktree remove --force "$wt"
-    echo "- worktree: 消した（$wt）"
+    echo "- worktree: 消した（${wt}）"
   fi
 fi
 
@@ -81,7 +81,7 @@ prs=$(gh pr list --repo "$REPO" --head "$BRANCH" --state all --json url,isCrossR
   --jq 'map(select(.isCrossRepository | not) | .url) | join(", ")') ||
   die "PR の一覧を取得できません。"
 if [[ -n $prs ]]; then
-  echo "- リモートの $BRANCH: PR（$prs）があるので残した"
+  echo "- リモートの $BRANCH: PR（${prs}）があるので残した"
 elif ! git merge-base --is-ancestor "$remote" "origin/$DEFAULT_BRANCH"; then
   echo "- リモートの $BRANCH: origin/$DEFAULT_BRANCH にないコミットがあるので残した"
 elif $KEEP_CLAIM; then

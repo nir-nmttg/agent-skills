@@ -125,9 +125,9 @@ else
   pr=$(jq -r .url <<<"$pr_json")
   # push の間に人が編集したり、Ready にしたり閉じたりしたかもしれないので、本文と状態を取り直す。Web で編集された本文は CRLF のことがある
   view=$(gh pr view "$pr" --repo "$REPO" --json body,state,isDraft) ||
-    die "push しましたが、PR（$pr）の本文を取得できません。"
+    die "push しましたが、PR（${pr}）の本文を取得できません。"
   [[ $(jq -r '"\(.state) \(.isDraft)"' <<<"$view") == "OPEN true" ]] ||
-    die "push しましたが、PR（$pr）がドラフトの open ではなくなったので、本文は更新しません。"
+    die "push しましたが、PR（${pr}）がドラフトの open ではなくなったので、本文は更新しません。"
   old=$(jq -r '.body // "" | gsub("\r"; "")' <<<"$view")
   # マーカーが 1 つずつ、start → end の順にあるときだけ差し替える
   marks=$(grep -nxF -e "$START_MARK" -e "$END_MARK" <<<"$old" | cut -d: -f2- | paste -sd'|' - || true)
@@ -143,6 +143,6 @@ else
   fi
   # タイトルは人が直しているかもしれないので変えない
   gh pr edit "$pr" --repo "$REPO" --body-file "$body" >/dev/null ||
-    die "push しましたが、PR（$pr）の本文を更新できません。"
+    die "push しましたが、PR（${pr}）の本文を更新できません。"
   echo "既存のドラフト PR を更新しました: $pr"
 fi

@@ -36,11 +36,11 @@ git worktree prune
 existing=$(worktree_of "$BRANCH")
 # メインの checkout の作業ツリーは使わない（使う人が作業している場所なので、ブランチを進めたり片付けたりしない）
 [[ $existing != "$MAIN" ]] ||
-  stop "conflict: メインの checkout（$MAIN）で $BRANCH を開いています。メインの checkout を別のブランチに切り替えてから実行し直してください。"
-[[ -z $existing || -d $existing ]] || stop "conflict: $BRANCH の worktree（$existing）の登録がありますが、フォルダがありません。"
+  stop "conflict: メインの checkout（${MAIN}）で $BRANCH を開いています。メインの checkout を別のブランチに切り替えてから実行し直してください。"
+[[ -z $existing || -d $existing ]] || stop "conflict: $BRANCH の worktree（${existing}）の登録がありますが、フォルダがありません。"
 # 同じマシンの別のセッションが作業中の worktree には入らない
 if [[ -n $existing && -n $(git -C "$existing" status --porcelain) ]]; then
-  stop "busy: #$NUMBER の worktree（$existing）に未コミットの変更があります。別のセッションが作業中の可能性があるので止めます。前のセッションが終わっているなら、変更をコミットするか捨ててから実行し直してください。"
+  stop "busy: #$NUMBER の worktree（${existing}）に未コミットの変更があります。別のセッションが作業中の可能性があるので止めます。前のセッションが終わっているなら、変更をコミットするか捨ててから実行し直してください。"
 fi
 
 # worktree の置き場所の衝突は、着手を確保する前に確かめる
@@ -55,7 +55,7 @@ if [[ $MODE == new ]]; then
     git merge-base --is-ancestor "$REF" "$BASE_REF" ||
       stop "conflict: ローカルの $BRANCH に $BASE_REF にないコミットがあります。続きから進めるなら --resume にするか、内容を確かめてから消すか別の名前にしてください。"
     [[ -z $existing ]] ||
-      stop "conflict: ローカルの $BRANCH が worktree（$existing）で使われています。不要なら \`git worktree remove $existing\` で消してから実行し直してください。"
+      stop "conflict: ローカルの $BRANCH が worktree（${existing}）で使われています。不要なら \`git worktree remove $existing\` で消してから実行し直してください。"
     git branch -q -f --no-track "$BRANCH" "$BASE_REF"
   else
     git branch -q --no-track "$BRANCH" "$BASE_REF"
@@ -65,7 +65,7 @@ if [[ $MODE == new ]]; then
   # 同じ sha のブランチが先に作られていると「up to date」で成功するので、
   # porcelain の出力で「このプッシュで新しく作った（*）」ことまで確かめて、着手の確保とする
   out=$(git push --porcelain --no-verify --force-with-lease="$REF:" origin "$REF:$REF" 2>&1) && pushed=true || pushed=false
-  if ! $pushed || ! grep -q "^\*	$REF:$REF	" <<<"$out"; then
+  if ! $pushed || ! grep -q "^\*	$REF:${REF}	" <<<"$out"; then
     # 別のセッションが着手していれば、ローカルのブランチはそのセッションが使うかもしれないので残す
     [[ -z $(remote_sha "$BRANCH") ]] || stop "claimed: #$NUMBER は別のセッションが着手済みです（リモートに $BRANCH ができました）。"
     ! $created || git branch -q -D "$BRANCH" 2>/dev/null || true
@@ -173,11 +173,11 @@ if [[ -n $linked ]]; then
   fi
   for v in .venv venv; do
     if [[ -L $WORKTREE/$v ]] && grep -qsF -- "$MAIN" "$MAIN/$v"/lib/python*/site-packages/*.pth "$MAIN/$v"/lib/python*/site-packages/__editable__*.py; then
-      warn_deps="${warn_deps:+$warn_deps・}Python の editable install"
+      warn_deps="${warn_deps:+${warn_deps}・}Python の editable install"
     fi
   done
   if [[ -L $WORKTREE/vendor && -f $WORKTREE/composer.json ]]; then
-    warn_deps="${warn_deps:+$warn_deps・}PHP の Composer（autoload）"
+    warn_deps="${warn_deps:+${warn_deps}・}PHP の Composer（autoload）"
   fi
 fi
 
@@ -187,12 +187,12 @@ echo "- リポジトリ: $REPO"
 echo "- 状態: $state"
 echo "- worktree: $WORKTREE"
 echo "- ブランチ: $BRANCH"
-echo "- 既定ブランチ: $DEFAULT_BRANCH（基点: $(git log -1 --format='%h %s' "$base")）"
+echo "- 既定ブランチ: ${DEFAULT_BRANCH}（基点: $(git log -1 --format='%h %s' "$base")）"
 ((ahead == 0)) || echo "- $BASE_REF にないコミット: $ahead 件"
 echo "- リンクした依存フォルダ（書き込まない）:${linked:- なし}"
 [[ -z $unlinked ]] || echo "- 外したリンク（ロックファイルがメインの checkout と違うため）:$unlinked"
 if ! $can_link; then
-  echo "- 注意: ロックファイルがメインの checkout の作業ツリーと違うので、依存をリンクしていません${skipped:+（対象:$skipped）}。worktree にプロジェクトの手順で、ロックファイルを変えない形（npm ci・pnpm install --frozen-lockfile・uv sync --locked など）でインストールしてください。"
+  echo "- 注意: ロックファイルがメインの checkout の作業ツリーと違うので、依存をリンクしていません${skipped:+（対象:${skipped}）}。worktree にプロジェクトの手順で、ロックファイルを変えない形（npm ci・pnpm install --frozen-lockfile・uv sync --locked など）でインストールしてください。"
 fi
 echo "- コピーした設定ファイル（コミットしない）:${copied:- なし}"
 [[ -z $warn_deps ]] || echo "- 注意: $warn_deps があるので、リンクした依存はメインの checkout のコードを読み込みます。リンクを外し、worktree にプロジェクトの手順でインストールしてからテストしてください。"

@@ -55,7 +55,7 @@ fi
 # 読む場所は、設計書の相対パスの基準である作業フォルダにする。プロジェクトの指示はリポジトリのルートから読む
 source=$(cd -P "$workdir" && pwd)
 root=$(git -C "$source" rev-parse --show-toplevel 2>/dev/null) || root=$source
-scope="設計書（作業フォルダ: $source）"
+scope="設計書（作業フォルダ: ${source}）"
 
 if [[ -n $followup ]]; then
   # --no-index は差分があると 1 で終わる。それ以外の失敗は止める
@@ -63,7 +63,7 @@ if [[ -n $followup ]]; then
   git diff --no-index -- "$prev/design.md" "$run_dir/design.md" >"$run_dir/design-diff.patch" || rc=$?
   ((rc <= 1)) || { echo "エラー: 設計書の差分を作れませんでした" >&2; exit 1; }
   [[ -s $run_dir/design-diff.patch ]] || { echo "エラー: 設計書が前回から変わっていません" >&2; exit 1; }
-  scope="確認のレビュー（前回: $(basename "$prev")、作業フォルダ: $source）"
+  scope="確認のレビュー（前回: $(basename "$prev")、作業フォルダ: ${source}）"
 fi
 
 {
