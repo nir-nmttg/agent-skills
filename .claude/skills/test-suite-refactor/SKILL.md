@@ -1,6 +1,8 @@
 ---
 name: test-suite-refactor
 description: 既存のテストコードを不具合の検出力で見直し、重複や実装の細部に依存するテストを削除・統合・書き換える。境界値・異常系・過去の不具合を守りながら、保守負担を減らす。
+disable-model-invocation: true
+argument-hint: "[対象のパス・範囲]"
 ---
 
 # 本質的なテストを残す

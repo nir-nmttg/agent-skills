@@ -68,7 +68,7 @@ codex_users="implementation-cross-review（Astra）・design-cross-review（Astr
 check_cmd git "ほぼすべて" "\`xcode-select --install\`（または \`brew install git\`）" git git --version
 check_cmd jq "ほぼすべて" "\`brew install jq\`" jq jq --version
 check_cmd codex "$codex_users" "\`brew install --cask codex\` のあと \`codex login\`" cask:codex codex --version
-check_cmd perl "haiku-implementation, design-cross-review, implementation-cross-review, gh-issue-autofix" "\`brew install perl\`（macOS には標準で入っている）" perl perl -e 'print "perl $^V\n"'
+check_cmd perl "haiku-implementation, design-cross-review, implementation-cross-review, gh-issue-autofix, codebase-cleanup-workflow" "\`brew install perl\`（macOS には標準で入っている）" perl perl -e 'print "perl $^V\n"'
 check_cmd gh "gh-todo, gh-issue-autofix" "\`brew install gh\` のあと \`gh auth login\`" gh gh --version
 
 # インストール方法は Homebrew 前提なので、足りないコマンドがあって Homebrew も無ければ先に入れてもらう
@@ -97,11 +97,11 @@ if has gh; then
   fi
 fi
 
-# --- サブエージェントのリンク（haiku-implementation・haiku-check・クロスレビューの 2 スキルに必須） ---------
+# --- サブエージェントのリンク（haiku-implementation・haiku-check・クロスレビューの 2 スキル・codebase-cleanup-workflow に必須） ---------
 
 agents_src="$repo_root/.claude/agents"
 agents_dir="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/agents"
-agent_users="haiku-implementation, haiku-check, design-cross-review, implementation-cross-review, gh-issue-autofix"
+agent_users="haiku-implementation, haiku-check, design-cross-review, implementation-cross-review, gh-issue-autofix, codebase-cleanup-workflow"
 unlinked_agents=()
 for f in "$agents_src"/*.md; do
   [[ -f $f ]] || continue
@@ -146,6 +146,7 @@ skill_needs() {
     implementation-cross-review) echo "git perl agents-link" ;;
     haiku-implementation) echo "git jq perl agents-link haiku-implementation-link" ;;
     haiku-check) echo "git agents-link" ;;
+    codebase-cleanup-workflow) echo "git perl agents-link" ;;
     gh-todo) echo "jq gh gh-login" ;;
     gh-issue-autofix) echo "git jq perl gh gh-login agents-link" ;;
     *) echo "" ;;
@@ -174,7 +175,7 @@ for skill in "$skills_dir"/*/; do
   done
   if ((${#lack[@]} > 0)); then
     blocked+=("$name（${lack[*]}）")
-  elif [[ $name == *-cross-review ]] && ! codex_ready; then
+  elif [[ $name == *-cross-review || $name == codebase-cleanup-workflow ]] && ! codex_ready; then
     ready+=("$name（Fable のみ）")
   else
     ready+=("$name")

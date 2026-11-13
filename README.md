@@ -1,15 +1,15 @@
 # agent-skills
 
-Claude Code で開発し、Codex で整備するための汎用スキル集。\
+Claude Code で開発・整備し、Codex で依存の更新と監査をするための汎用スキル集。\
 開発以外の作業に使うスキルも置いている。\
 特定のプロジェクトに依存しない。
 
 | | Claude Code | Codex |
 | --- | --- | --- |
-| 役割 | 開発する（設計・実装・テスト・レビュー・PR） | 整備する（設計への整合・構造・テスト・宣言順・文書・依存の更新） |
+| 役割 | 開発する（設計・実装・テスト・レビュー・PR）、整備する（設計への整合・構造・テスト・宣言順・文書） | 依存を更新する、セキュリティ監査の所見を Issue にする |
 | 使い方 | 条件に当たると Claude が自分の判断で使うスキルが中心 | `$スキル名` で指定したときだけ使う |
 
-Claude Code で機能を作り、余裕のあるときに Codex でコードベースを整え（`$codebase-cleanup-workflow`）、また Claude Code で次の開発に進む。\
+Claude Code で機能を作り、余裕のあるときにリファクタリング用スキル（codebase-cleanup-workflow）でコードベースを整え、また次の開発に進む。\
 Claude は作業の一部を Haiku 5.5・Opus 5.5・Fable 5.2 のサブエージェントや Codex CLI（GPT-6 Astra・GPT-6.1 Sol）に任せ、指示・採否の判断・反映を受け持つ。
 
 ## はじめに
@@ -33,18 +33,18 @@ Claude は作業の一部を Haiku 5.5・Opus 5.5・Fable 5.2 のサブエージ
      メインの checkout で実行する。
    - 反映されなければ、新しいセッションを始めるか Codex を再起動する。
 
-2. [`/skills-preflight`](.claude/skills/skills-preflight/SKILL.md)（Claude Code）・[`$skills-preflight`](.agents/skills/skills-preflight/SKILL.md)（Codex）で、必要なコマンド・ログイン・リンクを確かめる。\
+2. [skills-preflight](.claude/skills/skills-preflight/SKILL.md)（Claude Code）・[`$skills-preflight`](.agents/skills/skills-preflight/SKILL.md)（Codex）で、必要なコマンド・ログイン・リンクを確かめる。\
    Claude Code では、足りないコマンドとリンクを了承を得てから入れる（ログインはユーザーが行う）。\
    Codex はスキルの定義と Cloudflare の `security-audit` の配置も確かめ、環境は変えない。\
    主な前提は次のとおり（細かい条件は各 SKILL.md にある）。
 
    | 前提 | 使うスキル |
    | --- | --- |
-   | `perl` | design-cross-review・implementation-cross-review・haiku-implementation・gh-issue-autofix |
+   | `perl` | design-cross-review・implementation-cross-review・haiku-implementation・gh-issue-autofix・codebase-cleanup-workflow |
    | `git` 2.36 以降 | gh-issue-autofix（Auto-fix で push するとき） |
    | `jq` | haiku-implementation・gh-todo・gh-issue-autofix、クロスレビューの Codex の担当 |
    | `codex` のログイン | クロスレビューの Codex の担当（Astra。使えないときは Sol） |
-   | メインが auto モード | haiku-implementation・gh-issue-autofix |
+   | メインが auto モード | haiku-implementation・gh-issue-autofix、codebase-cleanup-workflow（ないときは Haiku に実装を任せない） |
    | `gh` のログイン | gh-todo・gh-issue-autofix・security-audit-to-issues、haiku-check で CI のログを見るとき |
    | Claude デスクトップアプリ | session-status-emoji |
    | 組み込みブラウザか Claude in Chrome | browser-readonly-research |
@@ -52,6 +52,7 @@ Claude は作業の一部を Haiku 5.5・Opus 5.5・Fable 5.2 のサブエージ
    | デスクトップアプリが開いていて PC が起きている（専用の PC を勧める） | スケジュールに登録するスキル |
    | Python 3.9 以降 | Codex の minor-version-upgrade・rename-files-by-content |
    | `node`・Cloudflare の `security-audit`・サブエージェント | security-audit-to-issues |
+   | 対象が git リポジトリで、未コミットの変更がない | codebase-cleanup-workflow |
 
 3. 下の一覧から選ぶ。\
    名前のリンク先に、手順とオプションがある。
@@ -74,13 +75,30 @@ Claude は作業の一部を Haiku 5.5・Opus 5.5・Fable 5.2 のサブエージ
 | [implementation-cross-review](.claude/skills/implementation-cross-review/SKILL.md) | 差分を Astra と Fable にレビューさせて直す（直したあとは Astra が確認） | 完了報告・コミット・PR の前 |
 | [japanese-report](.claude/skills/japanese-report/SKILL.md) | 報告を自然な日本語で書く | 結果を報告する前 |
 
-### `/スキル名` で指定したときだけ使うスキル
+### リファクタリング用スキル
+
+`/スキル名` で指定したときだけ使う。\
+既存の振る舞いを変えずに、コード・テスト・文書を整える。\
+codebase-cleanup-workflow は残りの 5 本を上から順に使い、工程ごとに Astra と Fable のレビューを挟む。
 
 | スキル | できること |
 | --- | --- |
-| [`/whats-next`](.claude/skills/whats-next/SKILL.md) | 進捗と次のアクションを 1 つ示し、承認後に進める |
-| [`/gh-todo`](.claude/skills/gh-todo/SKILL.md) | レビュー依頼・メンション・自分の Issue / PR を一覧にする |
-| [`/browser-readonly-research`](.claude/skills/browser-readonly-research/SKILL.md) | Web ページを読むだけで調べてまとめる |
+| [codebase-cleanup-workflow](.claude/skills/codebase-cleanup-workflow/SKILL.md) | 設計整合から文書同期までの整備を一巡し、工程ごとに Astra と Fable のレビューを受けて作業ブランチにコミットする |
+| [design-alignment-refactor](.claude/skills/design-alignment-refactor/SKILL.md) | 設計方針から外れた責務分担や依存関係を直す |
+| [code-structure-refactor](.claude/skills/code-structure-refactor/SKILL.md) | 責務の混在や重複を、分割・共通化で直す |
+| [test-suite-refactor](.claude/skills/test-suite-refactor/SKILL.md) | 検出力を保ったまま、テストの重複を整理する |
+| [code-order-refactor](.claude/skills/code-order-refactor/SKILL.md) | メソッドや関数を読みやすい順に並べ替える |
+| [docs-align-with-code](.claude/skills/docs-align-with-code/SKILL.md) | 実装に合わせて文書を更新する |
+
+### 指定して使うスキル
+
+`/スキル名` で指定したときだけ使う。
+
+| スキル | できること |
+| --- | --- |
+| [whats-next](.claude/skills/whats-next/SKILL.md) | 進捗と次のアクションを 1 つ示し、承認後に進める |
+| [gh-todo](.claude/skills/gh-todo/SKILL.md) | レビュー依頼・メンション・自分の Issue / PR を一覧にする |
+| [browser-readonly-research](.claude/skills/browser-readonly-research/SKILL.md) | Web ページを読むだけで調べてまとめる |
 
 ### スケジュールに登録するスキル
 
@@ -89,22 +107,15 @@ Claude デスクトップアプリのスケジュールタスクに登録し、`
 
 | スキル | できること |
 | --- | --- |
-| [`/gh-issue-autofix`](.claude/skills/gh-issue-autofix/SKILL.md) | `agent:autofix` ラベルの Issue を 1 件、確認なしで対応して同じラベルのドラフト PR にし、止めたら Issue に理由を書いて、Issue が更新されたら続きから再開する。受け入れ条件を満たして作った PR の指摘・CI の失敗・競合には Auto-fix で対応する。リポジトリの親ディレクトリに登録すると、配下から Issue か PR を選んでそのセッションで対応し、PR の指摘・CI の失敗・競合は定期実行で拾う |
+| [gh-issue-autofix](.claude/skills/gh-issue-autofix/SKILL.md) | `agent:autofix` ラベルの Issue を 1 件、確認なしで対応して同じラベルのドラフト PR にし、止めたら Issue に理由を書いて、Issue が更新されたら続きから再開する。受け入れ条件を満たして作った PR の指摘・CI の失敗・競合には Auto-fix で対応する。リポジトリの親ディレクトリに登録すると、配下から Issue か PR を選んでそのセッションで対応し、PR の指摘・CI の失敗・競合は定期実行で拾う |
 
 ## Codex 用スキル一覧
 
-すべて `$スキル名` で指定したときだけ使う。\
-どのスキルも既存の振る舞いを保ち、対象を省略するとプロジェクト全体を探す。
+すべて `$スキル名` で指定したときだけ使う。
 
 | スキル | できること |
 | --- | --- |
 | [`$minor-version-upgrade`](.agents/skills/minor-version-upgrade/SKILL.md) | ランタイムと依存を、互換性を保つ範囲で更新する |
-| [`$codebase-cleanup-workflow`](.agents/skills/codebase-cleanup-workflow/SKILL.md) | 設計整合から文書同期までの整備を一巡する |
-| [`$design-alignment-refactor`](.agents/skills/design-alignment-refactor/SKILL.md) | 設計方針から外れた責務分担や依存関係を直す |
-| [`$code-structure-refactor`](.agents/skills/code-structure-refactor/SKILL.md) | 責務の混在や重複を、分割・共通化で直す |
-| [`$test-suite-refactor`](.agents/skills/test-suite-refactor/SKILL.md) | 検出力を保ったまま、テストの重複を整理する |
-| [`$code-order-refactor`](.agents/skills/code-order-refactor/SKILL.md) | メソッドや関数を読みやすい順に並べ替える |
-| [`$docs-align-with-code`](.agents/skills/docs-align-with-code/SKILL.md) | 実装に合わせて文書を更新する |
 | [`$security-audit-to-issues`](.agents/skills/security-audit-to-issues/SKILL.md) | 自律監査で確定所見の修正 Issue と全判定の集約 Issue を作成・更新し、自動修正できる項目にラベルを付ける |
 
 ## 開発以外のスキル
