@@ -41,15 +41,13 @@ Claude は作業の一部を Haiku 5.5・Opus 5.5・Fable 5.2 のサブエージ
    | 前提 | 使うスキル |
    | --- | --- |
    | `perl` | design-cross-review・implementation-cross-review・haiku-implementation・gh-issue-autofix・codebase-cleanup-workflow |
-   | `git` 2.36 以降 | gh-issue-autofix（Auto-fix で push するとき） |
    | `jq` | haiku-implementation・gh-todo・gh-issue-autofix、クロスレビューの Codex の担当 |
    | `codex` のログイン | クロスレビューの Codex の担当（Astra。使えないときは Sol） |
-   | メインが auto モード | haiku-implementation・gh-issue-autofix、codebase-cleanup-workflow（ないときは Haiku に実装を任せない） |
+   | メインが auto モード | haiku-implementation、codebase-cleanup-workflow（ないときは Haiku に実装を任せない） |
    | `gh` のログイン | gh-todo・gh-issue-autofix・security-audit-to-issues、haiku-check で CI のログを見るとき |
    | Claude デスクトップアプリ | session-status-emoji |
    | 組み込みブラウザか Claude in Chrome | browser-readonly-research |
    | 組み込みブラウザ | gh-issue-autofix（ないときは動作確認を未検証にする） |
-   | デスクトップアプリが開いていて PC が起きている（専用の PC を勧める） | スケジュールに登録するスキル |
    | Python 3.9 以降 | Codex の minor-version-upgrade・rename-files-by-content |
    | `node`・Cloudflare の `security-audit`・サブエージェント | security-audit-to-issues |
    | 対象が git リポジトリで、未コミットの変更がない | codebase-cleanup-workflow |
@@ -99,15 +97,7 @@ codebase-cleanup-workflow は残りの 5 本を上から順に使い、工程ご
 | [whats-next](.claude/skills/whats-next/SKILL.md) | 進捗と次のアクションを 1 つ示し、承認後に進める |
 | [gh-todo](.claude/skills/gh-todo/SKILL.md) | レビュー依頼・メンション・自分の Issue / PR を一覧にする |
 | [browser-readonly-research](.claude/skills/browser-readonly-research/SKILL.md) | Web ページを読むだけで調べてまとめる |
-
-### スケジュールに登録するスキル
-
-Claude デスクトップアプリのスケジュールタスクに登録し、`/スキル名` で定期実行する。\
-登録のしかたと試運転は SKILL.md にある。
-
-| スキル | できること |
-| --- | --- |
-| [gh-issue-autofix](.claude/skills/gh-issue-autofix/SKILL.md) | `agent:autofix` ラベルの Issue を 1 件、確認なしで対応して同じラベルのドラフト PR にし、止めたら Issue に理由を書いて、Issue が更新されたら続きから再開する。受け入れ条件を満たして作った PR の指摘・CI の失敗・競合には Auto-fix で対応する。リポジトリの親ディレクトリに登録すると、配下から Issue か PR を選んでそのセッションで対応し、PR の指摘・CI の失敗・競合は定期実行で拾う |
+| [gh-issue-autofix](.claude/skills/gh-issue-autofix/SKILL.md) | `agent:autofix` ラベルの Issue を 1 件対応し、同じラベルのドラフト PR にする |
 
 ## Codex 用スキル一覧
 
