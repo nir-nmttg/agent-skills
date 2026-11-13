@@ -197,5 +197,5 @@ fi
 echo "- コピーした設定ファイル（コミットしない）:${copied:- なし}"
 [[ -z $warn_deps ]] || echo "- 注意: $warn_deps があるので、リンクした依存はメインの checkout のコードを読み込みます。リンクを外し、worktree にプロジェクトの手順でインストールしてからテストしてください。"
 if [[ -n $(git -C "$WORKTREE" status --porcelain) ]]; then
-  echo "- 注意: worktree に未コミットの変更があります（前回の続き）。"
+  echo "- 注意: 用意した直後の worktree に未コミットの変更があります。git status で確かめてください。"
 fi

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # 作業フォルダの git の変更を取り出し、要件と合わせて、レビュアーに読ませる prompt.md を作る。
-# Astra（review.sh）と Fable（fable-reviewer。利用枠が足りないときは opus-reviewer）は、ここで作った同じ prompt.md を読む。
+# Astra（review.sh）と Fable（fable-reviewer。Fable の代わりは opus-reviewer）は、ここで作った同じ prompt.md を読む。
 #
 # 使い方: prepare.sh [--cd <dir>] [--base <ref> | --commit <sha> | --uncommitted] <実行フォルダ>
 #   --cd           レビューするリポジトリ（既定: 今のフォルダ。確認のレビューでは前回のリポジトリ）
@@ -55,7 +55,7 @@ if [[ -e $run_dir/previous.txt ]]; then
   prev=$(cd -P "$prev" && pwd)
   [[ $prev != "$run_dir" ]] || { echo "エラー: 前回の実行フォルダが今回と同じです" >&2; exit 1; }
   for f in snapshot.txt repo.txt head.txt; do
-    [[ -s $prev/$f ]] || { echo "エラー: 前回の $f がありません（前回のスナップショットを取れなかったか、古い版で作ったフォルダです）。確認のレビューは使えないので、--followup を付けずに全体の差分でレビューしてください" >&2; exit 1; }
+    [[ -s $prev/$f ]] || { echo "エラー: 前回の $f がありません（前回のスナップショットを取れませんでした）。確認のレビューは使えないので、--followup を付けずに全体の差分でレビューしてください" >&2; exit 1; }
   done
   [[ -s $run_dir/fixes.md ]] || { echo "エラー: $run_dir/fixes.md がないか空です" >&2; exit 1; }
   # --cd を省いたら前回のリポジトリを使う（別の worktree の変更を、直したこととして読まないため）

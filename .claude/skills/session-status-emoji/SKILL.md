@@ -53,7 +53,7 @@ allowed-tools: mcp__ccd_session_mgmt__get_session, mcp__ccd_session_mgmt__set_se
 ## 更新のしかた
 
 1. `mcp__ccd_session_mgmt__get_session`（`session_id: "self"`）で今のタイトルを取る。ツールが読み込まれていなければ、ToolSearch で `select:mcp__ccd_session_mgmt__get_session,mcp__ccd_session_mgmt__set_session_title` を読み込む。
-2. タイトルの先頭が、上の表の絵文字か、初期値の ✨ か、このスキルで前に付けた絵文字（表にない絵文字を選んだ場合）に続く「 ｜」（半角スペースと全角の縦棒。以前の形の「 - 」や半角スペースだけのものも含む）なら、それを取り除く。残りを元のタイトルとする。ユーザーがもともとタイトルの先頭に付けていた絵文字は取り除かない。
+2. タイトルの先頭が、上の表の絵文字か、初期値の ✨ か、このスキルで前に付けた絵文字（表にない絵文字を選んだ場合）に続く区切り（「 ｜」（半角スペースと全角の縦棒）、「 - 」、半角スペースのどれか）なら、それを取り除く。残りを元のタイトルとする。ユーザーがもともとタイトルの先頭に付けていた絵文字は取り除かない。
 3. 付けたい絵文字がすでに付いていれば何もしない。
 4. `mcp__ccd_session_mgmt__set_session_title`（`session_id: "self"`、`title: "<絵文字> ｜<元のタイトル>"`、例: `🛠️ ｜CSV エクスポートの追加`）で変える。元のタイトルの文言は変えない。
 

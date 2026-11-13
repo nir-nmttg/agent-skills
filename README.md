@@ -21,7 +21,7 @@ Claude は作業の一部を Haiku 5.5・Fable 5.2（利用枠が足りなけれ
    | 前提 | 使うスキル |
    | --- | --- |
    | `perl` | design-cross-review・implementation-cross-review・haiku-implementation・gh-issue-autofix・codebase-cleanup-workflow |
-   | `jq` | haiku-implementation・gh-todo・gh-issue-autofix、クロスレビューの Codex の担当 |
+   | `jq` | haiku-implementation・gh-issue-autofix、クロスレビューの Codex の担当 |
    | `codex` のログイン | クロスレビューの Codex の担当 |
    | メインが auto モード | haiku-implementation、codebase-cleanup-workflow（ないときは Haiku に実装を任せない） |
    | `gh` のログイン | gh-todo・gh-issue-autofix・security-audit-to-issues、haiku-check で CI のログを見るとき |

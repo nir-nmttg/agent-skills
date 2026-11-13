@@ -25,7 +25,7 @@ Claude が考えた設計を、Astra（Codex CLI の GPT-6 Astra）と Fable（`
 - 既存の設計・規約・命名から外れる
 - haiku-implementation で Haiku に任せる前の、分割や指示書の前提を決める
 
-**使わない**（設計の欠陥が起こりえない、次の場合だけ）
+**使わない**（次の場合だけ）
 
 - 設計の判断を含まない変更: 原因と直し方が一通りに決まる修正、意味や動作を変えない修正（typo・整形・コメント）
 - ユーザーが「レビューは不要」と言っている
@@ -47,7 +47,7 @@ Claude が考えた設計を、Astra（Codex CLI の GPT-6 Astra）と Fable（`
 2. **直接の依頼**: `/design-cross-review` やレビューを頼まれたら、レビュー済みでも Astra と Fable を動かす。
 3. **自分の判断で使うとき**: Astra と Fable を対象にする。そこから、同じ設計をこの会話ですでにレビューして結果を受け取った担当を除く。残りがなければ動かさない。
 
-「Sol で」と言われたとき、`--only sol` や「Sol だけ」と言われたとき、この会話で Astra がモデルを使えない・プランの対象外の理由で失敗していたときは、Astra の代わりに Sol で動かす（4. で `--model gpt-6.1-sol` を渡す。`--only sol`・「Sol だけ」なら Fable は動かさない）。
+「Sol で」と言われたとき、`--only sol` や「Sol だけ」と言われたとき、この会話で Astra がモデルを使えない・プランの対象外・使用量の上限の理由で失敗していたときは、Astra の代わりに Sol で動かす（4. で `--model gpt-6.1-sol` を渡す。`--only sol`・「Sol だけ」なら Fable は動かさない）。
 
 「Opus で」と言われたとき、`--only opus` や「Opus だけ」と言われたとき、4. で確かめた Fable の利用枠が足りないとき、利用枠を確かめられないうえに、この会話で Fable が利用枠の不足で失敗していたときは、Fable の代わりに Opus（`opus-reviewer`）で動かす（`--only opus`・「Opus だけ」なら Astra は動かさない）。Opus で代わりに動かした回も Fable の担当として数え、レビュー済みの担当を除くときも同じに扱う。
 
@@ -119,7 +119,7 @@ Fable は Agent ツールで呼ぶ。Fable を動かす予定なら、呼ぶ前�
 
 Agent ツールには次を指定する。
 
-- `subagent_type`: `fable-reviewer`、Opus で動かすときは `opus-reviewer`（必ず指定する。`fork` や省略で会話を引き継ぐ形にしない）
+- `subagent_type`: `fable-reviewer`、Opus で動かすときは `opus-reviewer`（必ず指定する。省略や `fork` では、定義のモデルと読み取り専用の設定が効かない）
 - `effort`: 上の「Claude の推論レベル」。空や `auto` のときは `high`
 - `model`: **渡さない**（引数は別名しか受け付けず、親と同じ系統なら親のモデルになって、定義の `claude-fable-5-2`・`claude-opus-5-5` の固定が外れる）
 - `prompt`: 次の 1 行だけにする

@@ -64,7 +64,7 @@
 
 ## 計画JSONとinventoryの形式
 
-計画は `schema_version: 2` の静的計画として RUN ごとに新しく作り、状態は `init` が作る。`verification_mode` は省略するか `"static"` にし、ほかの検証方式や `execution` を含む計画は拒否する。JSON の重複キー・未対応キー・不正な型、symlink・hardlink・特殊ファイル・`..` 参照は拒否する。
+計画は `schema_version: 2` の静的計画として RUN ごとに新しく作り、状態は `init` が作る。JSON の重複キー・未対応キー・不正な型、symlink・hardlink・特殊ファイル・`..` 参照は拒否する。
 
 以下は構造例で、版・日時・hash・パスを実際に確認した値へ置き換える。
 

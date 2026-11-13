@@ -26,15 +26,11 @@ printf '対象: %s\n\n' "$(cell "$skills_dir")"
 printf '| 状態 | コマンド | 確認結果・用途 |\n'
 printf '| --- | --- | --- |\n'
 printf '| ✅ | `bash` | 実行中: %s（基本チェック用） |\n' "$BASH_VERSION"
-for cmd in git rg; do
-  if location=$(command -v "$cmd"); then
-    printf '| ✅ | `%s` | %s |\n' "$cmd" "$(cell "$location")"
-  elif [[ $cmd == git ]]; then
-    printf '| ⚠️ | `git` | 見つかりません。履歴・差分の確認に使います |\n'
-  else
-    printf '| ⚠️ | `rg` | 見つかりません。コード探索は既存の検索機能や `grep` などで代替できます |\n'
-  fi
-done
+if location=$(command -v git); then
+  printf '| ✅ | `git` | %s |\n' "$(cell "$location")"
+else
+  printf '| ⚠️ | `git` | 見つかりません。履歴・差分の確認に使います |\n'
+fi
 
 cloudflare_skill="$link_dir/security-audit"
 printf '\n| 状態 | 外部スキル | 確認結果 |\n'
