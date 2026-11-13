@@ -18,6 +18,31 @@ const ISSUE_SYNC_DONE = ["complete", "partial", "blocked"];
 const SAFE_TOKEN = /^[a-z0-9][a-z0-9_.:-]{0,63}$/;
 const REASON_TOKEN = /^[a-z0-9][a-z0-9_.:-]{0,127}$/;
 
+// Coordinator に送る文面。Supervisor は自分で書かず、ここで出した文面をそのまま送る。
+const MESSAGES = {
+  // 審査などでターンが途中で終わったあと
+  continue: [
+    "前のターンは途中で終わりました。実行フォルダの記録を読み直してください。",
+    "- 動いている Worker や、終わった Worker の結果は受け取ってください。",
+    "- 項目に分かれる作業（監査単位・候補・所見・個別 Issue）は、止まる直前に扱っていた項目だけをやり直さずに保留とし、理由を台帳（Issue 反映は issue_sync）に記録してください。",
+    "- 項目に分かれない作業（初期調査、findings.json・報告書・集約 Issue の作成）は、保存済みの記録をもとに1回だけ進め直してください。同じところでまた止まったら、そこまでの結果を保存し、未完了として理由を記録してください。",
+    "- そのほかの作業は、止まる前の続きから進めてください。",
+    "ターンを終えるときは、SKILL.md の状態報告の JSON だけを最終回答にしてください。",
+  ].join("\n"),
+  // 最終回答が状態報告の形でない・照合が合わないとき
+  status_report: "SKILL.md の状態報告の JSON だけを最終回答にして、続けてください。",
+  // 利用者の「続けてください」で再開するとき
+  resume: [
+    "利用者の依頼で再開します。実行フォルダの記録を読み直し、未完了の工程を続きから進めてください。",
+    "- 審査の停止で保留にした項目は保留のままにし、そのほかの保留は再開条件を満たすものだけ進めてください。",
+    "ターンを終えるときは、SKILL.md の状態報告の JSON だけを最終回答にしてください。",
+  ].join("\n"),
+};
+
+function withMessage(head, key) {
+  return `${head}\n送る文面:\n${MESSAGES[key]}`;
+}
+
 class UsageError extends Error {}
 
 function fail(message) {
@@ -129,8 +154,8 @@ function cmdAttach(dir, coordinatorId) {
   return "auditing";
 }
 
-function token(value) {
-  const t = String(value).toLowerCase().replace(/[^a-z0-9_.:-]/g, "_").replace(/^[^a-z0-9]+/, "").slice(0, 128);
+function token(value, max = 128) {
+  const t = String(value).toLowerCase().replace(/[^a-z0-9_.:-]/g, "_").replace(/^[^a-z0-9]+/, "").slice(0, max);
   return t || "other";
 }
 
@@ -139,8 +164,15 @@ function cmdRecord(dir, kind, detail) {
   const state = loadState(dir);
   if (AUDITING_ONLY.includes(kind) && state.stage !== "auditing") fail(`段階 ${state.stage} では ${kind} を記録できません`);
   if (kind === "unsupported" && !["starting", "auditing"].includes(state.stage)) fail(`段階 ${state.stage} では unsupported を記録できません`);
+  if (kind === "returned") {
+    // 利用者に返すのは、判定が report を出したときだけ（Supervisor の独自の判断で打ち切らない）
+    const d = decide(state);
+    if (d.action !== "report") fail(`判定が report ではないので returned は記録できません: ${formatDecision(d, state)}`);
+    if (detail === undefined || token(detail) !== d.reason) fail(`returned の理由は判定の reason（${d.reason}）にしてください`);
+  }
   const event = { kind };
-  if (detail !== undefined) event[kind === "returned" ? "reason" : "error_kind"] = token(detail);
+  // エラーの種別は 64 字までにし、判定の reason（error_kind:<種別>）が returned の上限に収まるようにする
+  if (detail !== undefined) event[kind === "returned" ? "reason" : "error_kind"] = kind === "returned" ? token(detail) : token(detail, 64);
   if (kind === "unknown") {
     state.consecutive_unknown += 1;
   } else {
@@ -161,12 +193,15 @@ function cmdRecord(dir, kind, detail) {
   if (kind === "unsupported") state.stage = "self_auditing";
   pushEvent(state, event);
   saveState(dir, state);
-  return `${kind} auto_resumes=${state.auto_resumes}/${state.max_auto_resumes} no_progress=${state.consecutive_no_progress}`;
+  const head = `${kind} auto_resumes=${state.auto_resumes}/${state.max_auto_resumes} no_progress=${state.consecutive_no_progress}`;
+  // 停止などを記録したら、次の動き（と送る文面）を続けて示す
+  if (DECISION_KINDS.includes(kind)) return `${head}\n${nextOutput(state)}`;
+  if (kind === "human_resume") return withMessage(head, "resume");
+  return head;
 }
 
-function cmdNext(dir) {
-  const state = loadState(dir);
-  if (state.stage !== "auditing") return `none stage=${state.stage}`;
+function decide(state) {
+  if (state.stage !== "auditing") return { action: "none" };
   // 最後に続きを頼んだ（resuming・human_resume）より前の出来事では判定しない
   let last;
   for (let i = state.events.length - 1; i >= 0; i -= 1) {
@@ -177,13 +212,28 @@ function cmdNext(dir) {
       break;
     }
   }
-  if (!last) return "wait";
-  if (["followup_failed", "run_dir_mismatch"].includes(last.kind)) return `report reason=${last.kind}`;
-  if (last.kind === "stopped" && last.error_kind && last.error_kind !== "cyber_policy") return `report reason=error_kind:${last.error_kind}`;
-  if (last.kind === "unknown") return state.consecutive_unknown >= MAX_UNKNOWN ? "give_up reason=unknown_state" : "wait";
-  if (state.consecutive_no_progress >= MAX_NO_PROGRESS) return "give_up reason=no_progress";
-  if (state.auto_resumes >= state.max_auto_resumes) return "give_up reason=max_auto_resumes";
-  return "continue";
+  if (!last) return { action: "wait" };
+  if (["followup_failed", "run_dir_mismatch"].includes(last.kind)) return { action: "report", reason: last.kind };
+  if (last.kind === "stopped" && last.error_kind && last.error_kind !== "cyber_policy") return { action: "report", reason: `error_kind:${last.error_kind}` };
+  if (last.kind === "unknown") return state.consecutive_unknown >= MAX_UNKNOWN ? { action: "give_up", reason: "unknown_state" } : { action: "wait" };
+  if (state.consecutive_no_progress >= MAX_NO_PROGRESS) return { action: "give_up", reason: "no_progress" };
+  if (state.auto_resumes >= state.max_auto_resumes) return { action: "give_up", reason: "max_auto_resumes" };
+  return { action: "continue", message: last.kind === "malformed" ? "status_report" : "continue" };
+}
+
+function formatDecision(d, state) {
+  if (d.action === "none") return `none stage=${state?.stage ?? "unknown"}`;
+  return d.reason ? `${d.action} reason=${d.reason}` : d.action;
+}
+
+function nextOutput(state) {
+  const d = decide(state);
+  const head = formatDecision(d, state);
+  return d.action === "continue" ? withMessage(head, d.message) : head;
+}
+
+function cmdNext(dir) {
+  return nextOutput(loadState(dir));
 }
 
 function runStatusOf(meta) {
@@ -319,21 +369,36 @@ function cmdSummary(dir) {
 
 function cmdResume(dir) {
   const state = loadState(dir);
-  if (state.stage !== "gave_up") fail(`段階が gave_up ではありません: ${state.stage}`);
-  state.stage = "auditing";
+  if (state.stage === "done") {
+    // 終えた実行は、監査を終えた記録（run_status が complete）がなければ利用者の依頼で再開できる
+    const r = readJson(path.join(dir, "run-metadata.json"));
+    const runStatus = r.ok && r.value && typeof r.value === "object" ? runStatusOf(r.value) : null;
+    if (["complete", "completed"].includes(runStatus)) fail(`監査を終えているので再開できません: run_status=${runStatus}`);
+  } else if (state.stage !== "gave_up") {
+    fail(`段階が gave_up・done ではありません: ${state.stage}`);
+  }
+  // Coordinator を使わずに Supervisor が監査した実行は、Supervisor が続ける
+  const selfAudit = state.events.some((e) => e.kind === "unsupported");
+  state.stage = selfAudit ? "self_auditing" : "auditing";
   state.consecutive_no_progress = 0;
   state.consecutive_unknown = 0;
   state.auto_resumes = 0;
   state.last_progress = progress(dir);
   pushEvent(state, { kind: "human_resume" });
   saveState(dir, state);
-  return "auditing";
+  return selfAudit ? "self_auditing" : withMessage("auditing", "resume");
 }
 
 function cmdFinish(dir, stage, reason) {
   if (!["done", "gave_up"].includes(stage)) fail("stage は done か gave_up にしてください");
   const state = loadState(dir);
   if (!["auditing", "self_auditing"].includes(state.stage)) fail(`段階 ${state.stage} からは終えられません`);
+  if (stage === "gave_up") {
+    // あきらめるのは、判定が give_up を出したときだけ
+    const d = decide(state);
+    if (d.action !== "give_up") fail(`判定が give_up ではないので gave_up にできません: ${formatDecision(d, state)}`);
+    if (reason === undefined || token(reason) !== d.reason) fail(`gave_up の理由は判定の reason（${d.reason}）にしてください`);
+  }
   state.stage = stage;
   const event = { kind: `finish_${stage}` };
   if (reason !== undefined) event.reason = token(reason);

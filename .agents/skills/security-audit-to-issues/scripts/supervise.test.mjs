@@ -13,6 +13,15 @@ function writeJson(dir, name, value) {
   fs.writeFileSync(path.join(dir, name), JSON.stringify(value));
 }
 
+// next などの出力の1行目（判定）
+function decision(out) {
+  return out.split("\n")[0];
+}
+
+function next(dir) {
+  return decision(main(["next", dir]));
+}
+
 function started(dir) {
   main(["init", dir]);
   main(["attach", dir, "agent-1"]);
@@ -22,11 +31,16 @@ test("段階は starting から auditing、gave_up、auditing、done へ移る",
   const dir = runDir();
   assert.equal(main(["init", dir]), "starting");
   assert.throws(() => main(["init", dir]), /すでにあります/);
-  assert.equal(main(["next", dir]), "none stage=starting");
+  assert.equal(next(dir), "none stage=starting");
   assert.equal(main(["attach", dir, "agent-1"]), "auditing");
-  assert.throws(() => main(["resume", dir]), /gave_up ではありません/);
-  assert.equal(main(["finish", dir, "gave_up"]), "gave_up");
-  assert.equal(main(["resume", dir]), "auditing");
+  assert.throws(() => main(["resume", dir]), /gave_up・done ではありません/);
+  assert.throws(() => main(["finish", dir, "gave_up", "no_progress"]), /判定が give_up ではない/);
+  main(["record", dir, "unknown"]);
+  main(["record", dir, "unknown"]);
+  main(["record", dir, "unknown"]);
+  assert.throws(() => main(["finish", dir, "gave_up", "other"]), /判定の reason/);
+  assert.equal(main(["finish", dir, "gave_up", "unknown_state"]), "gave_up");
+  assert.equal(decision(main(["resume", dir])), "auditing");
   assert.equal(main(["finish", dir, "done"]), "done");
   assert.match(main(["state", dir]), /^stage=done coordinator_id=agent-1 /);
 });
@@ -35,10 +49,10 @@ test("進まない停止が2回続くと give_up", () => {
   const dir = runDir();
   started(dir);
   main(["record", dir, "stopped", "cyber_policy"]);
-  assert.equal(main(["next", dir]), "continue");
+  assert.equal(next(dir), "continue");
   main(["record", dir, "resuming"]);
   main(["record", dir, "stopped", "cyber_policy"]);
-  assert.equal(main(["next", dir]), "give_up reason=no_progress");
+  assert.equal(next(dir), "give_up reason=no_progress");
 });
 
 test("停止のあいだに成果物が変われば進んだとみなす", () => {
@@ -52,7 +66,7 @@ test("停止のあいだに成果物が変われば進んだとみなす", () =>
   main(["record", dir, "resuming"]);
   writeJson(dir, "coverage-ledger.json", [{ status: "covered" }]);
   main(["record", dir, "stopped"]);
-  assert.equal(main(["next", dir]), "continue");
+  assert.equal(next(dir), "continue");
 });
 
 test("自動の続きは malformed の出し直しを含めて上限ちょうどで止まる", () => {
@@ -61,47 +75,47 @@ test("自動の続きは malformed の出し直しを含めて上限ちょうど
   for (let i = 0; i < 8; i += 1) {
     fs.writeFileSync(path.join(dir, "REPORT.md"), `v${i}`);
     main(["record", dir, i % 2 ? "malformed" : "stopped"]);
-    assert.equal(main(["next", dir]), "continue", `回数 ${i}`);
+    assert.equal(next(dir), "continue", `回数 ${i}`);
     main(["record", dir, "resuming"]);
   }
   fs.writeFileSync(path.join(dir, "REPORT.md"), "last");
   main(["record", dir, "stopped"]);
-  assert.equal(main(["next", dir]), "give_up reason=max_auto_resumes");
+  assert.equal(next(dir), "give_up reason=max_auto_resumes");
 });
 
 test("審査以外のエラーと送信の失敗は利用者に返す", () => {
   const dir = runDir();
   started(dir);
   main(["record", dir, "stopped", "usage_limit"]);
-  assert.equal(main(["next", dir]), "report reason=error_kind:usage_limit");
+  assert.equal(next(dir), "report reason=error_kind:usage_limit");
   main(["record", dir, "stopped", "cyber_policy"]);
   main(["record", dir, "followup_failed"]);
-  assert.equal(main(["next", dir]), "report reason=followup_failed");
+  assert.equal(next(dir), "report reason=followup_failed");
 });
 
 test("状態不明は3回続くまで待ち直す", () => {
   const dir = runDir();
   started(dir);
   main(["record", dir, "unknown"]);
-  assert.equal(main(["next", dir]), "wait");
+  assert.equal(next(dir), "wait");
   main(["record", dir, "unknown"]);
   main(["record", dir, "unknown"]);
-  assert.equal(main(["next", dir]), "give_up reason=unknown_state");
+  assert.equal(next(dir), "give_up reason=unknown_state");
 });
 
 test("unsupported で self_auditing になり、自動の続きはしない", () => {
   const dir = runDir();
   started(dir);
   main(["record", dir, "unsupported"]);
-  assert.equal(main(["next", dir]), "none stage=self_auditing");
+  assert.equal(next(dir), "none stage=self_auditing");
   assert.equal(main(["finish", dir, "done"]), "done");
 });
 
 test("supervisor.json がない・壊れていると止まる", () => {
   const dir = runDir();
-  assert.throws(() => main(["next", dir]), /supervisor.json がありません/);
+  assert.throws(() => next(dir), /supervisor.json がありません/);
   fs.writeFileSync(path.join(dir, "supervisor.json"), "{");
-  assert.throws(() => main(["next", dir]), /読めません/);
+  assert.throws(() => next(dir), /読めません/);
   assert.throws(() => main(["next", "relative/dir"]), /絶対パス/);
   writeJson(dir, "supervisor.json", { stage: "auditing", events: [] });
   assert.throws(() => main(["record", dir, "nonsense"]), /kind が正しくありません/);
@@ -111,10 +125,10 @@ test("エラーの種別は小文字の短い語にそろえて記録する", ()
   const dir = runDir();
   started(dir);
   main(["record", dir, "stopped", "Cyber Policy!"]);
-  assert.equal(main(["next", dir]), "report reason=error_kind:cyber_policy_");
+  assert.equal(next(dir), "report reason=error_kind:cyber_policy_");
   main(["record", dir, "human_resume"]);
   main(["record", dir, "stopped", "CYBER_POLICY"]);
-  assert.equal(main(["next", dir]), "continue");
+  assert.equal(next(dir), "continue");
 });
 
 test("段階に合わない記録と終わり方は断る", () => {
@@ -133,20 +147,20 @@ test("続きを頼んだあとは、それより前の出来事で判定しな�
   const dir = runDir();
   started(dir);
   main(["record", dir, "followup_failed"]);
-  assert.equal(main(["next", dir]), "report reason=followup_failed");
+  assert.equal(next(dir), "report reason=followup_failed");
   main(["record", dir, "human_resume"]);
-  assert.equal(main(["next", dir]), "wait");
+  assert.equal(next(dir), "wait");
   main(["record", dir, "malformed"]);
-  assert.equal(main(["next", dir]), "continue");
+  assert.equal(next(dir), "continue");
 });
 
 test("状態不明のあと出し直しを頼めば continue に戻る", () => {
   const dir = runDir();
   started(dir);
   main(["record", dir, "unknown"]);
-  assert.equal(main(["next", dir]), "wait");
+  assert.equal(next(dir), "wait");
   main(["record", dir, "malformed"]);
-  assert.equal(main(["next", dir]), "continue");
+  assert.equal(next(dir), "continue");
 });
 
 test("自動の続きの累計は人による再開をまたいで数え、あきらめた理由も残す", () => {
@@ -159,10 +173,11 @@ test("自動の続きの累計は人による再開をまたいで数え、あ�
   }
   fs.writeFileSync(path.join(dir, "REPORT.md"), "x");
   main(["record", dir, "stopped", "cyber_policy"]);
-  assert.equal(main(["next", dir]), "give_up reason=max_auto_resumes");
+  assert.equal(next(dir), "give_up reason=max_auto_resumes");
   main(["finish", dir, "gave_up", "max_auto_resumes"]);
   main(["resume", dir]);
   main(["record", dir, "resuming"]);
+  main(["record", dir, "stopped", "usage_limit"]);
   main(["record", dir, "returned", "error_kind:usage_limit"]);
   const s = JSON.parse(main(["summary", dir]));
   assert.equal(s.supervisor.auto_resumes, 9);
@@ -255,7 +270,7 @@ test("Supervisor の再開の記録は、記録済みの停止の判定を隠さ
   started(dir);
   main(["record", dir, "stopped", "cyber_policy"]);
   main(["record", dir, "supervisor_resume"]);
-  assert.equal(main(["next", dir]), "continue");
+  assert.equal(next(dir), "continue");
   const s = JSON.parse(main(["summary", dir]));
   assert.equal(s.supervisor.supervisor_resumes, 1);
   assert.equal(s.supervisor.stops, 1);
@@ -265,7 +280,79 @@ test("run_dir の食い違いは report になり、理由を残せる", () => {
   const dir = runDir();
   started(dir);
   main(["record", dir, "run_dir_mismatch"]);
-  assert.equal(main(["next", dir]), "report reason=run_dir_mismatch");
+  assert.equal(next(dir), "report reason=run_dir_mismatch");
   main(["record", dir, "returned", "run_dir_mismatch"]);
   assert.deepEqual(JSON.parse(main(["summary", dir])).supervisor.returned_reasons, ["run_dir_mismatch"]);
+});
+
+test("停止を記録すると、次の動きと送る文面を続けて示す", () => {
+  const dir = runDir();
+  started(dir);
+  const out = main(["record", dir, "stopped", "cyber_policy"]);
+  const lines = out.split("\n");
+  assert.match(lines[0], /^stopped auto_resumes=0\/8/);
+  assert.equal(lines[1], "continue");
+  assert.equal(lines[2], "送る文面:");
+  assert.match(out, /止まる直前に扱っていた項目だけをやり直さずに保留/);
+  assert.match(out, /1回だけ進め直してください/);
+  assert.doesNotMatch(out, /Daybreak|flagged|担当/);
+  assert.equal(main(["next", dir]), lines.slice(1).join("\n"));
+});
+
+test("状態報告の形でないときは、状態報告の出し直しを頼む文面にする", () => {
+  const dir = runDir();
+  started(dir);
+  const out = main(["record", dir, "malformed"]);
+  assert.match(out, /^malformed .*\ncontinue\n送る文面:\nSKILL\.md の状態報告の JSON だけを最終回答にして、続けてください。$/);
+});
+
+test("判定が report でなければ returned を記録できず、理由も判定と同じにする", () => {
+  const dir = runDir();
+  started(dir);
+  main(["record", dir, "stopped", "cyber_policy"]);
+  assert.throws(() => main(["record", dir, "returned", "safety_review_stop"]), /判定が report ではない/);
+  main(["record", dir, "followup_failed"]);
+  assert.throws(() => main(["record", dir, "returned", "safety_review_stop"]), /判定の reason/);
+  assert.throws(() => main(["record", dir, "returned"]), /判定の reason/);
+  assert.match(main(["record", dir, "returned", "followup_failed"]), /^returned /);
+});
+
+test("利用者の再開では、再開用の文面を示す", () => {
+  const dir = runDir();
+  started(dir);
+  main(["record", dir, "stopped", "usage_limit"]);
+  const out = main(["record", dir, "human_resume"]);
+  assert.match(out, /^human_resume .*\n送る文面:\n利用者の依頼で再開します。/);
+});
+
+test("終えた実行は、監査を終えた記録がなければ再開できる", () => {
+  const dir = runDir();
+  started(dir);
+  main(["finish", dir, "done"]);
+  writeJson(dir, "run-metadata.json", { run_status: "complete" });
+  assert.throws(() => main(["resume", dir]), /run_status=complete/);
+  writeJson(dir, "run-metadata.json", { run_status: "in_progress" });
+  const out = main(["resume", dir]);
+  assert.match(out, /^auditing\n送る文面:\n利用者の依頼で再開します。/);
+  assert.equal(next(dir), "wait");
+  assert.equal(JSON.parse(main(["summary", dir])).supervisor.human_resumes, 1);
+});
+
+test("Coordinator を使わずに終えた実行は、self_auditing に戻す", () => {
+  const dir = runDir();
+  main(["init", dir]);
+  main(["record", dir, "unsupported"]);
+  main(["finish", dir, "done"]);
+  writeJson(dir, "run-metadata.json", { run_status: "incomplete" });
+  assert.equal(main(["resume", dir]), "self_auditing");
+  assert.match(main(["state", dir]), /^stage=self_auditing /);
+});
+
+test("長いエラーの種別でも、判定の reason で returned を記録できる", () => {
+  const dir = runDir();
+  started(dir);
+  const out = main(["record", dir, "stopped", "x".repeat(200)]);
+  const reason = out.split("\n")[1].replace("report reason=", "");
+  assert.equal(reason, `error_kind:${"x".repeat(64)}`);
+  assert.match(main(["record", dir, "returned", reason]), /^returned /);
 });
