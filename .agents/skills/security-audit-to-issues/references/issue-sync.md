@@ -6,7 +6,7 @@
 - GitHub のリポジトリを一意に特定できたら、ホスト・所有者・リポジトリ名を `run-metadata.json` に記録する。反映時は監査時の記録を使う。特定できなければ、監査成果物を端末に保存し、反映を保留する。
 - 親エージェントが同じメタデータに `issue_sync` を作り、`audit_id` に新しい UUID、`status` に `pending` を保存する。UUID は `node -p 'require("node:crypto").randomUUID()'` などで生成する。同じ実行の再開時は保存済みの値を使い、新しい実行には別の値を割り当てる。
 - 新規実行では、実行環境のローカルタイムゾーンを `node -p 'Intl.DateTimeFormat().resolvedOptions().timeZone'` などで取得し、`run-metadata.json` の `timezone` に IANA 名で保存する。この実行の日付・日時の記録と表示にはそのゾーンを使い、日時には ISO 8601 のオフセットを付ける。再開時は保存したゾーンを使い、記録がなければ再開環境で取得した値を基準として記録する。取得できなければ日時を不明とし、取得を再開条件に記録する。
-- `issue_sync` には集約 Issue の日付と URL、個別 Issue の fingerprint ごとの反映結果・URL・保留理由も保存する。監査対象 SHA やプロファイルなど元スキルの項目を保ち、候補の判定と根拠は元スキルの台帳と `findings.json` に記録する。
+- `issue_sync` には集約 Issue の日付と URL（`summary_url`）、個別 Issue の fingerprint ごとの反映結果・URL・保留理由も保存する。個別 Issue は配列 `individuals` に1件ずつ `fingerprint`・`url`・`result`（`created`・`updated`・`unchanged`・`held` のどれか）・`autofix_added`（真偽値）・`reason`（保留の理由の短い文。なければ `null`）を、件数は `individual_counts`（`created`・`updated`・`unchanged`・`held`・`autofix_added`）に保存する。監査対象 SHA やプロファイルなど元スキルの項目を保ち、候補の判定と根拠は元スキルの台帳と `findings.json` に記録する。
 
 ## 1. 監査成果物を照合する
 
