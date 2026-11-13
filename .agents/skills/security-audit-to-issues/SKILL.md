@@ -27,6 +27,24 @@ $security-audit-to-issues [--profile quick|standard|deep]
 - 調査中に判断材料や権限が不足したら、理由と追加調査の方法を記録して、独立して進められる作業を続ける。予算不足や曖昧な登録先も保留理由に記録する。プロファイル・範囲・予算の変更が必要な項目は、再開条件として残す。
 - 監査の完了状況と Issue 反映の完了状況を別々に記録する。反映できる結果を最後まで処理し、未解決事項を集約 Issue と最終報告に残す。
 
+## Supervisor と Coordinator に分けて進める
+
+Codex の安全審査で Coordinator のターンが止まっても人の手を待たずに進むよう、このスキルを呼び出したエージェント（Supervisor）は、手順 1〜4 をサブエージェントの Coordinator に任せて見張り、止まったら続きを頼む。Supervisor の手順は [Supervisor として Coordinator の停止を見張る](references/supervision.md) に従い、手順 5 の最終報告は Supervisor が書く。Coordinator は元スキルの Parent（親）に当たり、この SKILL.md と参照ファイルの「親エージェント」も Coordinator（Coordinator を使わない場合は Supervisor）を指す。元スキルの hunter・critic・verifier などを Worker と呼ぶ。
+
+Coordinator の役目:
+
+- 最初に子を1つ起動して決まった語を返させ、Coordinator 自身が子を起動できることを確かめる。この起動は元スキルの `budget` に数え、`budget` が指定されていれば元スキルの最低限の予約に足りることを確かめてから起動する。起動できなければ、共有ファイルを作る前に状態報告 `unsupported` を返す。
+- 手順 1〜4 と「監査の一部が止まった場合」を行う。出力先には、元スキルの出力先として Supervisor が作った実行フォルダを使う。元スキルの親の役目（共有ファイルの唯一の書き手、台帳の更新、Worker の起動）と `issue_sync` の書き手は Coordinator が持つ。
+- 判断材料・権限・予算が足りないときも「人の応答を待たずに進める」に従って記録し、進められる作業を続ける。
+- Supervisor には途中経過を送らない。Supervisor に返すのは、ターンを終えるときの状態報告だけにする。
+- ターンを終えるときは、次の状態報告だけを最終回答にする。`complete`・`incomplete` は、監査が元スキルの終わり方（成果物が揃い検証を通す、または `run_status: "incomplete"` と理由を記録）に達し、手順 4 の Issue 反映を終えた（保留した場合はその理由を記録した）ときだけ使う。
+
+  ```json
+  {"role":"coordinator","status":"complete|incomplete|unsupported","run_dir":"<実行フォルダの絶対パス>"}
+  ```
+
+Coordinator を起動できない場合や、Coordinator が `unsupported` を返した場合は、Supervisor が手順 1〜5 を自分で行い、Supervisor のターンが止まったら人が「続けてください」を送る。
+
 ## 監査して結果を反映する
 
 1. 導入済みの `security-audit` の `SKILL.md` と対象に必要な参照ファイルを読む。[登録先と実行の記録](references/issue-sync.md#監査開始前に登録先を特定する) に従い、GitHub リポジトリと実行識別子を記録する。
@@ -38,7 +56,8 @@ $security-audit-to-issues [--profile quick|standard|deep]
 ## 監査の一部が止まった場合
 
 - 指定プロファイル・監査範囲・証拠基準を維持する。止まった項目とその依存作業を保留し、元スキルの工程順と前提を守って、独立して進められる作業を続ける。
-- 一時エラーは安全に再試行できる場合に復旧する。Daybreak の案内や権限不足で拒否された操作は自動再試行を保留し、ソースや既存テストの読み取りなど、許可された方法で必要な事実を確かめられるか判断する。
+- 一時エラーは安全に再試行できる場合に復旧する。個々の操作や Worker の作業が Daybreak の案内や権限不足で拒否されたときは、その項目を保留し、ソースや既存テストの読み取りなど、許可された方法で必要な事実を確かめられるか判断する。
+- Coordinator のターンそのものが審査で止まった場合は、Supervisor が [Supervisor として Coordinator の停止を見張る](references/supervision.md) に従って続きを頼む。続きを頼まれた Coordinator は、届いた文面に従う（止まる直前に扱っていた項目は保留にし、項目に分かれない作業は1回だけ進め直し、そのほかは止まる前の続きから進める）。
 - 初期調査から成果物の検証・保存まで、親エージェントが進捗を随時保存する。停止した工程・項目 ID（カバレッジ単位 ID や fingerprint など）・理由・確認済みの根拠・残作業・再開条件は、同じ実行の `coverage-ledger.json` に元スキルの形式を保って記録する。台帳に記録できない場合は `run-metadata.json` を使い、どちらにも保存できなければユーザーへの報告に含める。再開時は記録を読み直し、監査対象 SHA と再開条件を確認する。
 - 最終版の `findings.json` には、元スキルが指定プロファイルで求める独立検証をすべて終えた判定結果を記録する。判定に至らなかった候補は台帳の `candidate` に未解決の理由を記録し、未検証として `needs_validation` と別に数える。
 - 必須工程や監査範囲に停止による未完了が残る場合は、`run_status: "incomplete"` と `incomplete_reason` を実行メタデータに記録する。残った範囲と再開条件をユーザーに伝え、保存できる場合は部分報告にも記載する。
