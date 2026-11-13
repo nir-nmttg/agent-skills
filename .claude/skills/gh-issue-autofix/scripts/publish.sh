@@ -1,24 +1,17 @@
 #!/usr/bin/env bash
 # 作業ブランチを push し、ドラフト PR を作る（あれば本文を更新する）。worktree の中で実行する。
 #
-# 使い方: publish.sh <Issue の番号> --title <タイトル> --body-file <本文のファイル | -> [--closes] [--expect-pr <PR の URL>] [--label <ラベル>]
-#         publish.sh <Issue の番号> --followup <PR の URL>
+# 使い方: publish.sh <Issue の番号> --title <タイトル> --body-file <本文のファイル | -> [--closes] [--label <ラベル>]
 #   --body-file - なら本文を標準入力から読む。
 #   --closes があれば本文の末尾に「Closes #<番号>」、なければ「Refs #<番号>」を付ける。
 #   --closes がなければ、本文の closing keyword（Fixes #12 など）を Refs に置き換え、
 #   push していないコミットのメッセージに closing keyword があれば止める
-#   （Issue に PR が紐づくと、find-issue.sh の検索から外れて再開されなくなるため）。
-#   --expect-pr: 自動で再開したときに、選んだときにあったドラフト PR を渡す。それが open のドラフトでなければ止める
-#   （作業中に人が閉じた・Ready にした PR を、作り直したり更新したりしない）。
+#   （受け入れ条件を満たしていない PR のマージで Issue が閉じないようにするため）。
 #   --label: PR を新しく作ったときに付けるラベル（Issue を選ぶのに使ったもの。PR の一覧で見分けるため）。
 #     既存の PR には付けない（人が外したラベルを付け直さない）。リポジトリにないラベルは作らずに飛ばす。
-#     付けられなくても PR の作成は失敗にしない。
+#     付けられなくても PR の作成は失敗にせず、「注意:」の行を出す。
 #   既存の PR は、このスクリプトが書いたマーカーの範囲だけを置き換える（人が足した部分は残す）。
 #   ドラフトでない PR（レビュー中）とマージ済みの PR があれば、push も更新もしない（closed だけなら新しく作る）。
-#   --followup: Auto-fix で起こされたときの push。指定の PR が open（ドラフトか Ready かは問わない）で、
-#     auto-merge が有効でなく、マージ済みの PR がなく、今のリモートのブランチが HEAD の祖先（早送りになる）のときだけ push する。
-#     push 先は確かめたリモートの sha を期待値にし（消えたブランチを作り直さない）、PR の本文・タイトル・状態・ラベルは変えない。
-#     closing keyword は、自分のコミット（取り込んだ既定ブランチのコミットを除く）だけを確かめる。
 set -euo pipefail
 source "$(dirname "$0")/lib.sh"
 
@@ -27,16 +20,14 @@ END_MARK='<!-- gh-issue-autofix:end -->'
 # GitHub が Issue を紐づける closing keyword と、そのあとの Issue の参照（#12・owner/repo#12・Issue の URL）
 KEYWORD_RE='\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)(\s*:?\s*)(?=(?:[\w.-]+/[\w.-]+)?#\d|https?://github\.com/[^\s/]+/[^\s/]+/issues/\d)'
 
-NUMBER= TITLE= BODY_FILE= CLOSES=false EXPECT_PR= LABEL= FOLLOWUP=
+NUMBER= TITLE= BODY_FILE= CLOSES=false LABEL=
 while (($#)); do
   case $1 in
-    --title | --body-file | --expect-pr | --label | --followup)
+    --title | --body-file | --label)
       (($# >= 2)) || die "$1 に値を指定してください。"
       case $1 in
-        --followup) FOLLOWUP=$2 ;;
         --title) TITLE=$2 ;;
         --body-file) BODY_FILE=$2 ;;
-        --expect-pr) EXPECT_PR=$2 ;;
         --label) LABEL=$2 ;;
       esac
       shift 2
@@ -47,50 +38,6 @@ while (($#)); do
   esac
 done
 require_number "$NUMBER"
-
-if [[ -n $FOLLOWUP ]]; then
-  [[ -z $TITLE$BODY_FILE$EXPECT_PR$LABEL ]] && ! $CLOSES ||
-    die "--followup には --title・--body-file・--closes・--expect-pr・--label を付けません。"
-  require_tools
-  command -v perl >/dev/null 2>&1 || die "perl がありません。"
-  load_repo
-  BRANCH=$(branch_name "$NUMBER")
-  REF="refs/heads/$BRANCH"
-  [[ $(tr '[:upper:]' '[:lower:]' <<<"$FOLLOWUP") =~ ^https://github\.com/$(tr '[:upper:]' '[:lower:]' <<<"$REPO")/pull/[1-9][0-9]*$ ]] ||
-    die "--followup は https://github.com/$REPO/pull/<番号> の形にしてください: $FOLLOWUP"
-  current=$(git symbolic-ref -q --short HEAD || true)
-  [[ $current == "$BRANCH" ]] || die "今のブランチ（${current:-detached HEAD}）が $BRANCH ではありません。worktree の中で実行してください。"
-  [[ -z $(git status --porcelain) ]] || die "未コミットの変更があります。コミットするか、作業用のファイルを消してから実行してください。
-$(git status --short)"
-  fetch_default
-  remote=$(remote_sha "$BRANCH")
-  [[ -n $remote ]] || die "リモートに $BRANCH がありません（PR がマージされてブランチが消えた可能性があります）。push しません。"
-  git fetch -q origin "+$REF:refs/remotes/origin/$BRANCH" || die "origin から $BRANCH を取得できません。"
-  # 早送りでなければ止める（人の push・rebase を上書きしない。自分のコミットの書き換えで基点を誤ったときも止める）
-  git merge-base --is-ancestor "$remote" HEAD ||
-    die "リモートの $BRANCH（${remote:0:12}）が HEAD の祖先ではありません（作業中に人が push・rebase したか、push 済みのコミットを書き換えました）。push しません。"
-  (($(git rev-list --count "$remote..HEAD") > 0)) || die "リモートの $BRANCH にないコミットがありません。"
-  # 自分のコミットだけを確かめる（既定ブランチの取り込みで入ったコミットは、書き換えられないので見ない）
-  if ! git log --format=%B HEAD --not "$remote" "origin/$DEFAULT_BRANCH" |
-    KEYWORD_RE=$KEYWORD_RE perl -CSD -ne 'BEGIN { $f = 0 } $f = 1 if /$ENV{KEYWORD_RE}/i; END { exit $f }'; then
-    die "自分のコミットのメッセージに closing keyword（Fixes #12 など）があります。push の前なので、\`Refs #<番号>\` などに書き換えてから実行し直してください（自分のコミットだけを書き換える）。"
-  fi
-  prs=$(gh pr list --repo "$REPO" --head "$BRANCH" --state all --limit 100 --json url,state,isCrossRepository \
-    --jq '[.[] | select(.isCrossRepository | not)]') || die "PR の一覧を取得できません。"
-  merged=$(jq -r '[.[] | select(.state == "MERGED") | .url] | join(", ")' <<<"$prs")
-  [[ -z $merged ]] || die "$merged はマージ済みなので、push しません。"
-  jq -e --arg u "$FOLLOWUP" 'any(.[]; (.url | ascii_downcase) == ($u | ascii_downcase) and .state == "OPEN")' <<<"$prs" >/dev/null ||
-    die "$FOLLOWUP は $BRANCH の open な PR ではないので、push しません。"
-  auto_merge=$(gh pr view "$FOLLOWUP" --repo "$REPO" --json autoMergeRequest --jq '.autoMergeRequest != null') ||
-    die "PR（$FOLLOWUP）の auto-merge の設定を取得できません。"
-  [[ $auto_merge == false ]] || die "$FOLLOWUP は auto-merge が有効なので、push しません（push すると、人が見ないままマージされうるため）。"
-  count=$(git rev-list --count "$remote..HEAD")
-  # 確かめた sha のままのときだけ push する（早送りなので履歴は書き換えない。消えたブランチは作り直さない）。pre-push hook は通す
-  git push -q --force-with-lease="$REF:$remote" origin "HEAD:$REF" ||
-    die "$BRANCH を push できません（pre-push hook の失敗、その間のリモートの更新、権限・ブランチの保護を確かめてください）。"
-  echo "push しました: $FOLLOWUP（コミット $count 件）"
-  exit 0
-fi
 
 [[ -n $TITLE ]] || die "--title を指定してください。"
 [[ $BODY_FILE == - || -f $BODY_FILE ]] || die "--body-file に本文のファイルか - を指定してください: ${BODY_FILE:-（なし）}"
@@ -137,10 +84,6 @@ prs=$(gh pr list --repo "$REPO" --head "$BRANCH" --state all --limit 100 --json 
 merged=$(jq -r '[.[] | select(.state == "MERGED") | .url] | join(", ")' <<<"$prs")
 [[ -z $merged ]] || die "$merged はマージ済みなので、push も PR の作成もしません。"
 pr_json=$(jq -c '[.[] | select(.state == "OPEN")][0] // empty' <<<"$prs")
-if [[ -n $EXPECT_PR ]]; then
-  jq -e --arg u "$EXPECT_PR" 'any(.[]; .url == $u and .state == "OPEN" and .isDraft)' <<<"$prs" >/dev/null ||
-    die "$EXPECT_PR が open のドラフトではなくなった（閉じられたか Ready にされた）ので、push も PR の作成もしません。"
-fi
 if [[ -n $pr_json && $(jq -r .isDraft <<<"$pr_json") != true ]]; then
   die "$(jq -r .url <<<"$pr_json") はドラフトではない（レビュー中）ので、push も更新もしません。"
 fi
