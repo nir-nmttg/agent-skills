@@ -92,6 +92,16 @@ Codex 用は `$スキル名` で指定したときだけ使う。
 | --- | --- | --- |
 | [rename-files-by-content](.agents/skills/rename-files-by-content/SKILL.md) | Codex | ファイルを内容から `YYYY-MM-DD_名前` に改名する |
 
+## 組み合わせて使う
+
+Codex の security-audit-to-issues と Claude Code の gh-issue-autofix をつなぐと、監査 → Issue 化 → 自動対応 → ドラフト PR まで進められる。
+
+1. 監査するプロジェクトの直下で、Codex から `$security-audit-to-issues` を呼ぶ。\
+   確定所見が修正 Issue になり、自動で直せるものに `agent:autofix` が付く。
+2. 対応させる Issue を自分にアサインし（番号を渡すなら不要）、同じリポジトリで Claude Code から `/gh-issue-autofix` を呼ぶ（`--delegate` で質問せずに進める）。\
+   1 回で 1 件をドラフト PR にするので、残りは繰り返し呼ぶ。
+3. ドラフト PR を人がレビューし、Ready への変更とマージを行う。
+
 ## スキルの追加・変更
 
 作り方と変更時の確認は [AGENTS.md](AGENTS.md) にある。\
