@@ -112,7 +112,7 @@ if ((${#unlinked_agents[@]} == 0)); then
   add agents-link ok "\`~/.claude/agents\` へのリンク" "すべてリンク済み" "$agent_users"
 else
   add agents-link ng "\`~/.claude/agents\` へのリンク" "未リンク: ${unlinked_agents[*]}" "$agent_users" \
-    "\`$repo_root/scripts/link-skills.sh --claude\`$link_note（初めて \`~/.claude/agents\` を作ったときは、新しいセッションで使う）"
+    "\`$repo_root/scripts/link-skills.sh --claude\`${link_note}（初めて \`~/.claude/agents\` を作ったときは、新しいセッションで使う）"
 fi
 # haiku-implementer の hook は、ユーザー用のスキルのリンクから guard.sh を呼ぶ
 if [[ -L $link_dir/haiku-implementation && $(readlink "$link_dir/haiku-implementation") == "$skills_dir/haiku-implementation" ]]; then
@@ -174,9 +174,9 @@ for skill in "$skills_dir"/*/; do
     done
   done
   if ((${#lack[@]} > 0)); then
-    blocked+=("$name（${lack[*]}）")
+    blocked+=("${name}（${lack[*]}）")
   elif [[ $name == *-cross-review || $name == codebase-cleanup-workflow ]] && ! codex_ready; then
-    ready+=("$name（Fable のみ）")
+    ready+=("${name}（Fable のみ）")
   else
     ready+=("$name")
   fi
