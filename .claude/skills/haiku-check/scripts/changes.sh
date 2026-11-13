@@ -65,7 +65,7 @@ case $cmd in
       n=1
       while [[ -e $run_dir/changes-$n.patch ]]; do n=$((n + 1)); done
       git -C "$workdir" diff --binary "$before" "$after" >"$run_dir/changes-$n.patch"
-      echo "注意: 確認の実行中に追跡対象のファイルが変わりました: $(git -C "$workdir" diff --shortstat "$before" "$after" | sed 's/^ *//')"
+      echo "注意: 確認の実行中にファイルが変わりました（.gitignore の対象を除く）: $(git -C "$workdir" diff --shortstat "$before" "$after" | sed 's/^ *//')"
       git -C "$workdir" diff --stat "$before" "$after"
       echo "差分: $run_dir/changes-$n.patch"
     fi

@@ -16,7 +16,7 @@ Codex のコマンド制限と worker の隔離は別の境界である。ホス
 
 1. 静的計画の6レビュー・公開7日待機・`check`・`run` を通し、`check` の binding を確認し、`static-result.json` の `source_manifest` が示す各 snapshot ファイルの hash と実物を照合する。元の可変候補を実行しない。
 2. 別の検証用 RUN に、必要な固定 image/配布物と、選択した検証を行う worker を用意する。prepare/probe の結果、helper・生成 executor/config・worker・全入力と実際の隔離境界を事前レビューして証拠を保存する。
-3. 下記 `executor execute` で、snapshot・worker・固定配布物だけを渡す。必要な依存導入は scratch 内だけで行い、依存・cache・秘密をホストへ持ち出さない。静的計画へ実行設定や架空の隔離承認を追加しない。
+3. 下記 `executor execute` で、snapshot・worker・固定配布物だけを渡す。必要な依存導入は scratch 内だけで行い、依存・cache・秘密をホストへ持ち出さない。
 4. コマンド・入力 fingerprint・終了コード・実際の結果と未実施項目を保存する。終了時に環境は消える。反映の完了は静的確認で決まり、実施できなかった項目は未実施として記録する。更新由来の失敗なら修正または対象を保留する。既存失敗・環境不足と切り分け、失敗を未実施へ書き換えない。
 5. 反映後のコード・lockfile 修正は [再確認手順](#反映後に修正が必要になった場合) に従う。未承認の worker 出力を反映しない。ユーザー変更や独立した完了済み更新を巻き込む取り下げはせず、競合と解消案を記録して停止する。
 
@@ -59,7 +59,7 @@ native 拡張の静的確認では ABI・wheel/platform・headers/toolchain の�
 ## 3. worker と入力・出力の契約
 
 - 読み取り専用 `/candidate` を隔離内の `/scratch/project` へコピーし、worker は `CANDIDATE=/scratch/project`、`OUTPUT=/scratch/output` を使う。元のホストパスを組み立てない。
-- `--input <固定ファイル実体>` は指定順に `/inputs/0` 等へ読み取り専用で渡る。配布物と補助ファイルの必要分だけを直接指定し、静的計画へ実行引数を追加しない。拡張子・basename が必要なら scratch 内の所定名へコピーして使う。
+- `--input <固定ファイル実体>` は指定順に `/inputs/0` 等へ読み取り専用で渡る。配布物と補助ファイルの必要分だけを直接指定する。拡張子・basename が必要なら scratch 内の所定名へコピーして使う。
 - `.git`・秘密・実データ・HOME・認証設定・SSH agent・Docker socket を渡さない。環境変数は許可リストだけで、使い捨て HOME/tmp/cache と専用作業領域を使う。
 - rootfs と入力は読み取り専用、通信と追加権限を禁止し、CPU・メモリ・process・ディスク・時間を制限する。scratch は容量制限付きで native code を実行できる。出力は安全に検査した通常ファイルだけを専用先へ保存し、ホスト出力を worker へ書込み可能 mount しない。
 - worker は失敗を終了コードへ伝える。標準出力/標準エラーは `worker.log`、終了コードは `exit-code` に保存されるので、この名前を成果物に使わない。終了時にコンテナと scratch が消えるため、必要な検証と証拠保存を一回の worker 内で完了する。

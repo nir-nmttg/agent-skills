@@ -38,7 +38,7 @@
 - ホストの HOME、keychain、クラウド認証、SSH agent、Docker socket などを公開しない。ツールチェーンは読み取り専用、書込みは割り当てた作業コピー・一時領域・ダミー DB だけに制限する。
 - コード実行時の外部ネットワークを遮断する。アプリ・DB・ブラウザ確認に必要なローカル通信だけを許可し、ホスト公開ポートは loopback に限定する。実サービスは fixture・mock・ローカル代替を使う。
 - 実行時間、CPU・メモリ・プロセス数・ディスクの上限を設定し、適用した境界と実行コマンドを記録する。使う sandbox の設定も対象から無条件に実行せず先に読む。
-- 実行する helper・executor・config・worker・argv と必要な全入力を、別の検証/解決用 RUN に固定して事前レビューする。静的計画へ `execution` や架空の隔離承認を足さない。image 等は immutable digest に固定し、可変 tag を使わない。
+- 実行する helper・executor・config・worker・argv と必要な全入力を、別の検証/解決用 RUN に固定して事前レビューする。image 等は immutable digest に固定し、可変 tag を使わない。
 - 追加検証は静的 `run` の読み取り専用 snapshot と固定配布物だけを、別 RUN のレビュー済み executor へ渡す。選択した検証に必要な導入は隔離内の scratch だけで行い、結果・終了コード・証拠を専用先へ保存する。元の可変候補や RUN 全体を対象コードへ公開せず、依存をホストへ持ち出さない。
 
 同梱の準備処理は既存 Docker を使い、Docker 導入・daemon 起動・`sudo`・root 実行・socket 権限変更等は行わない。信頼済み制御処理の [Codex 実行承認](isolation.md#docker-接続と-codex-の実行承認) は利用でき、通常の拒否と承認後の結果を区別する。準備できなければ具体的な不足と未実施の検証を報告する。候補作成にその実行が不要なら、静的確認済みの反映は完了できる。

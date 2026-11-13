@@ -11,7 +11,7 @@ allowed-tools: Bash(bash *haiku-implementation/scripts/new-run.sh*), Bash(bash *
 
 コードを書く作業を、この会話を共有しない Haiku 5.5 のサブエージェント `haiku-implementer` に任せ、Claude は「分割する」「指示書を書く」「差分をレビューして反映する」「仕上げる」だけを行う。Claude が自分でコードを読み書きする量を減らし、その間に別の作業を進めて、メインのモデルの使用量とコンテキストを節約するのが目的。モデル・推論レベル（max）・使えるツールはエージェントの定義で固定している。結果は `artifacts/haiku-implementation/` に保存される。
 
-Haiku の実行もプランの使用量になる（Haiku は安いが無料ではない）。**手分けできる部分は優先して同時に動かす。本数は部分どうしの関係で決まる。** 各 Haiku は専用の git worktree で動くので互いにぶつからず、その間 Claude は作業フォルダで自分の担当部分を進められる。進み具合はデスクトップアプリの Background tasks から見たり止めたりできる。
+Haiku の実行はプランの使用量になる。**手分けできる部分は優先して同時に動かす。本数は部分どうしの関係で決まる。** 各 Haiku は専用の git worktree で動くので互いにぶつからず、その間 Claude は作業フォルダで自分の担当部分を進められる。進み具合はデスクトップアプリの Background tasks から見たり止めたりできる。
 
 ## 前提
 
@@ -92,7 +92,7 @@ bash "${CLAUDE_SKILL_DIR}/scripts/new-run.sh" <slug>
 - **手がかり**: 関係しそうなファイル・関数、まねるべき既存の実装（リポジトリのルートからの相対パスで書く。Haiku は worktree の中で読み替える）
 - **決定事項**: ユーザーとの会話で決まったこと
 - **やらないこと**: スコープ外にするもの。並行で動かすときは、ほかの小タスクや Claude が担当するファイルを「触らないファイル」として書く
-- **確認方法**: 実行してほしいテスト・型チェックのコマンド（わかれば）。DB や Docker が要るテストは、worktree のコードをテストするコマンドを、ロックつきの形（`bash <prepare.sh が出す locked.sh のパス> <コマンド>`）で書く（下の「DB や Docker が要るテスト」）。Haiku に「DB を使うか」を判断させない
+- **確認方法**: 実行してほしいテスト・型チェックのコマンド（わかれば）。DB や Docker が要るテストは、worktree のコードをテストするコマンドを、prompt.md の「ロック」のコマンドで実行するよう書く（下の「DB や Docker が要るテスト」）。Haiku に「DB を使うか」を判断させない
 
 秘密情報（トークン、パスワード、個人情報）は書かない。
 
@@ -122,7 +122,7 @@ bash "${CLAUDE_SKILL_DIR}/scripts/prepare.sh" [--cd <dir>] <実行フォルダ>
 
 **DB や Docker が要るテスト**
 
-Haiku はサンドボックスなしで動くので、DB や Docker を使うテストも自分で実行できる。ただし並行する Haiku どうしが同じテスト用 DB を取り合わないよう、prompt.md の「ロック」のコマンド（`locked.sh`）を通して 1 本ずつ実行させる（待つのは既定で 300 秒まで。`HAIKU_IMPLEMENTATION_LOCK_WAIT` で変えられる）。
+Haiku は DB や Docker を使うテストも自分で実行する。並行する Haiku どうしが同じテスト用 DB を取り合わないよう、prompt.md の「ロック」のコマンド（`locked.sh`）を通して 1 本ずつ実行させる（待つのは既定で 300 秒まで。`HAIKU_IMPLEMENTATION_LOCK_WAIT` で変えられる）。
 
 - 指示書の「確認方法」は、**作業フォルダではなく worktree のコードをテストするコマンド**にする。たとえば、作業フォルダをマウントしたコンテナで動く `docker compose exec` は、Haiku が書いたコードをテストしない。Docker Compose のプロジェクトなら、worktree をマウントした使い捨てのコンテナで動かす。
 

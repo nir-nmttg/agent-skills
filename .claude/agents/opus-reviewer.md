@@ -1,6 +1,6 @@
 ---
 name: opus-reviewer
-description: design-cross-review・implementation-cross-review で Fable の利用枠が足りないときに呼ぶ。読み取り専用で設計や実装をレビューする
+description: design-cross-review・implementation-cross-review から呼ぶ専用。Fable の代わりに、読み取り専用で設計や実装をレビューする
 model: claude-opus-5-5
 effort: high
 tools: Read, Grep, Glob

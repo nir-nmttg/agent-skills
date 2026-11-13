@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # 要件・設計書・指示書をまとめて、レビュアーに読ませる prompt.md を作る。
-# Astra（review.sh）と Fable（fable-reviewer。利用枠が足りないときは opus-reviewer）は、ここで作った同じ prompt.md を読む。
+# Astra（review.sh）と Fable（fable-reviewer。Fable の代わりは opus-reviewer）は、ここで作った同じ prompt.md を読む。
 #
 # 使い方: prepare.sh [--cd <dir>] <実行フォルダ>
 #   --cd  レビュアーが既存コードを確かめる作業フォルダ（既定: 今のフォルダ。確認のレビューでは前回の作業フォルダ）

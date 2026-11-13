@@ -18,13 +18,14 @@ description: このリポジトリの Codex スキルの定義・呼び出し設
 - 対象が指定されていればその場所、なければ現在のプロジェクトの指示・README・実行設定・CI を静的に読み、利用スキルに必要な構成を確認する。対象未指定なら固有の前提は未確認とする。
 - `security-audit-to-issues` は、基本確認の結果から `~/.agents/skills/security-audit/` に定義・参照ファイル・スキーマ・両バリデーターがそろっているか確かめる。別の信頼済みの配置先が指定されていれば、そこで同じファイルを確認する。`node` とサブエージェントを使えるか、監査結果の保存先を読み書きできるかを別途確認する。
 - Issue の反映に必要な `gh` の版・ログイン状態と、`gh api` が `--paginate`・`--slurp` に対応しているかを確認する。対象プロジェクトがあれば、[登録先の決め方](../security-audit-to-issues/references/issue-sync.md#監査開始前に登録先を特定する) でリポジトリを特定する。その結果を使い、[登録先の確認コマンド](../security-audit-to-issues/references/issue-sync.md#2-登録先と既存-issue-を確かめる) で非公開・Issue の有効化・アーカイブ状態を調べる。対象や書き込み権限が分からなければ未確認とする。ここでは定義・環境・GitHub の状態を読み取り専用で確認する。
-- `minor-version-upgrade` は静的確認で互換更新の差分を反映する。本体と `references/gate.md`・`verification.md` を読み、信頼済み Python 3.9 以降を絶対パス・`-I -S` で使え、公式情報・取得物・manifest/lockfile・全依存 inventory・根拠を確認できるか調べる。計画が静的確認の内容だけを書く形式であることを確かめる。`init` 直後に事前 `check` の機械検査結果を読み、6レビュー後に最終 `check` → `run` と進む手順を確認する。事前検査の unknown による非ゼロと、機械異常・結果未生成を区別できることを調べる。ゲートは対象コードを起動せず snapshot を保存する。
+- `minor-version-upgrade` は静的確認で互換更新の差分を反映する。本体と `references/gate.md`・`verification.md` を読み、信頼済み Python 3.9 以降を絶対パス・`-I -S` で使え、公式情報・取得物・manifest/lockfile・全依存 inventory・根拠を確認できるか調べる。`init` 直後に事前 `check` の機械検査結果を読み、6レビュー後に最終 `check` → `run` と進む手順を確認する。事前検査の unknown による非ゼロと、機械異常・結果未生成を区別できることを調べる。ゲートは対象コードを起動せず snapshot を保存する。
 - 候補版と全新規配布物（image を含む）の最新の公式公開から7日以上を確認できることを調べる。7日未満・不明・未来は保留し、最新が新しすぎれば経過済みの適切な安定版を選ぶ。7日の待機は固定で、保留対象は再開可能日または不明の理由を報告できる手順を確認する。
 - Ruby/Bundler、Node/npm・pnpm・Yarn、Python/uv・pip・Poetry 等の採用方式・版を、版指定・manifest・lockfile・CI から特定する。wrapper・Gemfile/gemspec・backend・plugin を版確認のために実行せず、採用していないツールや方式変更を要求しない。混在構成・直接/間接/build/platform 等の範囲を確認し、他言語へ更新範囲を広げない。
 - 正しい候補と lockfile を対象コードの評価なしに作れるか確認する。`lockfile-only`・`dry-run`・`ignore-scripts` の名前だけで判断しない。解決・生成にコード評価が不可欠なら `references/isolation.md` の隔離が必要で、実行できない対象は条件付きとする。追加テストやブラウザは任意の追加検証の前提として扱い、更新の利用可否は、正しい候補を作れるかと静的確認ができるかで判断する。
 - 全更新後依存とランタイムの既知情報を確認できるか調べる。監査 JSON の範囲・形式・鮮度と finding・エラー・skip・coverage の停止条件を読む。JSON 未収集の component は全依存版を公式告知/advisory DB へ照会して証拠化できるかも確認する。`advisories` の初回 `pass` に全公式/runtime/手動照会の最古の実取得時刻を `--observed-at` で固定し、全 `pass` の初回承認時刻と実取得時刻を24時間・未来日時で検査する手順も読む。同じ `pass` の再登録で期限を延長せず、調査結果・時刻の更新は新 RUN と全レビューに分ける。秘密・private 情報を無断送信しない。
 - 必要な候補解決や任意検証に限り、既存 Docker CLI・daemon/context・固定 image・toolchain と helper を確認する。信頼済み CLI の読み取り専用接続確認は正規承認を利用でき、通常の拒否と承認後の結果を区別する。Docker 導入・daemon 起動・`sudo`・socket 権限変更は行わない。
 - 反映前後の全適用予定パス・hash・実行 bit・削除を照合し、競合なら止め、元 bytes/逆差分から自分の更新分だけを安全に取り下げて新しい静的計画を確認する手順を読む。readonly snapshot の権限を反映先に使わず、静的確認と実行確認を区別する。
+- `rename-files-by-content` は、`scripts/rename_files.py` を動かす `python3` が 3.9 以降かを確かめる。対象フォルダが指定されていれば、読み書きできるかも確かめる。
 - 事前確認は読み取り専用に限る。更新本体、`new-run.sh`、`prepare`・probe・worker、image 取得・build、ゲート各工程、テストは起動しない。コマンドの存在・信頼済みツールの版・接続状態以外は推測で確認済みにせず、未導入・未ログインと権限不足を区別する。秘密値は表示しない。
 
 ## 結果を報告する

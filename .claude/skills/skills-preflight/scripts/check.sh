@@ -63,10 +63,10 @@ check_cmd() {
 }
 
 # Claude の担当（Fable、利用枠が足りないときは Opus）だけなら Codex なしで動くので、クロスレビューは Codex の担当の分だけ Codex を使う
-codex_users="implementation-cross-review（Astra）・design-cross-review（Astra）"
+codex_users="implementation-cross-review（Astra）・design-cross-review（Astra）・codebase-cleanup-workflow（Astra）"
 
 check_cmd git "ほぼすべて" "\`xcode-select --install\`（または \`brew install git\`）" git git --version
-check_cmd jq "ほぼすべて" "\`brew install jq\`" jq jq --version
+check_cmd jq "haiku-implementation, gh-issue-autofix, クロスレビューの Codex の担当" "\`brew install jq\`" jq jq --version
 check_cmd codex "$codex_users" "\`brew install --cask codex\` のあと \`codex login\`" cask:codex codex --version
 check_cmd perl "haiku-implementation, design-cross-review, implementation-cross-review, gh-issue-autofix, codebase-cleanup-workflow" "\`brew install perl\`（macOS には標準で入っている）" perl perl -e 'print "perl $^V\n"'
 check_cmd gh "gh-todo, gh-issue-autofix" "\`brew install gh\` のあと \`gh auth login\`" gh gh --version
@@ -97,7 +97,7 @@ if has gh; then
   fi
 fi
 
-# --- サブエージェントのリンク（haiku-implementation・haiku-check・クロスレビューの 2 スキル・codebase-cleanup-workflow に必須） ---------
+# --- サブエージェントのリンク（agent_users のスキルに必須） ---------
 
 agents_src="$repo_root/.claude/agents"
 agents_dir="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/agents"
@@ -147,7 +147,7 @@ skill_needs() {
     haiku-implementation) echo "git jq perl agents-link haiku-implementation-link" ;;
     haiku-check) echo "git agents-link" ;;
     codebase-cleanup-workflow) echo "git perl agents-link" ;;
-    gh-todo) echo "jq gh gh-login" ;;
+    gh-todo) echo "gh gh-login" ;;
     gh-issue-autofix) echo "git jq perl gh gh-login agents-link" ;;
     *) echo "" ;;
   esac
