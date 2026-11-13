@@ -90,7 +90,9 @@ codebase-cleanup-workflow は残りの 5 本を上から順に使い、工程ご
 | [code-order-refactor](.claude/skills/code-order-refactor/SKILL.md) | メソッドや関数を読みやすい順に並べ替える |
 | [docs-align-with-code](.claude/skills/docs-align-with-code/SKILL.md) | 実装に合わせて文書を更新する |
 
-### `/スキル名` で指定したときだけ使うスキル
+### 指定して使うスキル
+
+`/スキル名` で指定したときだけ使う。
 
 | スキル | できること |
 | --- | --- |
