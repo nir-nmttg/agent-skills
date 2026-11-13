@@ -14,7 +14,7 @@ Claude Code・Codex 向けの汎用スキルを管理する。特定プロジェ
 - 本文・description・ユーザーへの報告は日本語で簡潔にする。識別子・コマンドなどは原文を保つ。
 - 既存の呼び出し方針を維持する。新規スキルは通常の自動選択を基本とし、ユーザーが指定した場合は明示指定専用にする。
 - Codex の frontmatter は `name`・`description` を基本とし、UI 表示・呼び出し設定は `agents/openai.yaml` に書く。Claude 専用の設定・変数を持ち込まない。
-- Codex の `agents/openai.yaml` には `interface.short_description`（何をするかの短い説明）と `interface.default_prompt`（`$skill-name` を含む依頼文の例）を必ず設定し、`interface.display_name` は設定しない。Codex のスキルには引数のヒントを書く項目がなく、`$` の候補には `short_description` が表示されるので、引数を取るスキルは `short_description` の先頭に引数の形（例 `[--profile quick|standard|deep]`）を書く。
+- Codex の `agents/openai.yaml` には `interface.short_description`（何をするかの短い説明）と `interface.default_prompt`（`$skill-name` を含む依頼文の例）を必ず設定し、`interface.display_name` は設定しない。`short_description` は `$` の候補に表示されるので、引数を取るスキルは先頭に引数の形（例 `[--profile quick|standard|deep]`）を書く。
 
 ## 別のモデルに任せるとき
 
