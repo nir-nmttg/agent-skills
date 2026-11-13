@@ -250,7 +250,7 @@ test("summary は件数と URL だけを出し、未検証は fingerprint の重
   assert.deepEqual(s.supervisor.error_kinds, ["cyber_policy"]);
 });
 
-test("監督役の再開の記録は、記録済みの停止の判定を隠さない", () => {
+test("Supervisor の再開の記録は、記録済みの停止の判定を隠さない", () => {
   const dir = runDir();
   started(dir);
   main(["record", dir, "stopped", "cyber_policy"]);

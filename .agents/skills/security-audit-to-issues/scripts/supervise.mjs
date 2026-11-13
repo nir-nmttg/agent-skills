@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// 監督役が取りまとめ役の停止を見張るための記録と判定。出力は決まった語・数・ハッシュ・URL と、取りまとめ役が記録した保留の理由（短い文）だけにする。
+// Supervisor が Coordinator の停止を見張るための記録と判定。出力は決まった語・数・ハッシュ・URL と、Coordinator が記録した保留の理由（短い文）だけにする。
 import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
