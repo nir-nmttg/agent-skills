@@ -133,6 +133,17 @@
 - 一覧を最後まで取得でき、ラベルがなければ `gh label create "$LABEL" --repo "$ISSUE_REPO"` で作成する。作成に失敗した場合は一覧を読み直す。別の担当者が作成済みと分かれば、そのラベルを使う。
 - `agent:autofix` を付ける直前に、Issue の状態・本文とコメント全ページを読み直す。開いており、最新の本文とコメントでも自動修正の条件を満たす場合だけ付ける。コメントは `gh api --hostname "$REPO_HOST" --paginate --slurp "repos/$REPO/issues/$NUMBER/comments?per_page=100"` で取得する。
 - ラベルの存在を確認できたら、`gh issue edit "$NUMBER" --repo "$ISSUE_REPO" --add-label "$LABEL"` で付ける。本文とラベルの両方に差分がなければ書き込まない。ラベルの確認・作成・付与を完了できなければ、対象 Issue の URL・ラベル名・理由を報告する。
-- 個別 Issue とラベルの結果を確かめ、集約 Issue 自身のラベル付与も確認してから `issue_sync.status` を確定する。すべて反映できれば `complete`、一部に保留や失敗があれば `partial`、登録先や権限などの前提を満たせず書き込めなければ `blocked` とする。監査の `run_status` は監査工程の完了状況を表す。
-- 確定した反映状況とラベルの結果を、書式に従って集約 Issue（冒頭の Issue 反映の状況、確定の一覧表の対応状況と詳細の反映結果、どの確定項目にも属さない保留を書く未完了の工程・範囲）に書き戻す。差分があれば手順 6 に従って版を増やして保存・反映・再取得する。この最終更新に失敗した場合は `issue_sync.status` を `partial` にし、保存済みの更新案と停止理由を最終報告に残す。
+- 集約 Issue の番号 `SUMMARY_NUMBER` が決まり、その Issue が開いていれば、反映結果が作成・更新・変更なしの個別 Issue を集約 Issue のサブ Issue にする。サブ Issue の親は1つだけなので、先に `gh api --hostname "$REPO_HOST" "repos/$REPO/issues/$NUMBER/parent"` で親を確かめ、結果は次のどれかとして詳細の反映結果に書く。追加の成否が不明なときは、親を確かめ直して決める。
+  - 追加: 404 で `No parent issue found` が返った。個別 Issue の数値の `id` を使って追加する。
+  - 追加済み: 親が `SUMMARY_NUMBER` だった（同じ実行の再開など）。
+  - 親あり: 親が別の Issue だった（過去の監査の集約 Issue など）。付け替えず、親の URL を書く。
+  - 失敗: ほかのエラーが返った、または追加できなかった。理由を書く。
+
+  ```bash
+  ID=$(gh api --hostname "$REPO_HOST" "repos/$REPO/issues/$NUMBER" --jq .id)
+  gh api --hostname "$REPO_HOST" -X POST "repos/$REPO/issues/$SUMMARY_NUMBER/sub_issues" -F sub_issue_id="$ID"
+  ```
+
+- 個別 Issue・ラベル・サブ Issue の結果を確かめ、集約 Issue 自身のラベル付与も確認してから `issue_sync.status` を確定する。すべて反映できれば `complete`、一部に保留や失敗（サブ Issue は失敗だけ）があれば `partial`、登録先や権限などの前提を満たせず書き込めなければ `blocked` とする。監査の `run_status` は監査工程の完了状況を表す。
+- 確定した反映状況とラベル・サブ Issue の結果を、書式に従って集約 Issue（冒頭の Issue 反映の状況、確定の一覧表の対応状況と詳細の反映結果、どの確定項目にも属さない保留を書く未完了の工程・範囲）に書き戻す。差分があれば手順 6 に従って版を増やして保存・反映・再取得する。この最終更新に失敗した場合は `issue_sync.status` を `partial` にし、保存済みの更新案と停止理由を最終報告に残す。
 - 集約 Issue への反映も保留になった場合は、反映予定の本文と理由を実行フォルダに保存し、保存済み成果物の絶対パス・該当 Issue の URL・再開条件を最終報告に残す。

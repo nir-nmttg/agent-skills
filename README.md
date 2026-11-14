@@ -88,7 +88,7 @@ Claude Code は Opus 5.5 の推論レベル high で動かすことを推奨す�
 | スキル | できること |
 | --- | --- |
 | [minor-version-upgrade](.agents/skills/minor-version-upgrade/SKILL.md) | ランタイムと依存を、互換性を保つ範囲で更新する |
-| [security-audit-to-issues](.agents/skills/security-audit-to-issues/SKILL.md) | 自律監査で確定所見の修正 Issue と全判定の集約 Issue を作成・更新し、自動修正できる項目にラベルを付ける |
+| [security-audit-to-issues](.agents/skills/security-audit-to-issues/SKILL.md) | 自律監査で確定所見の修正 Issue と全判定の集約 Issue を作成・更新し、修正 Issue を集約 Issue のサブ Issue にして、自動修正できる項目にラベルを付ける |
 
 ## 開発以外のスキル
 
