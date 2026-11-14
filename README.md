@@ -26,7 +26,7 @@ Claude Code は Opus 5.5 の推論レベル high で動かすことを推奨す�
    | `jq` | haiku-implementation・gh-issue-autofix、クロスレビューの Codex の担当（architecture-alignment-cross-review の Sol を含む） |
    | `codex` のログイン | クロスレビューの Codex の担当（architecture-alignment-cross-review の Sol を含む） |
    | メインが auto モード | haiku-implementation、codebase-cleanup-workflow（ないときは Haiku に実装を任せない） |
-   | `gh` のログイン | gh-todo・gh-issue-autofix・security-audit-to-issues、haiku-check で CI のログを見るとき |
+   | `gh` のログイン | gh-todo・gh-issue-autofix・security-audit-to-issues・security-audit-item-to-issue、haiku-check で CI のログを見るとき |
    | Claude デスクトップアプリ | session-status-emoji |
    | 組み込みブラウザか Claude in Chrome | browser-readonly-research |
    | 組み込みブラウザ | gh-issue-autofix・ui-behavior-check（ないときは動作確認を未検証にする） |
@@ -79,6 +79,7 @@ Claude Code は Opus 5.5 の推論レベル high で動かすことを推奨す�
 | [gh-todo](.claude/skills/gh-todo/SKILL.md) | レビュー依頼・メンション・自分の Issue / PR を一覧にする |
 | [browser-readonly-research](.claude/skills/browser-readonly-research/SKILL.md) | Web ページを読むだけで調べてまとめる |
 | [gh-issue-autofix](.claude/skills/gh-issue-autofix/SKILL.md) | `agent:autofix` ラベルの Issue を 1 件、質問せずに対応し、同じラベルのドラフト PR にする |
+| [security-audit-item-to-issue](.claude/skills/security-audit-item-to-issue/SKILL.md) | 監査の集約 Issue の項目を調べ、確定なら個別 Issue にしてサブ Issue に加え、集約 Issue を更新する |
 | [skills-update](.claude/skills/skills-update/SKILL.md) | このスキル集を最新に取り込み、Claude Code・Codex へリンクし直して、使えるスキルを確かめる |
 
 ## Codex 用スキル一覧
