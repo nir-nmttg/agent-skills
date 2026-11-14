@@ -51,7 +51,7 @@ bash "${CLAUDE_SKILL_DIR}/scripts/start.sh" [--cd <dir>] <slug>
 
 | 順序 | スキル | この工程の役割 |
 | --- | --- | --- |
-| 1 | [design-alignment-refactor](../design-alignment-refactor/SKILL.md) | 現在の設計方針を根拠に逸脱を修正し、後続が守る責務の境界や依存方向を明確にする。 |
+| 1 | [architecture-alignment-refactor](../architecture-alignment-refactor/SKILL.md) | 現在の設計方針を根拠に逸脱を修正し、後続が守る責務の境界や依存方向を明確にする。 |
 | 2 | [overengineering-refactor](../overengineering-refactor/SKILL.md) | 明確になった設計の範囲で、未使用コードや要件に対して過剰な抽象化・汎用化・防御的実装を取り除き、後続が不要な複雑さまで整理し直さないようにする。 |
 | 3 | [code-structure-refactor](../code-structure-refactor/SKILL.md) | その方針を保ちながら、責務の混在・重複・過剰な分割を整理する。前工程で解消・削除した候補を別案へ作り直さない。 |
 | 4 | [test-suite-refactor](../test-suite-refactor/SKILL.md) | 本体の構造が落ち着いてから、検出力を保ってテストの重複や実装の細部への依存を整理する。前工程の確認に必要なテストは先に削減しない。 |
@@ -63,7 +63,7 @@ bash "${CLAUDE_SKILL_DIR}/scripts/start.sh" [--cd <dir>] <slug>
 ### 各工程の進め方
 
 1. **始める**: `progress.md` のその工程を「作業中」にし、工程開始時の SHA（`git rev-parse HEAD`）を書く。
-2. **候補を決める**: その工程の SKILL.md の判断基準で、効果のある候補を決める。公開 API・永続化形式・業務ルールなど判断が必要な契約変更は保留して「保留・未探索」に書き、独立した改善を進める。作り方の判断を含む候補（複数の構造から 1 つを選ぶ、リスク領域に触れる、Haiku に任せる前の分割を決める）は、design-cross-review の条件で設計レビューを使う。
+2. **候補を決める**: その工程の SKILL.md の判断基準で、効果のある候補を決める。公開 API・永続化形式・業務ルールなど判断が必要な契約変更は保留して「保留・未探索」に書き、独立した改善を進める。作り方の判断を含む候補（複数の構造から 1 つを選ぶ、リスク領域に触れる、Haiku に任せる前の分割を決める）は、plan-cross-review の条件で設計レビューを使う。
 3. **実装する**: 担当は haiku-implementation の基準より絞り、方針と変更箇所が決まっていてテストで確かめられる、広い機械的な変更（多数の呼び出し元の置き換え、ファイルをまたぐ抽出、宣言の大量移動）だけを Haiku に任せ、それ以外は Claude が書く。工程 5 を Haiku に任せたときは、移動以外の変更が混ざっていないことを Claude が差分で確かめる。構造変更に必要なテスト・文書・参照先の更新は、その変更と一緒に行う。
 4. **確かめる**: haiku-check で影響範囲のテスト・型チェック・lint・ビルドを実行する。新たな失敗はまず自分の変更を修復し、解消できなければ該当する自分の変更だけを戻す。失敗した変更に依存する後続作業は保留する。同じ状態・条件で成功済みの検証結果は共有し、影響するコードや設定が変わったら再実行する。
 5. **レビューする**: 変更があれば `progress.md` を「レビュー中」にし、コミットの前に implementation-cross-review を `--base <工程開始時の SHA>` で動かす。

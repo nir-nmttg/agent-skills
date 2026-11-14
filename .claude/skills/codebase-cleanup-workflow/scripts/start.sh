@@ -76,7 +76,7 @@ cat >"$dir/progress.md" <<EOF
 
 | 工程 | 状態 | 工程開始時の SHA | コミット | レビューの実行フォルダ | メモ |
 | --- | --- | --- | --- | --- | --- |
-| 1 design-alignment-refactor | 未着手 | | | | |
+| 1 architecture-alignment-refactor | 未着手 | | | | |
 | 2 overengineering-refactor | 未着手 | | | | |
 | 3 code-structure-refactor | 未着手 | | | | |
 | 4 test-suite-refactor | 未着手 | | | | |

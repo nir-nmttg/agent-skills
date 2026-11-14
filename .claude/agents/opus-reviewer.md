@@ -1,6 +1,6 @@
 ---
 name: opus-reviewer
-description: design-cross-review・implementation-cross-review から呼ぶ専用。Fable の代わりに、読み取り専用で設計や実装をレビューする
+description: plan-cross-review・implementation-cross-review（Fable の代わり）と architecture-alignment-cross-review から呼ぶ専用。読み取り専用でレビューする
 model: claude-opus-5-5
 effort: high
 tools: Read, Grep, Glob
