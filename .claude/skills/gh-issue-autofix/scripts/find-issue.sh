@@ -2,11 +2,11 @@
 # 対応する Issue を 1 件選び、内容を Markdown で出力する（読むだけ）。
 #
 # 使い方: find-issue.sh [--label <ラベル>] [<Issue の URL か番号>]
-#   URL / 番号がなければ、ラベル（既定 agent:autofix）が付き、自分がアサインされ、PR が紐づいていない open な Issue のうち、
-#   claude/issue-<番号> のリモートのブランチも、それを head とする PR（状態を問わない）もないものを、作成の古い順に 1 件選ぶ。
-#   ブランチか PR があるものは「着手中か、ドラフト PR がある Issue」として一覧に出し、選ばない（続きは番号で指定する）。
+#   URL / 番号がなければ、ラベル（既定 agent:autofix）が付き、自分がアサインされ、PR が紐づいていない open な Issue の
+#   作成の古い順の先頭 100 件から、claude/issue-<番号> のリモートのブランチも、それを head とする PR（状態を問わない）も
+#   ないものを 1 件選ぶ。ブランチか PR があるものは「着手中か、PR がある Issue」として一覧に出し、選ばない（続きは番号で指定する）。
 #   URL / 番号があれば、ラベル・アサインの条件は見ずにその Issue を使う（closed・PR・別のリポジトリは断る）。
-#   ブランチがあれば再開（start.sh --resume）にする。
+#   リモートにブランチがあれば再開（start.sh --resume）にする。
 # 終了コード: 0 = 選んだ、2 = 対応するものがない・断る（理由を出力）、1 = エラー
 set -euo pipefail
 source "$(dirname "$0")/lib.sh"
@@ -69,52 +69,31 @@ if [[ -n $TARGET ]]; then
 else
   # --- ラベルで探す ---
   query="repo:$REPO is:issue is:open label:\"$LABEL\" assignee:@me -linked:pr sort:created-asc"
-  # GitHub の検索は 1000 件までしか返さない（25 件 × 40 ページ）
-  NUMBER= after= skipped= truncated=false
-  for page_no in $(seq 1 40); do
-    page=$(gh api graphql -f query='
-      query($q: String!, $after: String) {
-        search(query: $q, type: ISSUE, first: 25, after: $after) {
-          pageInfo { hasNextPage endCursor }
-          nodes { ... on Issue { number } }
-        }
-      }' -f q="$query" ${after:+-f after="$after"}) || die "Issue の検索に失敗しました。"
-    for n in $(jq -r '.data.search.nodes[].number' <<<"$page"); do
-      if has_branch "$n"; then
-        skipped="$skipped $n"
-        continue
-      fi
-      # 代入にして、PR の取得に失敗したら止める（set -e）
-      n_prs=$(prs_of "$n")
-      if [[ $n_prs != "[]" ]]; then
-        skipped="$skipped $n"
-      else
-        NUMBER=$n
-        break
-      fi
-    done
-    [[ -z $NUMBER ]] || break
-    [[ $(jq -r .data.search.pageInfo.hasNextPage <<<"$page") == true ]] || break
-    ((page_no < 40)) || truncated=true
-    after=$(jq -r .data.search.pageInfo.endCursor <<<"$page")
+  found=$(gh api graphql -f query='
+    query($q: String!) {
+      search(query: $q, type: ISSUE, first: 100) { nodes { ... on Issue { number } } }
+    }' -f q="$query" --jq '.data.search.nodes[].number') || die "Issue の検索に失敗しました。"
+  NUMBER= skipped=
+  for n in $found; do
+    if has_branch "$n"; then
+      skipped="$skipped
+- #$n: ブランチ \`$(branch_name "$n")\`"
+      continue
+    fi
+    # 代入にして、PR の取得に失敗したら止める（set -e）
+    n_prs=$(prs_of "$n")
+    if [[ $n_prs != "[]" ]]; then
+      skipped="$skipped
+- #$n: PR $(describe_prs "$n_prs")"
+    else
+      NUMBER=$n
+      break
+    fi
   done
 
   if [[ -n $skipped ]]; then
-    echo "## 着手中か、ドラフト PR がある Issue（選ばない）"
-    echo
-    count=0
-    for n in $skipped; do
-      count=$((count + 1))
-      if ((count > 20)); then
-        echo "- ほか $(($(wc -w <<<"$skipped") - 20)) 件"
-        break
-      fi
-      prs=$(prs_of "$n")
-      line="- #$n:"
-      has_branch "$n" && line="$line ブランチ \`$(branch_name "$n")\`"
-      [[ $prs == "[]" ]] && line="${line}、PR なし" || line="$line PR $(describe_prs "$prs")"
-      echo "$line"
-    done
+    echo "## 着手中か、PR がある Issue（選ばない）"
+    echo "$skipped"
     echo
     echo "続きから進めるときは \`/gh-issue-autofix <番号>\` で指定する。"
     echo
@@ -124,8 +103,7 @@ else
     labels=$(gh label list --repo "$REPO" --limit 1000 --json name --jq '.[].name') || die "ラベルの一覧を取得できません。"
     grep -qxF -- "$LABEL" <<<"$labels" ||
       stop "$REPO にラベル \`$LABEL\` がありません。\`gh label create '$LABEL' --repo $REPO --description 'Claude が対応してよい Issue'\` で作ってください。"
-    $truncated && stop "検索結果の先頭 1000 件はすべて着手中かドラフト PR があるものでした。それより後は調べていません（${REPO}、条件: ${query}）。"
-    stop "対応する Issue はありません（${REPO}、条件: ${query}。claude/issue-<番号> のブランチか PR があるものは除く）。"
+    stop "対応する Issue はありません（${REPO}、条件: ${query} の先頭 100 件。claude/issue-<番号> のブランチか PR があるものは除く）。"
   fi
 fi
 
@@ -178,10 +156,6 @@ if [[ -n $open_pr ]]; then
 fi
 if has_branch "$NUMBER"; then
   branch_state="あり（続きから再開する）"
-  next="start.sh --resume $NUMBER"
-elif git show-ref -q --verify "refs/heads/$BRANCH" &&
-  ! git merge-base --is-ancestor "refs/heads/$BRANCH" "refs/remotes/origin/$DEFAULT_BRANCH" 2>/dev/null; then
-  branch_state="ローカルにだけある（前にやめたときのコミットの続きから再開する）"
   next="start.sh --resume $NUMBER"
 else
   branch_state="なし（新しく作る）"

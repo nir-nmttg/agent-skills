@@ -4,9 +4,9 @@
 # 使い方: publish.sh <Issue の番号> --title <タイトル> --body-file <本文のファイル | -> [--closes] [--label <ラベル>]
 #   --body-file - なら本文を標準入力から読む。
 #   --closes があれば本文の末尾に「Closes #<番号>」、なければ「Refs #<番号>」を付ける。
-#   --closes がなければ、本文の closing keyword（Fixes #12 など）を Refs に置き換え、
-#   push していないコミットのメッセージに closing keyword があれば止める
+#   --closes がなければ、本文の closing keyword（Fixes #12 など）を Refs に置き換える
 #   （受け入れ条件を満たしていない PR のマージで Issue が閉じないようにするため）。
+#   Issue を閉じるかは PR 本文だけで決めるので、push していないコミットのメッセージに closing keyword があれば止める。
 #   --label: PR を新しく作ったときに付けるラベル（Issue を選ぶのに使ったもの。PR の一覧で見分けるため）。
 #     既存の PR には付けない（人が外したラベルを付け直さない）。リポジトリにないラベルは作らずに飛ばす。
 #     付けられなくても PR の作成は失敗にせず、「注意:」の行を出す。
@@ -63,18 +63,14 @@ fi
 fetch_default
 (($(git rev-list --count "origin/$DEFAULT_BRANCH..HEAD") > 0)) || die "origin/$DEFAULT_BRANCH にないコミットがありません。"
 
-if ! $CLOSES; then
-  # push していないコミットだけを見る（push 済みのものは書き換えられない）
-  base="origin/$DEFAULT_BRANCH"
-  if [[ -n $(remote_sha "$BRANCH") ]]; then
-    git fetch -q origin "+refs/heads/$BRANCH:refs/remotes/origin/$BRANCH" || die "origin から $BRANCH を取得できません。"
-    base="origin/$BRANCH"
-  fi
-  if git log --format=%B "$base..HEAD" | KEYWORD_RE=$KEYWORD_RE perl -CSD -ne 'BEGIN { $f = 0 } $f = 1 if /$ENV{KEYWORD_RE}/i; END { exit $f }'; then
-    :
-  else
-    die "push していないコミットのメッセージに closing keyword（Fixes #12 など）があります。push の前なので、\`Refs #<番号>\` などに書き換えてから実行し直してください（git commit --amend や git rebase で書き換えてよい）。"
-  fi
+# push していないコミットだけを見る（push 済みのものは書き換えられない）
+base="origin/$DEFAULT_BRANCH"
+if [[ -n $(remote_sha "$BRANCH") ]]; then
+  git fetch -q origin "+refs/heads/$BRANCH:refs/remotes/origin/$BRANCH" || die "origin から $BRANCH を取得できません。"
+  base="origin/$BRANCH"
+fi
+if ! git log --format=%B "$base..HEAD" | KEYWORD_RE=$KEYWORD_RE perl -CSD -ne 'BEGIN { $f = 0 } $f = 1 if /$ENV{KEYWORD_RE}/i; END { exit $f }'; then
+  die "push していないコミットのメッセージに closing keyword（Fixes #12 など）があります。Issue を閉じるかは PR 本文で決めるので、\`Refs #<番号>\` などに書き換えてから実行し直してください（git commit --amend や git rebase で書き換えてよい）。"
 fi
 
 # fork から同じ名前のブランチで出された PR は除く。状態を問わずに取り、マージ済みがあれば何もしない
