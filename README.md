@@ -2,7 +2,7 @@
 
 Claude Code と Codex 向けの、特定のプロジェクトに依存しない汎用スキル集。\
 Claude Code では開発と整備（リファクタリング）に、Codex では依存の更新とセキュリティ監査に使い、開発以外の作業に使うスキルもある。\
-Claude は作業の一部を Haiku 5.5・Fable 5.2（利用枠が足りなければ Opus 5.5）のサブエージェントや Codex CLI（GPT-6 Astra、使えなければ GPT-6.1 Sol）に任せ、指示・採否・反映を受け持つ。
+Claude は作業の一部を Haiku 5.5・Fable 5.2・Opus 5.5 のサブエージェントや Codex CLI（GPT-6 Astra・GPT-6.1 Sol）に任せ、指示・採否・反映を受け持つ。
 
 ## はじめに
 
@@ -21,9 +21,9 @@ Claude は作業の一部を Haiku 5.5・Fable 5.2（利用枠が足りなけれ
 
    | 前提 | 使うスキル |
    | --- | --- |
-   | `perl` | design-cross-review・implementation-cross-review・haiku-implementation・gh-issue-autofix・codebase-cleanup-workflow |
-   | `jq` | haiku-implementation・gh-issue-autofix、クロスレビューの Codex の担当 |
-   | `codex` のログイン | クロスレビューの Codex の担当 |
+   | `perl` | design-cross-review・design-alignment-cross-review・implementation-cross-review・haiku-implementation・gh-issue-autofix・codebase-cleanup-workflow |
+   | `jq` | haiku-implementation・gh-issue-autofix、クロスレビューの Codex の担当（design-alignment-cross-review の Sol を含む） |
+   | `codex` のログイン | クロスレビューの Codex の担当（design-alignment-cross-review の Sol を含む） |
    | メインが auto モード | haiku-implementation、codebase-cleanup-workflow（ないときは Haiku に実装を任せない） |
    | `gh` のログイン | gh-todo・gh-issue-autofix・security-audit-to-issues、haiku-check で CI のログを見るとき |
    | Claude デスクトップアプリ | session-status-emoji |
@@ -49,6 +49,7 @@ Claude は作業の一部を Haiku 5.5・Fable 5.2（利用枠が足りなけれ
 | [design-cross-review](.claude/skills/design-cross-review/SKILL.md) | 設計を Astra と Fable にレビューさせる | 設計・実装計画を示す前 |
 | [haiku-implementation](.claude/skills/haiku-implementation/SKILL.md) | 実装を Haiku 5.5 に任せ、手分けして進める | 指示書に書けて確かめられる実装 |
 | [haiku-check](.claude/skills/haiku-check/SKILL.md) | テスト・lint・CI ログの確認を Haiku 5.5 に任せる | 状態を変えない確認 |
+| [design-alignment-cross-review](.claude/skills/design-alignment-cross-review/SKILL.md) | 差分が既存の設計に沿っているかを Sol と Opus に確かめさせて直す | 構造を選ぶ実装のテストの後 |
 | [ui-behavior-check](.claude/skills/ui-behavior-check/SKILL.md) | 開発サーバーを起動し、画面を操作して動作を確かめる | Web の画面に出る変更の後 |
 | [implementation-cross-review](.claude/skills/implementation-cross-review/SKILL.md) | 差分を Astra と Fable にレビューさせて直す | 完了報告・コミット・PR の前 |
 | [japanese-report](.claude/skills/japanese-report/SKILL.md) | 報告を自然な日本語で書く | 結果を報告する前 |
