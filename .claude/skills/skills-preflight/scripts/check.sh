@@ -69,7 +69,7 @@ check_cmd git "ほぼすべて" "\`xcode-select --install\`（または \`brew i
 check_cmd jq "haiku-implementation, gh-issue-autofix, クロスレビューの Codex の担当" "\`brew install jq\`" jq jq --version
 check_cmd codex "$codex_users" "\`brew install --cask codex\` のあと \`codex login\`" cask:codex codex --version
 check_cmd perl "haiku-implementation, plan-cross-review, architecture-alignment-cross-review, implementation-cross-review, gh-issue-autofix, codebase-cleanup-workflow" "\`brew install perl\`（macOS には標準で入っている）" perl perl -e 'print "perl $^V\n"'
-check_cmd gh "gh-todo, gh-issue-autofix" "\`brew install gh\` のあと \`gh auth login\`" gh gh --version
+check_cmd gh "gh-todo, gh-issue-autofix, security-audit-item-to-issue" "\`brew install gh\` のあと \`gh auth login\`" gh gh --version
 
 # インストール方法は Homebrew 前提なので、足りないコマンドがあって Homebrew も無ければ先に入れてもらう
 need_brew=false
@@ -91,9 +91,9 @@ fi
 if has gh; then
   if gh auth status >/dev/null 2>&1; then
     user=$(gh api user --jq .login 2>/dev/null || true)
-    add gh-login ok "GitHub（gh）のログイン" "${user:+@$user}" "gh-todo, gh-issue-autofix"
+    add gh-login ok "GitHub（gh）のログイン" "${user:+@$user}" "gh-todo, gh-issue-autofix, security-audit-item-to-issue"
   else
-    add gh-login ng "GitHub（gh）のログイン" "未ログイン" "gh-todo, gh-issue-autofix" "\`gh auth login\`"
+    add gh-login ng "GitHub（gh）のログイン" "未ログイン" "gh-todo, gh-issue-autofix, security-audit-item-to-issue" "\`gh auth login\`"
   fi
 fi
 
@@ -149,6 +149,7 @@ skill_needs() {
     haiku-check) echo "git agents-link" ;;
     codebase-cleanup-workflow) echo "git perl agents-link" ;;
     gh-todo) echo "gh gh-login" ;;
+    security-audit-item-to-issue) echo "gh gh-login" ;;
     gh-issue-autofix) echo "git jq perl gh gh-login agents-link" ;;
     *) echo "" ;;
   esac
