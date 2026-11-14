@@ -28,7 +28,7 @@ Claude は作業の一部を Haiku 5.5・Fable 5.2（利用枠が足りなけれ
    | `gh` のログイン | gh-todo・gh-issue-autofix・security-audit-to-issues、haiku-check で CI のログを見るとき |
    | Claude デスクトップアプリ | session-status-emoji |
    | 組み込みブラウザか Claude in Chrome | browser-readonly-research |
-   | 組み込みブラウザ | gh-issue-autofix（ないときは動作確認を未検証にする） |
+   | 組み込みブラウザ | gh-issue-autofix・ui-behavior-check（ないときは動作確認を未検証にする） |
    | Python 3.9 以降 | Codex の minor-version-upgrade・rename-files-by-content |
    | `node`・Cloudflare の `security-audit`・サブエージェント | security-audit-to-issues |
    | 対象が git リポジトリで、未コミットの変更がない | codebase-cleanup-workflow |
@@ -48,6 +48,7 @@ Claude は作業の一部を Haiku 5.5・Fable 5.2（利用枠が足りなけれ
 | [design-cross-review](.claude/skills/design-cross-review/SKILL.md) | 設計を Astra と Fable にレビューさせる | 設計・実装計画を示す前 |
 | [haiku-implementation](.claude/skills/haiku-implementation/SKILL.md) | 実装を Haiku 5.5 に任せ、手分けして進める | 指示書に書けて確かめられる実装 |
 | [haiku-check](.claude/skills/haiku-check/SKILL.md) | テスト・lint・CI ログの確認を Haiku 5.5 に任せる | 状態を変えない確認 |
+| [ui-behavior-check](.claude/skills/ui-behavior-check/SKILL.md) | 開発サーバーを起動し、画面を操作して動作を確かめる | Web の画面に出る変更の後 |
 | [implementation-cross-review](.claude/skills/implementation-cross-review/SKILL.md) | 差分を Astra と Fable にレビューさせて直す | 完了報告・コミット・PR の前 |
 | [japanese-report](.claude/skills/japanese-report/SKILL.md) | 報告を自然な日本語で書く | 結果を報告する前 |
 
