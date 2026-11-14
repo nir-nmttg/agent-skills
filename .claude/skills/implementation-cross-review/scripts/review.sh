@@ -2,7 +2,7 @@
 # prepare.sh で作った prompt.md を Codex CLI（既定は GPT-6 Astra）に読み取り専用でレビューさせ、review.md に保存する。
 #
 # 使い方: review.sh [--model <id>] --effort <low|medium|high|xhigh|max> <実行フォルダ>
-#   --model   Codex のモデル（既定: gpt-6-astra）。使えないときは gpt-6.1-sol を渡す
+#   --model   Codex のモデル（既定: gpt-6-astra）。軽い担当の Sol で動かすときは gpt-6.1-sol を渡す
 #   --effort  Codex の推論レベル。Claude の推論レベルをそのまま渡す（省略時は ${CLAUDE_EFFORT}、それもなければ high）
 #
 # 環境変数 IMPLEMENTATION_CROSS_REVIEW_TITLE で出力の見出しを変えられる（plan-cross-review・architecture-alignment-cross-review が使う）。
