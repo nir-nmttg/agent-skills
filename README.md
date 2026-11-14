@@ -81,7 +81,7 @@ Claude Code は Opus 5.5 の推論レベル high で動かすことを推奨す�
 | [gh-todo](.claude/skills/gh-todo/SKILL.md) | レビュー依頼・メンション・自分の Issue / PR を一覧にする |
 | [browser-readonly-research](.claude/skills/browser-readonly-research/SKILL.md) | Web ページを読むだけで調べてまとめる |
 | [gh-issue-autofix](.claude/skills/gh-issue-autofix/SKILL.md) | `agent:autofix` ラベルの Issue を 1 件、質問せずに対応し、同じラベルのドラフト PR にする |
-| [security-audit-item-to-issue](.claude/skills/security-audit-item-to-issue/SKILL.md) | 監査の集約 Issue の項目を調べ、確定なら個別 Issue にしてサブ Issue に加え、集約 Issue を更新する |
+| [security-audit-item-to-issue](.claude/skills/security-audit-item-to-issue/SKILL.md) | 監査の集約 Issue の項目を調べ、確定なら修正 Issue にしてサブ Issue に加え、集約 Issue を更新する |
 | [skills-update](.claude/skills/skills-update/SKILL.md) | このスキル集を最新に取り込み、Claude Code・Codex へリンクし直して、使えるスキルを確かめる |
 
 ## Codex 用スキル一覧
