@@ -108,6 +108,7 @@
 - 確定0件や監査未完了でも、[集約 Issue の書式](issue-templates.md#集約-issue) で1件まとめる。冒頭に監査対象 SHA、プロファイル、範囲、監査と Issue 反映の状況、4区分の件数、未完了工程と再開条件を書く。件数は根本原因・fingerprint の重複を除いて数え、不明な値は不明とする。
 - 4区分と未完了の工程・範囲は一覧表と項目ごとの詳細に書き、列・箇条・番号・並び順は書式に従う。
 - 確定には今回作成・更新・照合した個別 Issue を載せる。再発候補や照合が曖昧なものは、候補の URL と保留理由を書く。
+- 確定の一覧表の対応状況は、集約本文を書き込む直前に、反映結果が作成・更新・変更なしの個別 Issue ごとに `gh issue view "$NUMBER" --repo "$ISSUE_REPO" --json state,closedByPullRequestsReferences` で取り直して決める。閉じている Issue は、参照された PR を `gh pr view "$PR_URL" --json state` で確かめ、`MERGED` があれば `merged` にする。状態を取得できなければ `不明` と書き、理由を詳細の反映結果に書く。
 - 要検証は `blockers` と `validation_plan`、棄却は `reason` をもとに書き、棄却には判断を覆す新しい事実の条件を示す。
 - 同じ実行の再開で候補が確定した場合は、番号を変えずに確定の区分へ移し、個別 Issue にリンクする。人が記載した判断や追記は保持する。
 - 書き込む本文を組み立てたら、各番号が一覧表と `<summary>` に1回ずつ出ること、冒頭と見出しの件数・一覧表の行数・詳細の数が一致すること（件数が不明の区分は一覧表の行数と詳細の数。未完了の工程・範囲は見出しの件数と行数・詳細の数）、`<details>` と `</details>` の数が一致することを確かめる。
@@ -121,7 +122,7 @@
 - 手順 2 の登録先条件を再確認し、手順 5 と同じ `gh issue create` / `gh issue edit` と `--body-file` を使う。本文とタイトルに差分がなければ書き込みを省く。反映後に取得し直してリンクと一覧表・詳細を確かめ、集約 Issue の URL をメタデータに保存する。成否が不明なら再取得して照合してから再試行する。
 - 同じ実行の再開では、その実行の最新の台帳・最終版の所見を使う。別の実行の集約 Issue は履歴として残し、次の監査では根本原因の個別 Issue と過去の判定を参照する。
 
-## 7. ラベルと反映状況を記録する
+## 7. ラベル・サブ Issue と反映状況を記録する
 
 - 個別 Issue と集約 Issue に `agent:security-audit` を付ける。`agent:autofix` は手順 5 の条件を満たす個別 Issue に付ける。未付与のラベルごとに `LABEL` をその名前に設定する。登録先のラベルを全ページ取得し、`name` が `LABEL` と完全一致する項目があるか確認する。
 
@@ -132,6 +133,17 @@
 - 一覧を最後まで取得でき、ラベルがなければ `gh label create "$LABEL" --repo "$ISSUE_REPO"` で作成する。作成に失敗した場合は一覧を読み直す。別の担当者が作成済みと分かれば、そのラベルを使う。
 - `agent:autofix` を付ける直前に、Issue の状態・本文とコメント全ページを読み直す。開いており、最新の本文とコメントでも自動修正の条件を満たす場合だけ付ける。コメントは `gh api --hostname "$REPO_HOST" --paginate --slurp "repos/$REPO/issues/$NUMBER/comments?per_page=100"` で取得する。
 - ラベルの存在を確認できたら、`gh issue edit "$NUMBER" --repo "$ISSUE_REPO" --add-label "$LABEL"` で付ける。本文とラベルの両方に差分がなければ書き込まない。ラベルの確認・作成・付与を完了できなければ、対象 Issue の URL・ラベル名・理由を報告する。
-- 個別 Issue とラベルの結果を確かめ、集約 Issue 自身のラベル付与も確認してから `issue_sync.status` を確定する。すべて反映できれば `complete`、一部に保留や失敗があれば `partial`、登録先や権限などの前提を満たせず書き込めなければ `blocked` とする。監査の `run_status` は監査工程の完了状況を表す。
-- 確定した反映状況とラベルの結果を、書式に従って集約 Issue（冒頭の Issue 反映の状況、確定の一覧表の反映結果・詳細、どの確定項目にも属さない保留を書く未完了の工程・範囲）に書き戻す。差分があれば手順 6 に従って版を増やして保存・反映・再取得する。この最終更新に失敗した場合は `issue_sync.status` を `partial` にし、保存済みの更新案と停止理由を最終報告に残す。
+- 集約 Issue の番号 `SUMMARY_NUMBER` が決まり、その Issue が開いていれば、反映結果が作成・更新・変更なしの個別 Issue を集約 Issue のサブ Issue にする。サブ Issue の親は1つだけなので、先に `gh api --hostname "$REPO_HOST" "repos/$REPO/issues/$NUMBER/parent"` で親を確かめ、結果は次のどれかとして詳細の反映結果に書く。追加の成否が不明なときは、親を確かめ直して決める。
+  - 追加: 404 で `No parent issue found` が返った。個別 Issue の数値の `id` を使って追加する。
+  - 追加済み: 親が `SUMMARY_NUMBER` だった（同じ実行の再開など）。
+  - 親あり: 親が別の Issue だった（過去の監査の集約 Issue など）。付け替えず、親の URL を書く。
+  - 失敗: ほかのエラーが返った、または追加できなかった。理由を書く。
+
+  ```bash
+  ID=$(gh api --hostname "$REPO_HOST" "repos/$REPO/issues/$NUMBER" --jq .id)
+  gh api --hostname "$REPO_HOST" -X POST "repos/$REPO/issues/$SUMMARY_NUMBER/sub_issues" -F sub_issue_id="$ID"
+  ```
+
+- 個別 Issue・ラベル・サブ Issue の結果を確かめ、集約 Issue 自身のラベル付与も確認してから `issue_sync.status` を確定する。すべて反映できれば `complete`、一部に保留や失敗（サブ Issue は失敗だけ）があれば `partial`、登録先や権限などの前提を満たせず書き込めなければ `blocked` とする。監査の `run_status` は監査工程の完了状況を表す。
+- 確定した反映状況とラベル・サブ Issue の結果を、書式に従って集約 Issue（冒頭の Issue 反映の状況、確定の一覧表の対応状況と詳細の反映結果、どの確定項目にも属さない保留を書く未完了の工程・範囲）に書き戻す。差分があれば手順 6 に従って版を増やして保存・反映・再取得する。この最終更新に失敗した場合は `issue_sync.status` を `partial` にし、保存済みの更新案と停止理由を最終報告に残す。
 - 集約 Issue への反映も保留になった場合は、反映予定の本文と理由を実行フォルダに保存し、保存済み成果物の絶対パス・該当 Issue の URL・再開条件を最終報告に残す。
