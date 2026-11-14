@@ -2,7 +2,8 @@
 
 Claude Code と Codex 向けの、特定のプロジェクトに依存しない汎用スキル集。\
 Claude Code では開発と整備（リファクタリング）に、Codex では依存の更新とセキュリティ監査に使い、開発以外の作業に使うスキルもある。\
-Claude は作業の一部を Haiku 5.5・Fable 5.2・Opus 5.5 のサブエージェントや Codex CLI（GPT-6 Astra・GPT-6.1 Sol）に任せ、指示・採否・反映を受け持つ。
+Claude は作業の一部を Haiku 5.5・Fable 5.2・Opus 5.5 のサブエージェントや Codex CLI（GPT-6 Astra・GPT-6.1 Sol）に任せ、指示・採否・反映を受け持つ。\
+Claude Code は Opus 5.5 の推論レベル high で動かすことを推奨する。
 
 ## はじめに
 

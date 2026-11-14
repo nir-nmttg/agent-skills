@@ -154,7 +154,7 @@ skill_needs() {
   esac
 }
 
-# Codex の担当（Astra、使えないときは Sol）を動かすのに必要なものがそろっているか
+# Codex の担当（Astra か Sol）を動かすのに必要なものがそろっているか
 codex_ready() {
   local m
   for m in ${missing[@]+"${missing[@]}"}; do
