@@ -29,6 +29,7 @@ Claude は作業の一部を Haiku 5.5・Fable 5.2（利用枠が足りなけれ
    | Claude デスクトップアプリ | session-status-emoji |
    | 組み込みブラウザか Claude in Chrome | browser-readonly-research |
    | 組み込みブラウザ | gh-issue-autofix・ui-behavior-check（ないときは動作確認を未検証にする） |
+   | 権限の確認が出ない権限モード（auto モードなど） | gh-issue-autofix（無人で動かすとき） |
    | Python 3.9 以降 | Codex の minor-version-upgrade・rename-files-by-content |
    | `node`・Cloudflare の `security-audit`・サブエージェント | security-audit-to-issues |
    | 対象が git リポジトリで、未コミットの変更がない | codebase-cleanup-workflow |
@@ -75,7 +76,7 @@ Claude は作業の一部を Haiku 5.5・Fable 5.2（利用枠が足りなけれ
 | [whats-next](.claude/skills/whats-next/SKILL.md) | 進捗と次のアクションを 1 つ示し、承認後に進める |
 | [gh-todo](.claude/skills/gh-todo/SKILL.md) | レビュー依頼・メンション・自分の Issue / PR を一覧にする |
 | [browser-readonly-research](.claude/skills/browser-readonly-research/SKILL.md) | Web ページを読むだけで調べてまとめる |
-| [gh-issue-autofix](.claude/skills/gh-issue-autofix/SKILL.md) | `agent:autofix` ラベルの Issue を 1 件対応し、質問しながら、または全自動で、同じラベルのドラフト PR にする |
+| [gh-issue-autofix](.claude/skills/gh-issue-autofix/SKILL.md) | `agent:autofix` ラベルの Issue を 1 件、質問せずに対応し、同じラベルのドラフト PR にする |
 | [skills-update](.claude/skills/skills-update/SKILL.md) | このスキル集を最新に取り込み、Claude Code・Codex へリンクし直して、使えるスキルを確かめる |
 
 ## Codex 用スキル一覧
@@ -101,7 +102,8 @@ Codex の [security-audit-to-issues](.agents/skills/security-audit-to-issues/SKI
 
 1. 監査するプロジェクトの直下で、Codex から `$security-audit-to-issues` を呼ぶ。\
    確定所見が修正 Issue になり、自動で直せるものに `agent:autofix` が付く。
-2. 対応させる Issue を自分にアサインし（番号を渡すなら不要）、同じリポジトリで Claude Code から `/gh-issue-autofix` を呼ぶ（`--delegate` で質問せずに進める）。\
+2. 対応させる Issue を自分にアサインし（番号を渡すなら不要）、同じリポジトリで Claude Code から `/gh-issue-autofix` を呼ぶ。\
+   質問せずに進めるので、無人で動かすときは権限の確認が出ない権限モード（auto モードなど）のセッションで呼ぶ。\
    1 回で 1 件をドラフト PR にするので、残りは繰り返し呼ぶ。
 3. ドラフト PR を人がレビューし、Ready への変更とマージを行う。
 

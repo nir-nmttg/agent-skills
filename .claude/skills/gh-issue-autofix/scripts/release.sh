@@ -1,23 +1,15 @@
 #!/usr/bin/env bash
-# Issue の worktree を片付け、作業がなければ着手も取り消す。worktree の外（メインの checkout）で実行する。
-#   - コミットせずに止めたとき: 着手（リモートの claude/issue-<番号>）を取り消す
-#   - ドラフト PR を作ったあと: worktree だけを消す（PR があるのでブランチは残る）
+# Issue の worktree を片付ける。worktree の外（メインの checkout）で実行する。
+#   着手（リモートの claude/issue-<番号>）は消さずに残す。PR にせずにやめた Issue も、次の引数なしの実行で
+#   選び直さないようにする（find-issue.sh の「着手中」の一覧に出る。選び直させるときは人がリモートのブランチを消す）。
 #
-# 使い方: release.sh [--keep-claim] <Issue の番号>
-#   --keep-claim: 着手（リモートの claude/issue-<番号>）を消さずに残す。全自動モードで PR にできずにやめたとき、
-#     次の引数なしの実行で同じ Issue を選び直さないようにする（find-issue.sh の「着手中」の一覧に出る）。
-#   リモートの claude/issue-<番号> に既定ブランチにないコミットがなく、PR もなく、ローカルにだけあるコミットもなければ消す。
+# 使い方: release.sh <Issue の番号>
 #   worktree に変更がなければ、worktree と、既定ブランチかリモートの claude/issue-<番号> に含まれるローカルのブランチを消す
 #   （リモートにあるものは消しても失わない。残すと、人がリモートを rebase したときに start.sh --resume が分岐で止まる）。
 set -euo pipefail
 source "$(dirname "$0")/lib.sh"
 
-KEEP_CLAIM=false
-if [[ ${1:-} == --keep-claim ]]; then
-  KEEP_CLAIM=true
-  shift
-fi
-(($# == 1)) || die "使い方: release.sh [--keep-claim] <Issue の番号>"
+(($# == 1)) || die "使い方: release.sh <Issue の番号>"
 NUMBER=$1
 require_number "$NUMBER"
 require_tools
@@ -77,22 +69,10 @@ if [[ -z $remote ]]; then
   echo "- リモートの $BRANCH: なし"
   exit 0
 fi
-prs=$(gh pr list --repo "$REPO" --head "$BRANCH" --state all --json url,isCrossRepository \
-  --jq 'map(select(.isCrossRepository | not) | .url) | join(", ")') ||
-  die "PR の一覧を取得できません。"
-if [[ -n $prs ]]; then
-  echo "- リモートの $BRANCH: PR（${prs}）があるので残した"
-elif ! git merge-base --is-ancestor "$remote" "origin/$DEFAULT_BRANCH"; then
-  echo "- リモートの $BRANCH: origin/$DEFAULT_BRANCH にないコミットがあるので残した"
-elif $KEEP_CLAIM; then
-  echo "- リモートの $BRANCH: --keep-claim なので着手を残した（次の引数なしの実行では選ばれない）"
+if ! git merge-base --is-ancestor "$remote" "origin/$DEFAULT_BRANCH"; then
+  echo "- リモートの $BRANCH: origin/$DEFAULT_BRANCH にないコミットがあるので残した（引数なしの実行では選ばれない）"
 elif $local_ahead; then
-  # 消すと、次の実行が --new で始めてローカルのコミットとぶつかる。着手の印として残し、続きから再開できるようにする
-  echo "- リモートの $BRANCH: ローカルにだけあるコミットの続きから再開できるように残した"
+  echo "- リモートの $BRANCH: 着手の印として残した（ローカルにだけあるコミットの続きから再開できる。引数なしの実行では選ばれない）"
 else
-  # 確かめた sha のままのときだけ消す
-  git push -q --no-verify --force-with-lease="$REF:$remote" origin ":$REF" ||
-    die "リモートの $BRANCH を消せません（その間に更新された可能性があります）。"
-  git update-ref -d "refs/remotes/origin/$BRANCH" 2>/dev/null || true
-  echo "- リモートの $BRANCH: 消した（着手を取り消した）"
+  echo "- リモートの $BRANCH: 着手の印として残した（引数なしの実行では選ばれない）"
 fi
