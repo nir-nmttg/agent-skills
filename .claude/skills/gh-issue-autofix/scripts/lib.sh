@@ -80,10 +80,6 @@ fetch_default() {
     die "origin から $DEFAULT_BRANCH を取得できません。"
 }
 
-# 依存を決めるロックファイル（git の pathspec）
-LOCKFILES=('*package-lock.json' '*npm-shrinkwrap.json' '*pnpm-lock.yaml' '*yarn.lock' '*bun.lock' '*bun.lockb'
-  '*uv.lock' '*poetry.lock' '*Pipfile.lock' '*requirements*.txt' '*Gemfile.lock' '*composer.lock' '*go.sum' '*Cargo.lock')
-
 # submodule があれば、作業ツリーに合わせて更新する（hook は動かさない）
 update_submodules() {
   [[ -f ${1:-.}/.gitmodules ]] || return 0

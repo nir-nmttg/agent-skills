@@ -2,12 +2,10 @@
 # Issue の着手を確保し、作業用の worktree を用意する。メインの checkout のブランチと作業ツリーには触れない。
 #
 # 使い方: start.sh --new <Issue の番号>     # 新しく着手する
-#         start.sh --resume <Issue の番号>  # claude/issue-<番号> の続きから再開する
+#         start.sh --resume <Issue の番号>  # リモートの claude/issue-<番号> の続きから再開する
 #   --new は、fetch した origin の既定ブランチの先頭から claude/issue-<番号> を作り、
 #   「リモートにまだ存在しないときだけ」の条件で push して着手を確保する（存在すれば着手済みで止める）。
 #   worktree は <メインの checkout>/.claude/worktrees/issue-<番号> に置き、git で追跡しない .env* をコピーする。
-#   依存フォルダは、ロックファイルがメインの checkout の作業ツリーと同じときだけメインの checkout へリンクする。
-#   違うときはリンクせず、前に張ったリンクも外す（worktree にインストールし直す）。
 # 終了コード: 0 = 用意できた、1 = エラー（ネットワーク・権限など、環境の問題。--new で着手を確保したあとなら「着手は確保済み」と出す）
 #   2 = 止める。出力の先頭で区分する:
 #     claimed:  別のセッションが着手済み
@@ -53,7 +51,7 @@ if [[ $MODE == new ]]; then
   if git show-ref -q --verify "$REF"; then
     # 前回 push の前に止まったものだけ使い直す。独自のコミットがあるブランチは公開しない
     git merge-base --is-ancestor "$REF" "$BASE_REF" ||
-      stop "conflict: ローカルの $BRANCH に $BASE_REF にないコミットがあります。続きから進めるなら --resume にするか、内容を確かめてから消すか別の名前にしてください。"
+      stop "conflict: ローカルの $BRANCH に $BASE_REF にないコミットがあります。続きを残すなら人が push してから --resume で呼び直し、不要なら内容を確かめてからブランチ（と worktree）を消してください。"
     [[ -z $existing ]] ||
       stop "conflict: ローカルの $BRANCH が worktree（${existing}）で使われています。不要なら \`git worktree remove $existing\` で消してから実行し直してください。"
     git branch -q -f --no-track "$BRANCH" "$BASE_REF"
@@ -95,11 +93,8 @@ else
       fi
     fi
     state="再開（リモートの $BRANCH の続きから）"
-  elif git show-ref -q --verify "$REF"; then
-    # 前回ローカルにだけコミットしてやめ、リモートの着手の印も消えたもの
-    state="再開（ローカルの $BRANCH の続きから。リモートにはない）"
   else
-    die "リモートにもローカルにも $BRANCH がないので再開できません。--new を使ってください。"
+    die "リモートに $BRANCH がないので再開できません。--new を使ってください。"
   fi
 fi
 
@@ -120,43 +115,11 @@ else
 fi
 update_submodules "$WORKTREE" || die "worktree の submodule を更新できません。"
 
-# --- 依存フォルダと .env* ---
-link_names=" ${GH_ISSUE_AUTOFIX_LINK_DIRS:-node_modules .venv venv .bundle vendor} "
-# ロックファイルがメインの checkout の作業ツリーと同じときだけ、メインの checkout の依存をリンクする
-# （追加・削除・改行の変換は git diff が扱う。比べられないときは違うとみなす）
-if git -C "$MAIN" diff --quiet --no-ext-diff "$REF" -- "${LOCKFILES[@]}" 2>/dev/null; then
-  can_link=true
-else
-  can_link=false
-fi
-
-linked= unlinked= copied= skipped=
+# --- .env* ---
+copied=
 while IFS= read -r -d '' p; do
   p=${p%/}
-  name=${p##*/}
-  if [[ -d $MAIN/$p && $link_names == *" $name "* ]]; then
-    if [[ -L $WORKTREE/$p && $(readlink "$WORKTREE/$p") == "$MAIN/$p" ]]; then
-      # 前の実行で張ったリンク。違うときは外す（リンクそのものだけを消し、リンク先には触れない）
-      if $can_link; then
-        linked="$linked $p"
-      else
-        rm -- "$WORKTREE/$p"
-        unlinked="$unlinked $p"
-        skipped="$skipped $p"
-      fi
-      continue
-    fi
-    [[ ! -e $WORKTREE/$p && ! -L $WORKTREE/$p ]] || continue
-    if $can_link; then
-      mkdir -p "$(dirname "$WORKTREE/$p")"
-      ln -s "$MAIN/$p" "$WORKTREE/$p"
-      # .gitignore の「node_modules/」はリンクに効かないので、リンクそのものを除外する
-      add_exclude "/$p"
-      linked="$linked $p"
-    else
-      skipped="$skipped $p"
-    fi
-  elif [[ -f $MAIN/$p && $name == .env* && ! -e $WORKTREE/$p && ! -L $WORKTREE/$p ]]; then
+  if [[ -f $MAIN/$p && ${p##*/} == .env* && ! -e $WORKTREE/$p && ! -L $WORKTREE/$p ]]; then
     mkdir -p "$(dirname "$WORKTREE/$p")"
     cp -p "$MAIN/$p" "$WORKTREE/$p"
     # メインの checkout のブランチの .gitignore にだけある規則で無視されていることがあるので、worktree でも無視させる
@@ -164,22 +127,6 @@ while IFS= read -r -d '' p; do
     copied="$copied $p"
   fi
 done < <(git -C "$MAIN" ls-files -z --others --ignored --exclude-standard --directory)
-
-# workspaces や editable install では、リンクした依存がメインの checkout のコードを読み込む
-warn_deps=
-if [[ -n $linked ]]; then
-  if [[ -f $WORKTREE/pnpm-workspace.yaml ]] || { [[ -f $WORKTREE/package.json ]] && jq -e '.workspaces' "$WORKTREE/package.json" >/dev/null 2>&1; }; then
-    warn_deps="JavaScript の workspaces"
-  fi
-  for v in .venv venv; do
-    if [[ -L $WORKTREE/$v ]] && grep -qsF -- "$MAIN" "$MAIN/$v"/lib/python*/site-packages/*.pth "$MAIN/$v"/lib/python*/site-packages/__editable__*.py; then
-      warn_deps="${warn_deps:+${warn_deps}・}Python の editable install"
-    fi
-  done
-  if [[ -L $WORKTREE/vendor && -f $WORKTREE/composer.json ]]; then
-    warn_deps="${warn_deps:+${warn_deps}・}PHP の Composer（autoload）"
-  fi
-fi
 
 base=$(git merge-base "$BASE_REF" "$REF")
 ahead=$(git rev-list --count "$BASE_REF..$REF")
@@ -189,13 +136,7 @@ echo "- worktree: $WORKTREE"
 echo "- ブランチ: $BRANCH"
 echo "- 既定ブランチ: ${DEFAULT_BRANCH}（基点: $(git log -1 --format='%h %s' "$base")）"
 ((ahead == 0)) || echo "- $BASE_REF にないコミット: $ahead 件"
-echo "- リンクした依存フォルダ（書き込まない）:${linked:- なし}"
-[[ -z $unlinked ]] || echo "- 外したリンク（ロックファイルがメインの checkout と違うため）:$unlinked"
-if ! $can_link; then
-  echo "- 注意: ロックファイルがメインの checkout の作業ツリーと違うので、依存をリンクしていません${skipped:+（対象:${skipped}）}。worktree にプロジェクトの手順で、ロックファイルを変えない形（npm ci・pnpm install --frozen-lockfile・uv sync --locked など）でインストールしてください。"
-fi
 echo "- コピーした設定ファイル（コミットしない）:${copied:- なし}"
-[[ -z $warn_deps ]] || echo "- 注意: $warn_deps があるので、リンクした依存はメインの checkout のコードを読み込みます。リンクを外し、worktree にプロジェクトの手順でインストールしてからテストしてください。"
 if [[ -n $(git -C "$WORKTREE" status --porcelain) ]]; then
   echo "- 注意: 用意した直後の worktree に未コミットの変更があります。git status で確かめてください。"
 fi
