@@ -1,4 +1,4 @@
-# prepare.sh（implementation-cross-review・design-cross-review・design-alignment-cross-review）が共有する処理。実行せず、source して使う。
+# prepare.sh（implementation-cross-review・plan-cross-review・architecture-alignment-cross-review）が共有する処理。実行せず、source して使う。
 
 # 作業場所のルートの CLAUDE.md・.claude/CLAUDE.md・AGENTS.md を <project-instructions> として出力する。
 # サブエージェントは omitClaudeMd で、Codex は project_doc_max_bytes=0 で自動では読まないので、ここで渡す。

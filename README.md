@@ -21,9 +21,9 @@ Claude は作業の一部を Haiku 5.5・Fable 5.2・Opus 5.5 のサブエージ
 
    | 前提 | 使うスキル |
    | --- | --- |
-   | `perl` | design-cross-review・design-alignment-cross-review・implementation-cross-review・haiku-implementation・gh-issue-autofix・codebase-cleanup-workflow |
-   | `jq` | haiku-implementation・gh-issue-autofix、クロスレビューの Codex の担当（design-alignment-cross-review の Sol を含む） |
-   | `codex` のログイン | クロスレビューの Codex の担当（design-alignment-cross-review の Sol を含む） |
+   | `perl` | plan-cross-review・architecture-alignment-cross-review・implementation-cross-review・haiku-implementation・gh-issue-autofix・codebase-cleanup-workflow |
+   | `jq` | haiku-implementation・gh-issue-autofix、クロスレビューの Codex の担当（architecture-alignment-cross-review の Sol を含む） |
+   | `codex` のログイン | クロスレビューの Codex の担当（architecture-alignment-cross-review の Sol を含む） |
    | メインが auto モード | haiku-implementation、codebase-cleanup-workflow（ないときは Haiku に実装を任せない） |
    | `gh` のログイン | gh-todo・gh-issue-autofix・security-audit-to-issues、haiku-check で CI のログを見るとき |
    | Claude デスクトップアプリ | session-status-emoji |
@@ -46,10 +46,10 @@ Claude は作業の一部を Haiku 5.5・Fable 5.2・Opus 5.5 のサブエージ
 | スキル | できること | 使う場面 |
 | --- | --- | --- |
 | [session-status-emoji](.claude/skills/session-status-emoji/SKILL.md) | セッション名に作業の段階の絵文字を付ける | デスクトップアプリの全セッション |
-| [design-cross-review](.claude/skills/design-cross-review/SKILL.md) | 設計を Astra と Fable にレビューさせる | 設計・実装計画を示す前 |
+| [plan-cross-review](.claude/skills/plan-cross-review/SKILL.md) | 設計を Astra と Fable にレビューさせる | 設計・実装計画を示す前 |
 | [haiku-implementation](.claude/skills/haiku-implementation/SKILL.md) | 実装を Haiku 5.5 に任せ、手分けして進める | 指示書に書けて確かめられる実装 |
 | [haiku-check](.claude/skills/haiku-check/SKILL.md) | テスト・lint・CI ログの確認を Haiku 5.5 に任せる | 状態を変えない確認 |
-| [design-alignment-cross-review](.claude/skills/design-alignment-cross-review/SKILL.md) | 差分が既存の設計に沿っているかを Sol と Opus に確かめさせて直す | 構造を選ぶ実装のテストの後 |
+| [architecture-alignment-cross-review](.claude/skills/architecture-alignment-cross-review/SKILL.md) | 差分が既存の設計に沿っているかを Sol と Opus に確かめさせて直す | 構造を選ぶ実装のテストの後 |
 | [ui-behavior-check](.claude/skills/ui-behavior-check/SKILL.md) | 開発サーバーを起動し、画面を操作して動作を確かめる | Web の画面に出る変更の後 |
 | [implementation-cross-review](.claude/skills/implementation-cross-review/SKILL.md) | 差分を Astra と Fable にレビューさせて直す | 完了報告・コミット・PR の前 |
 | [japanese-report](.claude/skills/japanese-report/SKILL.md) | 報告を自然な日本語で書く | 結果を報告する前 |
@@ -61,7 +61,7 @@ Claude は作業の一部を Haiku 5.5・Fable 5.2・Opus 5.5 のサブエージ
 | スキル | できること |
 | --- | --- |
 | [codebase-cleanup-workflow](.claude/skills/codebase-cleanup-workflow/SKILL.md) | 下の 6 本を順に使い、工程ごとに Haiku の確認と Astra・Fable のレビューを挟んで作業ブランチにコミットする |
-| [design-alignment-refactor](.claude/skills/design-alignment-refactor/SKILL.md) | 設計方針から外れた責務分担や依存関係を直す |
+| [architecture-alignment-refactor](.claude/skills/architecture-alignment-refactor/SKILL.md) | 設計方針から外れた責務分担や依存関係を直す |
 | [overengineering-refactor](.claude/skills/overengineering-refactor/SKILL.md) | 過剰な抽象化・汎用化・防御的実装や未使用コードを取り除く |
 | [code-structure-refactor](.claude/skills/code-structure-refactor/SKILL.md) | 責務の混在や重複を、分割・共通化で直す |
 | [test-suite-refactor](.claude/skills/test-suite-refactor/SKILL.md) | 検出力を保ったまま、テストの重複を整理する |

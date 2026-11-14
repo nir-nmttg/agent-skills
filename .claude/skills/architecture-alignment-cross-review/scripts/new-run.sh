@@ -5,7 +5,7 @@
 #   --followup  確認のレビュー（再レビュー）にする。前回の決定事項を写し、前回のフォルダを previous.txt に、今回のフォルダを前回の followup.txt に残す
 #   slug        変更の短い名前（英数字・ハイフン）。フォルダ名に使う
 #
-# 保存先は ${DESIGN_ALIGNMENT_CROSS_REVIEW_DIR}（既定: このリポジトリ直下の artifacts/design-alignment-cross-review）/<日時>-<slug>.<乱数>/。
+# 保存先は ${ARCHITECTURE_ALIGNMENT_CROSS_REVIEW_DIR}（既定: このリポジトリ直下の artifacts/architecture-alignment-cross-review）/<日時>-<slug>.<乱数>/。
 set -euo pipefail
 
 usage() { sed -n '4,6p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 1; }
@@ -30,7 +30,7 @@ fi
 
 # ~/.claude/skills のシンボリックリンク経由で呼ばれても、リンク先のリポジトリに保存する
 repo_root=$(cd -P "$(dirname "$0")/../../../.." && pwd)
-root=${DESIGN_ALIGNMENT_CROSS_REVIEW_DIR:-$repo_root/artifacts/design-alignment-cross-review}
+root=${ARCHITECTURE_ALIGNMENT_CROSS_REVIEW_DIR:-$repo_root/artifacts/architecture-alignment-cross-review}
 mkdir -p "$root"
 # 同時に動かしても別のフォルダになるよう、原子的に作る
 dir=$(mktemp -d "$root/$(date +%Y%m%d-%H%M%S)-$slug.XXXXXX")

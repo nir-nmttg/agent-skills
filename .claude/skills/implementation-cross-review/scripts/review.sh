@@ -5,7 +5,7 @@
 #   --model   Codex のモデル（既定: gpt-6-astra）。使えないときは gpt-6.1-sol を渡す
 #   --effort  Codex の推論レベル。Claude の推論レベルをそのまま渡す（省略時は ${CLAUDE_EFFORT}、それもなければ high）
 #
-# 環境変数 IMPLEMENTATION_CROSS_REVIEW_TITLE で出力の見出しを変えられる（design-cross-review・design-alignment-cross-review が使う）。
+# 環境変数 IMPLEMENTATION_CROSS_REVIEW_TITLE で出力の見出しを変えられる（plan-cross-review・architecture-alignment-cross-review が使う）。
 set -euo pipefail
 
 usage() { sed -n '4,6p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 1; }

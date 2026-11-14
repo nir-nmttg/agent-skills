@@ -1,8 +1,8 @@
 ---
-name: design-cross-review
+name: plan-cross-review
 description: Claude が考えた設計（会話中の案や設計書）を Codex CLI の GPT-6 Astra と Fable 5.2 に同じ依頼でレビューさせる。「この設計を Codex にレビューしてもらって」「Fable で設計をレビューして」などの依頼で使う。依頼がなくても、作り方の判断を含む設計や実装計画は、提示や実装の前に使い、迷ったら使う（除外は本文）。
 argument-hint: "[--only astra|sol|fable|opus] [--cd <dir>] [設計書のパス] [補足]"
-allowed-tools: Bash(bash *design-cross-review/scripts/new-run.sh*), Bash(bash *design-cross-review/scripts/prepare.sh*), Bash(bash *design-cross-review/scripts/review.sh*), mcp__ccd_session_mgmt__get_usage, Read, Grep, Glob, Write(//**/artifacts/design-cross-review/**), Edit(//**/artifacts/design-cross-review/**)
+allowed-tools: Bash(bash *plan-cross-review/scripts/new-run.sh*), Bash(bash *plan-cross-review/scripts/prepare.sh*), Bash(bash *plan-cross-review/scripts/review.sh*), mcp__ccd_session_mgmt__get_usage, Read, Grep, Glob, Write(//**/artifacts/plan-cross-review/**), Edit(//**/artifacts/plan-cross-review/**)
 ---
 
 # Astra と Fable による設計レビュー
@@ -10,7 +10,7 @@ allowed-tools: Bash(bash *design-cross-review/scripts/new-run.sh*), Bash(bash *d
 引数: $ARGUMENTS
 Claude の推論レベル: ${CLAUDE_EFFORT}
 
-Claude が考えた設計を、Astra（Codex CLI の GPT-6 Astra）と Fable（`fable-reviewer`）に**同じ依頼で**レビューさせ、その指摘を Claude が吟味する。同じ観点を別のモデルで見て、単一モデルの見落としを補う。どちらも要件と設計から読み解くので、実装者の不安に注意が偏らない。要件との一致や前提の誤りに加えて、データ・認可・お金・外部への送信・移行・並行処理など壊れると影響の大きい部分では、壊れ方と戻しやすさも重点的に見る。Astra が使えないときは Sol（GPT-6.1 Sol）で、Fable の利用枠が足りないときは Opus（`opus-reviewer`）で代わりに動かす。直したあとの再レビューは、直した部分の確認に絞って Astra に任せる。プロンプトの組み立てと Codex の呼び出しはスクリプトに任せ、Claude は「要件と設計書をまとめる」「指摘を判断する」だけを行う。結果は `artifacts/design-cross-review/` に保存される。
+Claude が考えた設計を、Astra（Codex CLI の GPT-6 Astra）と Fable（`fable-reviewer`）に**同じ依頼で**レビューさせ、その指摘を Claude が吟味する。同じ観点を別のモデルで見て、単一モデルの見落としを補う。どちらも要件と設計から読み解くので、実装者の不安に注意が偏らない。要件との一致や前提の誤りに加えて、データ・認可・お金・外部への送信・移行・並行処理など壊れると影響の大きい部分では、壊れ方と戻しやすさも重点的に見る。Astra が使えないときは Sol（GPT-6.1 Sol）で、Fable の利用枠が足りないときは Opus（`opus-reviewer`）で代わりに動かす。直したあとの再レビューは、直した部分の確認に絞って Astra に任せる。プロンプトの組み立てと Codex の呼び出しはスクリプトに任せ、Claude は「要件と設計書をまとめる」「指摘を判断する」だけを行う。結果は `artifacts/plan-cross-review/` に保存される。
 
 ## 自分の判断で使うとき
 
@@ -44,7 +44,7 @@ Claude が考えた設計を、Astra（Codex CLI の GPT-6 Astra）と Fable（`
 次の順に決める。
 
 1. **指定**: `--only astra`・`--only fable`、または「Astra だけ」「Codex だけ」「Fable だけ」と言われたら、その担当だけを動かす（レビュー済みでも動かす）。`--only` の値が `astra` / `sol` / `fable` / `opus` 以外なら、そのことを伝えて止める。「Fable で設計をレビューして」「Codex にレビューしてもらって」のように名前を挙げただけの依頼は、指定に数えない。
-2. **直接の依頼**: `/design-cross-review` やレビューを頼まれたら、レビュー済みでも Astra と Fable を動かす。
+2. **直接の依頼**: `/plan-cross-review` やレビューを頼まれたら、レビュー済みでも Astra と Fable を動かす。
 3. **自分の判断で使うとき**: Astra と Fable を対象にする。そこから、同じ設計をこの会話ですでにレビューして結果を受け取った担当を除く。残りがなければ動かさない。
 
 「Sol で」と言われたとき、`--only sol` や「Sol だけ」と言われたとき、この会話で Astra がモデルを使えない・プランの対象外・使用量の上限の理由で失敗していたときは、Astra の代わりに Sol で動かす（4. で `--model gpt-6.1-sol` を渡す。`--only sol`・「Sol だけ」なら Fable は動かさない）。

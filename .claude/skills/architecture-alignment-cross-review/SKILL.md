@@ -1,8 +1,8 @@
 ---
-name: design-alignment-cross-review
+name: architecture-alignment-cross-review
 description: Claude の実装（git の差分）が対象プロジェクトの既存の設計（置き場所・責務・依存の向き・共通の仕組み）に沿っているかを GPT-6.1 Sol と Opus 5.5 に確かめさせて直す。「既存の設計に沿っているか見て」などの依頼で使う。依頼がなくても、構造を選ぶ実装はテストの後・implementation-cross-review の前に使う。
 argument-hint: "[--base <ref> | --commit <sha> | --uncommitted] [補足]"
-allowed-tools: Bash(bash *design-alignment-cross-review/scripts/new-run.sh*), Bash(bash *design-alignment-cross-review/scripts/prepare.sh*), Bash(bash *design-alignment-cross-review/scripts/review.sh*), Read, Grep, Glob, Write(//**/artifacts/design-alignment-cross-review/**), Edit(//**/artifacts/design-alignment-cross-review/**)
+allowed-tools: Bash(bash *architecture-alignment-cross-review/scripts/new-run.sh*), Bash(bash *architecture-alignment-cross-review/scripts/prepare.sh*), Bash(bash *architecture-alignment-cross-review/scripts/review.sh*), Read, Grep, Glob, Write(//**/artifacts/architecture-alignment-cross-review/**), Edit(//**/artifacts/architecture-alignment-cross-review/**)
 ---
 
 # Sol と Opus による設計への適合のレビュー
@@ -10,7 +10,7 @@ allowed-tools: Bash(bash *design-alignment-cross-review/scripts/new-run.sh*), Ba
 引数: $ARGUMENTS
 Claude の推論レベル: ${CLAUDE_EFFORT}
 
-Claude が実装した変更が、対象プロジェクトの既存の設計（明文化された方針と、複数の実装から読み取れる慣習）に沿っているかを、Sol（Codex CLI の GPT-6.1 Sol）と Opus（`opus-reviewer`）に**同じ依頼で**確かめさせ、根拠のある逸脱を Claude が直す。正しさ・バグ・セキュリティは implementation-cross-review が見るので、ここでは扱わない。設計に合わせる直しは責務やファイルの移動になりやすいので、正しさのレビューより先に形を整える。差分の取り出し・プロンプトの組み立て・Codex の呼び出しと再試行はスクリプトに任せ、Claude は「決定事項をまとめる」「指摘を確かめて判断する」「採用した指摘を直す」だけを行う。結果は `artifacts/design-alignment-cross-review/` に保存される。
+Claude が実装した変更が、対象プロジェクトの既存の設計（明文化された方針と、複数の実装から読み取れる慣習）に沿っているかを、Sol（Codex CLI の GPT-6.1 Sol）と Opus（`opus-reviewer`）に**同じ依頼で**確かめさせ、根拠のある逸脱を Claude が直す。正しさ・バグ・セキュリティは implementation-cross-review が見るので、ここでは扱わない。設計に合わせる直しは責務やファイルの移動になりやすいので、正しさのレビューより先に形を整える。差分の取り出し・プロンプトの組み立て・Codex の呼び出しと再試行はスクリプトに任せ、Claude は「決定事項をまとめる」「指摘を確かめて判断する」「採用した指摘を直す」だけを行う。結果は `artifacts/architecture-alignment-cross-review/` に保存される。
 
 ## 自分の判断で使うとき
 
@@ -30,7 +30,7 @@ Claude が実装した変更が、対象プロジェクトの既存の設計（�
 - 意味を変えない修正: typo・整形・コメントだけの変更、自動生成ファイルの再生成だけの変更
 - 動作を決めない文書（README など）だけの変更、依存パッケージのバージョンだけを変える変更
 - プロジェクトに設計の手がかりがほとんどない（作り始めたばかりで、比べる実装がない）
-- codebase-cleanup-workflow の工程の中（工程 1 の design-alignment-refactor が同じ観点を受け持つため）
+- codebase-cleanup-workflow の工程の中（工程 1 の architecture-alignment-refactor が同じ観点を受け持つため）
 - ユーザーが「不要」と言っている
 - 対象が git リポジトリでない
 
@@ -116,7 +116,7 @@ Opus は Agent ツールで呼ぶ。
 2. ユーザーの決定（決定事項・会話）に反する → **要確認**
 3. 合わせると、要件・受け入れ条件か、この変更より前からある振る舞いが変わる → **要確認**
 4. 書き方が 2 つ以上並び、今の方針がどちらか確かめられない、または文書と実装が矛盾する → **保留**
-5. 直しがこの差分の外（ほかのコード）に及ぶ → **見送り**（design-alignment-refactor を勧める）
+5. 直しがこの差分の外（ほかのコード）に及ぶ → **見送り**（architecture-alignment-refactor を勧める）
 6. 今も有効な明文化された方針（根拠は 1 か所でよい）、または 2 か所以上の慣習からの逸脱 → **採用**
 
 判断の表、各レビューの実行状態（成功・失敗と試行の回数）、件数の行を `<実行フォルダ>/decisions.md` に Write で保存する。どれも結果を返さなかった回も残す。
