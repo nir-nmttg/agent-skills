@@ -1,9 +1,13 @@
 ---
 name: security-audit-item-to-issue
-description: security-audit-to-issues の集約 Issue の項目を手元で調べ、確定なら個別 Issue にしてラベルを付け、集約 Issue のサブ Issue にして本文を更新する。「A03 を Issue 化して」などの依頼で使う。
+description: security-audit-to-issues の集約 Issue の項目を手元で調べ、確定なら個別 Issue にしてラベルを付け、集約 Issue のサブ Issue にして本文を更新する。
+disable-model-invocation: true
+argument-hint: "<集約 Issue の URL か番号> <項目の番号（A03 など。複数可）>"
 ---
 
 # 集約 Issue の項目を調べて Issue にする
+
+引数: $ARGUMENTS
 
 security-audit-to-issues が作った集約 Issue（`[yyyy-mm-dd] セキュリティ監査の調査・判定一覧`）の項目（`A03` など）を、手元の環境で調べ直す。確定と判断したら個別 Issue にし、集約 Issue をその結果に合わせて更新する。
 

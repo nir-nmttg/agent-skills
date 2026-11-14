@@ -53,7 +53,6 @@ Claude Code は Opus 5.5 の推論レベル high で動かすことを推奨す�
 | [architecture-alignment-cross-review](.claude/skills/architecture-alignment-cross-review/SKILL.md) | 差分が既存の設計に沿っているかを Sol と Opus に確かめさせて直す | 構造を選ぶ実装のテストの後 |
 | [ui-behavior-check](.claude/skills/ui-behavior-check/SKILL.md) | 開発サーバーを起動し、画面を操作して動作を確かめる | Web の画面に出る変更の後 |
 | [implementation-cross-review](.claude/skills/implementation-cross-review/SKILL.md) | 差分を Astra と Fable にレビューさせて直す | 完了報告・コミット・PR の前 |
-| [security-audit-item-to-issue](.claude/skills/security-audit-item-to-issue/SKILL.md) | 監査の集約 Issue の項目を調べ、確定なら個別 Issue にしてサブ Issue に加え、集約 Issue を更新する | 集約 Issue の項目の Issue 化を頼まれたとき |
 | [japanese-report](.claude/skills/japanese-report/SKILL.md) | 報告を自然な日本語で書く | 結果を報告する前 |
 
 ### リファクタリング用スキル
@@ -80,6 +79,7 @@ Claude Code は Opus 5.5 の推論レベル high で動かすことを推奨す�
 | [gh-todo](.claude/skills/gh-todo/SKILL.md) | レビュー依頼・メンション・自分の Issue / PR を一覧にする |
 | [browser-readonly-research](.claude/skills/browser-readonly-research/SKILL.md) | Web ページを読むだけで調べてまとめる |
 | [gh-issue-autofix](.claude/skills/gh-issue-autofix/SKILL.md) | `agent:autofix` ラベルの Issue を 1 件、質問せずに対応し、同じラベルのドラフト PR にする |
+| [security-audit-item-to-issue](.claude/skills/security-audit-item-to-issue/SKILL.md) | 監査の集約 Issue の項目を調べ、確定なら個別 Issue にしてサブ Issue に加え、集約 Issue を更新する |
 | [skills-update](.claude/skills/skills-update/SKILL.md) | このスキル集を最新に取り込み、Claude Code・Codex へリンクし直して、使えるスキルを確かめる |
 
 ## Codex 用スキル一覧
