@@ -72,8 +72,8 @@ if [[ $MODE == new ]]; then
     die "$BRANCH を push できません（権限・ブランチの保護・ネットワークを確かめてください）。
 $out"
   fi
-  # これより後の失敗では、確保した着手を呼び出し元が release.sh で取り消せるように知らせる
-  trap 'rc=$?; ((rc == 0)) || echo "着手は確保済み: この実行がリモートに $BRANCH を作りました（release.sh $NUMBER で取り消せます）。" >&2' EXIT
+  # これより後の失敗では、着手を確保したことと、呼び出し元が release.sh で worktree を片付けられることを知らせる
+  trap 'rc=$?; ((rc == 0)) || echo "着手は確保済み: この実行がリモートに $BRANCH を作りました（release.sh $NUMBER で worktree を片付けられます。着手は残ります）。" >&2' EXIT
   state="新規（$BASE_REF の先頭から）"
 else
   if [[ -n $remote ]]; then
