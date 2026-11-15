@@ -1,5 +1,5 @@
 ---
-name: security-audit-to-issues
+name: security-audit-sync-issues
 description: Cloudflare の security-audit で自律監査し、非公開リポジトリに確定所見の修正 Issue と実行ごとの調査・判定一覧を作成・更新する。
 ---
 
@@ -15,15 +15,15 @@ description: Cloudflare の security-audit で自律監査し、非公開リポ�
 ## 引数を確かめる
 
 ```text
-$security-audit-to-issues [--profile quick|standard|deep]
+$security-audit-sync-issues [--profile quick|standard|deep]
 ```
 
-- `--profile` の既定値は `standard`。指定があれば `quick`・`standard`・`deep` のいずれかを、そのまま元スキルに渡す。それ以外の値が指定された場合は使える値を案内し、監査を保留する。
+- `--profile` の既定値は `deep`。指定された `quick`・`standard`・`deep` のいずれか、未指定なら `deep` を、元スキルにプロファイルとして明示して渡す（元スキルの既定は `standard` なので任せない）。それ以外の値が指定された場合は使える値を案内し、監査を保留する。
 - `git rev-parse --show-toplevel` で監査対象を確かめる。Git リポジトリを特定できない場合は、監査するプロジェクトの直下で実行するよう案内する。
 
 ## 人の応答を待たずに進める
 
-- スケジュールには対象プロジェクトとこのスキルの呼び出しを設定し、同じリポジトリへの Issue 反映を同時実行1件にする。実行時のプロファイル・範囲・予算は指定を使う。未指定ならプロファイルは `standard`、範囲はリポジトリ全体、元スキルの `budget` は `null` とする。
+- スケジュールには対象プロジェクトとこのスキルの呼び出しを設定し、同じリポジトリへの Issue 反映を同時実行1件にする。実行時のプロファイル・範囲・予算は指定を使う。未指定ならプロファイルは `deep`、範囲はリポジトリ全体、元スキルの `budget` は `null` とする。
 - 調査中に判断材料や権限が不足したら、理由と追加調査の方法を記録して、独立して進められる作業を続ける。予算不足や曖昧な登録先も保留理由に記録する。プロファイル・範囲・予算の変更が必要な項目は、再開条件として残す。
 - 監査の完了状況と Issue 反映の完了状況を別々に記録する。反映できる結果を最後まで処理し、未解決事項を集約 Issue と最終報告に残す。
 

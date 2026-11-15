@@ -18,7 +18,7 @@ Codex の安全審査は、詳細が集まる Coordinator のターンを途中�
 Coordinator への指示には次だけを書く。
 
 ```text
-あなたは $security-audit-to-issues の Coordinator です。<このスキルの SKILL.md の絶対パス> の「Supervisor と Coordinator に分けて進める」にある Coordinator の役目に従ってください。
+あなたは $security-audit-sync-issues の Coordinator です。<このスキルの SKILL.md の絶対パス> の「Supervisor と Coordinator に分けて進める」にある Coordinator の役目に従ってください。
 - 出力先には、作成済みの <RUN_DIR> を使ってください。
 - フル監査です。プロファイル: <profile>、範囲: <範囲>、予算: <budget または null>。
 - ターンを終えるときは、SKILL.md の状態報告の JSON だけを最終回答にしてください。
