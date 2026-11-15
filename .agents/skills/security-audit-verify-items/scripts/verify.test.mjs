@@ -15,7 +15,7 @@ function details(id, title, extra = []) {
   return [`<details><summary><b>${id}</b> ${title}</summary>`, "", "- **概要**: 説明。", ...extra, `- **ID**: \`fp-${id}\``, "", "</details>", ""];
 }
 
-function body({ confirmed = [], needs = ["A02", "A03"], rejected = [], extra = {} } = {}) {
+function body({ confirmed = [], needs = ["A02", "A03"], rejected = [], extra = {}, checks = {} } = {}) {
   const section = (name, ids, header) => {
     if (ids.length === 0) return [`## ${name}（0件）`, "", "0件。", ""];
     return [
@@ -23,7 +23,7 @@ function body({ confirmed = [], needs = ["A02", "A03"], rejected = [], extra = {
       "",
       header,
       "| --- | --- | --- |",
-      ...ids.map((id) => `| ${id} | 領域 | 題名${id} |`),
+      ...ids.map((id) => `| ${id} | 領域 | 題名${id} |${Object.hasOwn(checks, id) ? ` ${checks[id]} |` : ""}`),
       "",
       ...ids.flatMap((id) => details(id, `題名${id}`, extra[id] ?? [])),
     ];
@@ -79,6 +79,45 @@ test("items は区画の外や別の項目の詳細にある印を見ない", ()
   assert.deepEqual(run(["items", SHA], { body: text }).out.split("\n").slice(1), ["A02 todo", "A03 todo"]);
   const wrong = body({ needs: ["A02", "A03"], extra: { A02: [marker("A03", SHA, "held")] } });
   assert.deepEqual([run(["items", SHA], { body: wrong }).code, run(["items", SHA], { body: wrong }).out], [2, "marker_invalid:A02"]);
+});
+
+test("items は判定に必要な確認が人の確認だけの項目を manual にし、ほかは調べ直す", () => {
+  const checks = {
+    A02: "仕様確認",
+    A03: "環境・権限の確認",
+    A04: "仕様確認、環境・権限の確認",
+    A05: "仕様確認、ローカル検証",
+    A06: "ローカル検証",
+    A07: "その他",
+    A08: "",
+    A09: "未知の語",
+  };
+  const needs = Object.keys(checks);
+  // manual は同じ SHA の印より先に見る
+  const text = body({ needs, checks, extra: { A02: [marker("A02", SHA, "undetermined")], A06: [marker("A06", SHA, "undetermined")] } });
+  const expected = [
+    "A02 manual",
+    "A03 manual",
+    "A04 manual",
+    "A05 todo",
+    "A06 skip",
+    "A07 todo",
+    "A08 todo",
+    "A09 todo",
+  ];
+  assert.deepEqual(run(["items", SHA], { body: text }).out.split("\n").slice(1), expected);
+  assert.deepEqual(run(["items", SHA], { body: text.replace(/\n/g, "\r\n") }).out.split("\n").slice(1), expected);
+});
+
+test("items は判定に必要な確認の列を見出しと列数で確かめられないとき調べ直す", () => {
+  const out = (text) => run(["items", SHA], { body: text }).out.split("\n").slice(1);
+  // 列のない行
+  assert.deepEqual(out(body({ needs: ["A02"] })), ["A02 todo"]);
+  // 見出しの最後の列が別の列
+  const otherHeader = body({ needs: ["A02"], checks: { A02: "仕様確認" } }).replace("| No. | 領域 | 題名 | 判定に必要な確認 |", "| No. | 領域 | 題名 | 備考 |");
+  assert.deepEqual(out(otherHeader), ["A02 todo"]);
+  // 行のセルが見出しより多い
+  assert.deepEqual(out(body({ needs: ["A02"], checks: { A02: "ローカル検証 | 仕様確認" } })), ["A02 todo"]);
 });
 
 test("items は要検証が 0 件・A100・CRLF を扱える", () => {

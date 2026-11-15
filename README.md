@@ -91,7 +91,7 @@ Claude Code は Opus 5.5 の推論レベル high で動かすことを推奨す�
 | --- | --- |
 | [minor-version-upgrade](.agents/skills/minor-version-upgrade/SKILL.md) | ランタイムと依存を、互換性を保つ範囲で更新する |
 | [security-audit-sync-issues](.agents/skills/security-audit-sync-issues/SKILL.md) | 自律監査で確定所見の修正 Issue と全判定の集約 Issue を作成・更新し、修正 Issue を集約 Issue のサブ Issue にして、自動修正できる項目にラベルを付ける |
-| [security-audit-verify-items](.agents/skills/security-audit-verify-items/SKILL.md) | 集約 Issue の要検証をすべて調べ直し、確定は修正 Issue にしてサブ Issue に加え、棄却・判断できないも集約 Issue に反映する |
+| [security-audit-verify-items](.agents/skills/security-audit-verify-items/SKILL.md) | 集約 Issue の要検証のうち手元で確かめられるものを調べ直し、確定は修正 Issue にしてサブ Issue に加え、棄却・判断できないも集約 Issue に反映する |
 
 ## 開発以外のスキル
 
@@ -109,7 +109,9 @@ Codex の [security-audit-sync-issues](.agents/skills/security-audit-sync-issues
    確定所見が修正 Issue に、全判定が集約 Issue になる。\
    修正 Issue は集約 Issue のサブ Issue になり、自動で直せるものに `agent:autofix` が付く。
 2. **調べ直す**: 同じリポジトリで、Codex から `$security-audit-verify-items` を呼ぶ。\
-   最新の集約 Issue の要検証を順にすべて調べ直し、確定は修正 Issue になり、棄却・判断できないも集約 Issue に残る。\
+   最新の集約 Issue の要検証のうち、手元で確かめられるもの（判定に必要な確認に `ローカル検証` か `その他` を含むもの）を順に調べ直す。\
+   確定は修正 Issue になり、棄却・判断できないも集約 Issue に残る。\
+   仕様確認や環境・権限の確認だけが要る項目は、調べずに要検証のまま残す。\
    予定実行で動かすときは、1 つの予定実行で 1. を終えてから呼ぶ（同じリポジトリで 2 つを同時に動かさない）。
 3. **自動で対応させる**: 対応させる Issue を自分にアサインし（番号を渡すなら不要）、同じリポジトリで Claude Code から `/gh-issue-autofix` を呼ぶ。\
    質問せずに進めるので、無人で動かすときは権限の確認が出ない権限モード（auto モードなど）のセッションで呼ぶ。\

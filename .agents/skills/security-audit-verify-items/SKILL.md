@@ -1,11 +1,19 @@
 ---
 name: security-audit-verify-items
-description: セキュリティ監査の集約 Issue の要検証を順に調べ直し、確定は修正 Issue にしてサブ Issue に加え、棄却・判断できないも集約 Issue に反映する。
+description: セキュリティ監査の集約 Issue の要検証のうち手元で確かめられるものを調べ直し、確定は修正 Issue にしてサブ Issue に加え、棄却・判断できないも集約 Issue に反映する。
 ---
 
 # 集約 Issue の要検証を調べ直す
 
-security-audit-sync-issues が作った集約 Issue（`[yyyy-mm-dd] セキュリティ監査の調査・判定一覧`）の「要検証」の項目を、表の順にすべて手元で調べ直し、結果を Issue に反映する。人に確認せずに最後まで進むので、予定実行でも手で呼んでも同じように動く。修正は Claude Code の gh-issue-autofix が受け持つ。
+security-audit-sync-issues が作った集約 Issue（`[yyyy-mm-dd] セキュリティ監査の調査・判定一覧`）の「要検証」の項目のうち、手元で確かめられるものを表の順に調べ直し、結果を Issue に反映する。人に確認せずに最後まで進むので、予定実行でも手で呼んでも同じように動く。修正は Claude Code の gh-issue-autofix が受け持つ。
+
+## 調べ直す項目
+
+Verifier にできるのは、指定コミットの作業ツリーでコードを読むことと、開発用の環境で動かすことだけなので、それで決着をつけられる項目に絞る。
+
+- **対象**: 要検証の一覧表の「判定に必要な確認」に `ローカル検証` か `その他` を含む項目。列が空・書式にない語を含む・列がない・列数が見出しと違う項目も、取りこぼさないよう対象にする。
+- **対象外（人が確かめる）**: 「判定に必要な確認」が `仕様確認` と `環境・権限の確認` だけの項目。所有者の意図やデプロイ先の設定は手元では決められないので、調べずに要検証のまま残す。
+- 要検証のほかの区分（確定・未検証・棄却・未完了の工程・範囲）は調べ直さない。
 
 ## 呼び方
 
@@ -30,7 +38,7 @@ $security-audit-verify-items [<集約 Issue の URL か番号>]
 
 Codex の安全審査（`cyber_policy`）は、脆弱性の詳細を扱うターンを途中で終わらせることがある。このスキルを呼び出したエージェント（**Supervisor**）は項目の詳細を読まず、番号ごとに 1 体のサブエージェント（**Verifier**）を `spawn_agent` で起動して任せる。集約 Issue の書き換えがぶつからないよう、Verifier は 1 体ずつ順に動かす。
 
-Supervisor は Verifier の役目を自分で行わない。最初の 1 体も起動できない（`spawn_agent` がない・失敗した）ときは、詳細を読まずに全番号を「未処理」として [3. 結果をまとめて片付ける](#3-結果をまとめて片付けるsupervisor) に進む。
+Supervisor は Verifier の役目を自分で行わない。最初の 1 体も起動できない（`spawn_agent` がない・失敗した）ときは、詳細を読まずに `todo` の番号をすべて「未処理」として [3. 結果をまとめて片付ける](#3-結果をまとめて片付けるsupervisor) に進む。
 
 ## 1. 前提を確かめて準備する（Supervisor）
 
@@ -42,10 +50,10 @@ Supervisor は Verifier の役目を自分で行わない。最初の 1 体も�
 4. 排他: `VERIFY lock ~/security-audit-skill/<repo-name>/verify acquire`（`<repo-name>` は `REPO` のリポジトリ名、パスは絶対パスに展開する）。出力 `acquired <印>` の印を控え、以降の `touch`・`release` に渡す。終了コード 2（`locked`。ほかの実行が使用中か、引き継ぎ中）なら、`release` せず、何も書かずに報告して終える。3 時間更新のないロックは引き継がれる（出力の末尾が `stale`）。Verifier を待つあいだは待ち直すたびに、番号を 1 つ終えるたびに `VERIFY lock <同じフォルダ> touch <印>` を実行し、終えるとき（途中で終えるときも）は `release <印>` する。`touch` が `not_owner` を返したら（ロックを引き継がれた）、それ以上書き込まず、作業ツリーも消さずに（引き継いだ実行が使うため）報告して終える。動いている実行がないのに `locked` が続くときは、人が `<同じフォルダ>/lock` と `<同じフォルダ>/lock.takeover` を消す。
 5. 実行中の監査: `VERIFY busy ~/security-audit-skill/<repo-name>` が `busy` なら、何も書かずに出力の実行名を報告して終える。見るのは sync-issues の最新の実行（`run-<N>` の N が最大のもの）の段階だけ。その実行が止まったままなら、人が sync-issues で続けて終えるまで、このスキルは書き込まない。
 6. `git fetch origin <既定ブランチ>` が成功したときだけ進む（失敗したら古いコミットで進めず報告する）。`VERIFY_SHA` を `origin/<既定ブランチ>` の完全な SHA に固定し、全項目で使う。
-7. `gh issue view <集約 Issue> --repo "$ISSUE_REPO" --json body,state | VERIFY items "$VERIFY_SHA"` で番号を取り出す。終了コード 2（閉じている `issue_not_open` を含む）なら何も書かずに理由の語を報告する。出力は `chars <本文の文字数>` と、番号ごとの `todo` / `skip`。`skip` は同じコミットで調べ直し済み（判断できない・保留、または 2 回止まった）の項目。`chars` が 58,000 を超えるときは、調べ直しの箇条を足すと上限（60,000 字）を超えうるので、調べずに報告して終える。
+7. `gh issue view <集約 Issue> --repo "$ISSUE_REPO" --json body,state | VERIFY items "$VERIFY_SHA"` で番号を取り出す。終了コード 2（閉じている `issue_not_open` を含む）なら何も書かずに理由の語を報告する。出力は `chars <本文の文字数>` と、番号ごとの `todo` / `skip` / `manual`。`skip` は同じコミットで調べ直し済み（判断できない・保留、または 2 回止まった）の項目、`manual` は [調べ直す項目](#調べ直す項目) の対象外（人が確かめる）の項目。`chars` が 58,000 を超えるときは、調べ直しの箇条を足すと上限（60,000 字）を超えうるので、調べずに報告して終える。
 8. 作業ツリー: `~/security-audit-skill/<repo-name>/verify/worktree` に前回の残りがあれば `git worktree remove --force` と `git worktree prune` で片付け、`git worktree add --detach <パス> "$VERIFY_SHA"` で作る。終えるとき（途中で終えるときも）は消す。手元の作業ツリーと未コミットの変更には頼らない。
 
-`todo` が 0 件なら、片付けて報告する。
+`todo` が 0 件なら、結果のコメントを付けずに片付けて報告する。
 
 ## 2. 番号ごとに Verifier に任せる（Supervisor）
 
@@ -72,9 +80,9 @@ Supervisor は Verifier の役目を自分で行わない。最初の 1 体も�
 
 ## 3. 結果をまとめて片付ける（Supervisor）
 
-1. 集約 Issue に、結果のコメントを 1 件付ける。日付、`VERIFY_SHA`、確定・棄却・判断できない・保留・停止・飛ばした・未処理・報告と合わないの件数と番号、作った・使った修正 Issue の URL だけを書き、項目の中身は書かない。
+1. 集約 Issue に、結果のコメントを 1 件付ける。日付、`VERIFY_SHA`、確定・棄却・判断できない・保留・停止・飛ばした・人が確かめる・未処理・報告と合わないの件数と番号、作った・使った修正 Issue の URL だけを書き、項目の中身は書かない。
 2. 作業ツリーを消し、ロックを `release <印>` する。
-3. 日本語で報告する: 集約 Issue の URL と作成者、`VERIFY_SHA`、番号ごとの結果、作った・使った修正 Issue の URL と `agent:autofix` の有無、結果のコメントの URL、書けなかったものとその理由。
+3. 日本語で報告する: 集約 Issue の URL と作成者、`VERIFY_SHA`、番号ごとの結果（`skip`・`manual` の番号を含む）、作った・使った修正 Issue の URL と `agent:autofix` の有無、結果のコメントの URL、書けなかったものとその理由。
 
 ## Verifier の役目
 

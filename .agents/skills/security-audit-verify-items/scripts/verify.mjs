@@ -11,6 +11,8 @@ const SECTIONS = { 確定: "confirmed", 要検証: "needs_validation", 未検証
 const REQUIRED = ["確定", "要検証", "未検証", "棄却"];
 const BUSY_STAGES = ["starting", "auditing", "self_auditing"];
 const SKIP_RESULTS = ["undetermined", "held"];
+// 要検証の「判定に必要な確認」のうち、手元では確かめられず人が確かめる語。列がこれだけの項目は調べ直さない
+const MANUAL_CHECKS = ["仕様確認", "環境・権限の確認"];
 const TITLE = /^\[(\d{4}-\d{2}-\d{2})\] セキュリティ監査の調査・判定一覧$/;
 const SHA = /^[0-9a-f]{40}(?:[0-9a-f]{24})?$/;
 const ITEM_ID = /^A\d{2,}$/;
@@ -133,6 +135,7 @@ export function parse(text) {
       rest.push(line.replace(/\d+/g, "#"));
       continue;
     }
+    if (current && /^\|\s*No\./.test(line)) sections[current].header = line;
     // 区分が空になる・空でなくなるときに増減する行（「0件。」・一覧表の見出しと区切り）は比べない
     if (line.trim() === "0件。" || /^\|\s*(No\.|-{3,})/.test(line)) continue;
     rest.push(line);
@@ -186,6 +189,20 @@ function skipped(marker, sha) {
   return marker.result === "stopped" && marker.stops >= 2;
 }
 
+function cells(row) {
+  return row.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((c) => c.trim());
+}
+
+// 要検証の一覧表の行の「判定に必要な確認」が、人が確かめる語だけか。
+// 見出しの最後の列がその列で、行の列数が見出しと同じときだけ読む。
+// 列がない・列数が違う・列が空・語が書式にない・ほかの語を含むときは、取りこぼさないよう調べ直す側に倒す
+function manual(row, header) {
+  const head = header ? cells(header) : [];
+  const cols = cells(row);
+  if (head[head.length - 1] !== "判定に必要な確認" || cols.length !== head.length) return false;
+  return cols[cols.length - 1].split("、").every((w) => MANUAL_CHECKS.includes(w.trim()));
+}
+
 function cmdPick() {
   const list = readStdinJson();
   if (!Array.isArray(list)) fail("Issue の一覧の JSON 配列を渡してください");
@@ -202,9 +219,11 @@ function cmdItems(args) {
   const sha = shaArg(args[0]);
   const p = parse(issueBody(readStdinJson()));
   const out = [`chars ${p.chars}`];
-  for (const id of p.sections["要検証"].rows) {
+  const { rows, header } = p.sections["要検証"];
+  for (const id of rows) {
     if (!ITEM_ID.test(id)) broken(`item_id:${id}`);
-    out.push(`${id} ${skipped(p.items.get(id).marker, sha) ? "skip" : "todo"}`);
+    const it = p.items.get(id);
+    out.push(`${id} ${manual(it.row, header) ? "manual" : skipped(it.marker, sha) ? "skip" : "todo"}`);
   }
   return out.join("\n");
 }
