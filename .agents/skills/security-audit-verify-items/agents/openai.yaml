@@ -1,6 +1,6 @@
 interface:
-  short_description: "[<集約 Issue>] 集約 Issue の要検証をすべて調べ直し、確定を修正 Issue にする"
-  default_prompt: "$security-audit-verify-items を使って、このリポジトリの最新の集約 Issue の要検証をすべて調べ直し、確定したものを修正 Issue にしてください。"
+  short_description: "[<集約 Issue>] 集約 Issue の要検証のうち手元で確かめられるものを調べ直し、確定を修正 Issue にする"
+  default_prompt: "$security-audit-verify-items を使って、このリポジトリの最新の集約 Issue の要検証のうち手元で確かめられるものを調べ直し、確定したものを修正 Issue にしてください。"
 
 policy:
   allow_implicit_invocation: false
