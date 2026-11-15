@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // security-audit-verify-items の定型処理。集約 Issue の本文を読み、番号・決まった語・SHA・数だけを出す（項目の中身は出さない）。
 // mark だけは書き込む本文を出すので、呼び出し側はファイルに書いて読まない。
+// Claude Code 版（.claude/skills/security-audit-verify-items/scripts/verify.sh）からも共有して使うので、変えるときは両方の SKILL.md と合わせる。
 import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
