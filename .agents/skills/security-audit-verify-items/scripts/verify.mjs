@@ -341,7 +341,7 @@ function cmdBusy(args) {
 }
 
 // verify-items どうしの排他。acquire が返す持ち主の印を touch・release に渡す。
-// Supervisor は待つあいだも touch し、3 時間更新のないロックは 1 つの実行だけが引き継ぐ。
+// Codex 版は Supervisor が待つあいだも、Claude Code 版は Verifier が書き込む前に touch する。3 時間更新のないロックは 1 つの実行だけが引き継ぐ。
 function cmdLock(args) {
   const dir = dirArg(args[0]);
   const lock = path.join(dir, "lock");
