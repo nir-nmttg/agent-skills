@@ -108,7 +108,7 @@ Codex 用は `$スキル名`、Claude Code 用は `/スキル名` で指定し�
 | security-audit-sync-issues | [Codex](.agents/skills/security-audit-sync-issues/SKILL.md) | 自律監査で確定所見の修正 Issue と全判定の集約 Issue を作成・更新し、修正 Issue を集約 Issue のサブ Issue にして、自動修正できる項目にラベルを付ける |
 | security-audit-verify-items | [Codex](.agents/skills/security-audit-verify-items/SKILL.md)・[Claude Code](.claude/skills/security-audit-verify-items/SKILL.md) | 集約 Issue の要検証のうち手元で確かめられるものを調べ直し、確定は修正 Issue にしてサブ Issue に加え、棄却・判断できないも集約 Issue に反映する |
 
-### 流れ
+### 監査から修正の PR までの手順
 
 上の 2 本と、Claude Code の [gh-issue-autofix](.claude/skills/gh-issue-autofix/SKILL.md) をつなぐと、監査 → Issue 化 → 自動対応 → ドラフト PR まで進められる。
 
