@@ -1,8 +1,8 @@
 # agent-skills
 
 Claude Code と Codex 向けの、特定のプロジェクトに依存しない汎用スキル集。\
-Claude Code は開発と整備（リファクタリング）に、Codex は依存の更新とセキュリティ監査に使う。\
-セキュリティ監査で見つかった問題の修正（自動対応）は Claude Code で行い、要検証の調べ直しはどちらでもできる。\
+Claude Code は開発と整備（リファクタリング）に、Codex は依存の更新に使う。\
+セキュリティ監査は両方を組み合わせ、Codex で監査し、見つかった問題の修正（自動対応）は Claude Code で行う（要検証の調べ直しはどちらでもできる）。\
 開発以外の作業に使うスキルもある。\
 Claude は作業の一部を Haiku 5.5・Fable 5.2・Opus 5.5 のサブエージェントや Codex CLI（GPT-6 Astra・GPT-6.1 Sol）に任せ、指示・採否・反映を受け持つ。\
 Claude Code は Opus 5.5 の推論レベル high で動かすことを推奨する。
@@ -73,14 +73,13 @@ Claude Code は Opus 5.5 の推論レベル high で動かすことを推奨す�
 
 ### 指定して使うスキル
 
-次の作業の提案、GitHub の Issue / PR の対応、セキュリティ監査の要検証の調べ直し、Web での調査、このスキル集の更新など、必要なときに呼ぶ。
+次の作業の提案、GitHub の Issue / PR の対応、Web での調査、このスキル集の更新など、必要なときに呼ぶ。
 
 | スキル | できること |
 | --- | --- |
 | [whats-next](.claude/skills/whats-next/SKILL.md) | 進捗と次のアクションを 1 つ示し、承認後に進める |
 | [gh-todo](.claude/skills/gh-todo/SKILL.md) | レビュー依頼・メンション・自分の Issue / PR を一覧にする |
 | [browser-readonly-research](.claude/skills/browser-readonly-research/SKILL.md) | Web ページを読むだけで調べてまとめる |
-| [security-audit-verify-items](.claude/skills/security-audit-verify-items/SKILL.md) | セキュリティ監査の集約 Issue の要検証のうち手元で確かめられるものを調べ直し、確定は修正 Issue にする（Codex 版と同じ動き） |
 | [gh-issue-autofix](.claude/skills/gh-issue-autofix/SKILL.md) | `agent:autofix` ラベルの Issue を 1 件、質問せずに対応し、同じラベルのドラフト PR にする |
 | [skills-update](.claude/skills/skills-update/SKILL.md) | このスキル集を最新に取り込み、Claude Code・Codex へリンクし直して、使えるスキルを確かめる |
 
@@ -91,8 +90,6 @@ Claude Code は Opus 5.5 の推論レベル high で動かすことを推奨す�
 | スキル | できること |
 | --- | --- |
 | [minor-version-upgrade](.agents/skills/minor-version-upgrade/SKILL.md) | ランタイムと依存を、互換性を保つ範囲で更新する |
-| [security-audit-sync-issues](.agents/skills/security-audit-sync-issues/SKILL.md) | 自律監査で確定所見の修正 Issue と全判定の集約 Issue を作成・更新し、修正 Issue を集約 Issue のサブ Issue にして、自動修正できる項目にラベルを付ける |
-| [security-audit-verify-items](.agents/skills/security-audit-verify-items/SKILL.md) | 集約 Issue の要検証のうち手元で確かめられるものを調べ直し、確定は修正 Issue にしてサブ Issue に加え、棄却・判断できないも集約 Issue に反映する |
 
 ## 開発以外のスキル
 
@@ -102,9 +99,18 @@ Codex 用は `$スキル名` で指定したときだけ使う。
 | --- | --- | --- |
 | [rename-files-by-content](.agents/skills/rename-files-by-content/SKILL.md) | Codex | ファイルを内容から `YYYY-MM-DD_名前` に改名する |
 
-## セキュリティ監査の流れ
+## セキュリティ監査スキル
 
-Codex の [security-audit-sync-issues](.agents/skills/security-audit-sync-issues/SKILL.md)、security-audit-verify-items（[Codex](.agents/skills/security-audit-verify-items/SKILL.md)・[Claude Code](.claude/skills/security-audit-verify-items/SKILL.md)）、Claude Code の [gh-issue-autofix](.claude/skills/gh-issue-autofix/SKILL.md) をつなぐと、監査 → Issue 化 → 自動対応 → ドラフト PR まで進められる。
+Codex 用は `$スキル名`、Claude Code 用は `/スキル名` で指定したときだけ使う。
+
+| スキル | エージェント | できること |
+| --- | --- | --- |
+| security-audit-sync-issues | [Codex](.agents/skills/security-audit-sync-issues/SKILL.md) | 自律監査で確定所見の修正 Issue と全判定の集約 Issue を作成・更新し、修正 Issue を集約 Issue のサブ Issue にして、自動修正できる項目にラベルを付ける |
+| security-audit-verify-items | [Codex](.agents/skills/security-audit-verify-items/SKILL.md)・[Claude Code](.claude/skills/security-audit-verify-items/SKILL.md) | 集約 Issue の要検証のうち手元で確かめられるものを調べ直し、確定は修正 Issue にしてサブ Issue に加え、棄却・判断できないも集約 Issue に反映する |
+
+### 流れ
+
+上の 2 本と、Claude Code の [gh-issue-autofix](.claude/skills/gh-issue-autofix/SKILL.md) をつなぐと、監査 → Issue 化 → 自動対応 → ドラフト PR まで進められる。
 
 1. **監査する**: 監査するプロジェクトの直下で、Codex から `$security-audit-sync-issues` を呼ぶ。\
    確定所見が修正 Issue に、全判定が集約 Issue になる。\
