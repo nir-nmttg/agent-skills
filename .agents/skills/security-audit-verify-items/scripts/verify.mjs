@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-// security-audit-verify-items の定型処理。集約 Issue の本文を読み、番号・決まった語・SHA・数・URL だけを出す（項目の中身は出さない）。
+// security-audit-verify-items の定型処理。集約 Issue の本文を読み、番号・決まった語・SHA・数だけを出す（項目の中身は出さない）。
+// mark だけは書き込む本文を出すので、呼び出し側はファイルに書いて読まない。
 import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";

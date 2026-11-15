@@ -24,7 +24,7 @@ $security-audit-verify-items [<集約 Issue の URL か番号>]
 - 本番の環境・データには触れない。
 - 書式は [Issue 本文の書式](../security-audit-sync-issues/references/issue-templates.md)、照合・ラベル・サブ Issue・自動修正の条件は [Issue に反映する手順](../security-audit-sync-issues/references/issue-sync.md) に従う。
 - 用語: **番号** は集約 Issue の一覧表の No.（`A03` など、集約 Issue の中でだけ一意）。**fingerprint** は項目の詳細の **ID** の箇条の値。修正 Issue の `security-audit:fingerprint` には fingerprint を書き、番号は使わない。
-- 以下、`VERIFY` はこのスキルのフォルダにある `scripts/verify.mjs` を `node` で実行することを表す。集約 Issue の本文は `gh` の JSON をパイプで `VERIFY` に直接渡し、Supervisor は本文を読まず、自分の出力にも出さない。`VERIFY` の終了コード 2 は集約 Issue の構造の異常（出力は理由の語）、3 は引数の誤り。
+- 以下、`VERIFY` はこのスキルのフォルダにある `scripts/verify.mjs` を `node` で実行することを表す。集約 Issue の本文は `gh` の JSON をパイプで `VERIFY` に直接渡し、Supervisor は本文を読まず、自分の出力にも出さない。`VERIFY` の終了コード 2 は進められない状態（集約 Issue の構造の異常、対象の集約 Issue がない、ロックの使用中など。出力は理由の語）、3 は引数の誤り。
 
 ## Supervisor と Verifier に分ける
 
@@ -72,7 +72,7 @@ Supervisor は Verifier の役目を自分で行わない。最初の 1 体も�
 
 ## 3. 結果をまとめて片付ける（Supervisor）
 
-1. 集約 Issue に、結果のコメントを 1 件付ける（書き込む直前に [4. 集約 Issue に書き込む](#4-集約-issue-に書き込む) の 1. を確かめる）。日付、`VERIFY_SHA`、確定・棄却・判断できない・保留・停止・飛ばした・未処理・報告と合わないの件数と番号、作った・使った修正 Issue の URL だけを書き、項目の中身は書かない。
+1. 集約 Issue に、結果のコメントを 1 件付ける。日付、`VERIFY_SHA`、確定・棄却・判断できない・保留・停止・飛ばした・未処理・報告と合わないの件数と番号、作った・使った修正 Issue の URL だけを書き、項目の中身は書かない。
 2. 作業ツリーを消し、ロックを `release <印>` する。
 3. 日本語で報告する: 集約 Issue の URL と作成者、`VERIFY_SHA`、番号ごとの結果、作った・使った修正 Issue の URL と `agent:autofix` の有無、結果のコメントの URL、書けなかったものとその理由。
 
