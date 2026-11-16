@@ -1,6 +1,6 @@
 ---
 name: security-audit-verify-items
-description: セキュリティ監査の集約 Issue の項目（省くと要検証のすべて）を Verifier に並列で調べさせ、ユーザーと確かめてから修正 Issue と集約 Issue をまとめて更新する。
+description: セキュリティ監査の集約 Issue の項目（省くと要検証・未検証・未完了の工程・範囲のすべて）を Verifier に並列で調べさせ、ユーザーと確かめてから修正 Issue と集約 Issue をまとめて更新する。
 disable-model-invocation: true
 argument-hint: "[<集約 Issue の URL か番号>] [<項目の番号（A03・U01 など。複数可）>]"
 allowed-tools: Bash(bash *security-audit-verify-items/scripts/prepare.sh*), Bash(bash *security-audit-verify-items/scripts/cleanup.sh*), Bash(node *security-audit-verify-items/scripts/verify.mjs*), Write(//**/artifacts/security-audit-verify-items/**), Edit(//**/artifacts/security-audit-verify-items/**)
@@ -10,7 +10,7 @@ allowed-tools: Bash(bash *security-audit-verify-items/scripts/prepare.sh*), Bash
 
 引数: $ARGUMENTS
 
-Codex の security-audit-sync-issues が作った集約 Issue（`[yyyy-mm-dd] セキュリティ監査の調査・判定一覧`）の、ユーザーが指定した項目（省くと要検証のすべて）を調べ直す。区分は問わない（要検証・未検証・未完了の工程・範囲など）。項目ごとの調査は Verifier サブエージェントに並列で任せ、すべての結果をユーザーと確かめてから、確定を修正 Issue にし、集約 Issue をまとめて更新する。修正は gh-issue-autofix が受け持つ。
+Codex の security-audit-sync-issues が作った集約 Issue（`[yyyy-mm-dd] セキュリティ監査の調査・判定一覧`）の、ユーザーが指定した項目（省くと要検証・未検証・未完了の工程・範囲のすべて）を調べ直す。区分は問わない（要検証・未検証・未完了の工程・範囲など）。項目ごとの調査は Verifier サブエージェントに並列で任せ、すべての結果をユーザーと確かめてから、確定を修正 Issue にし、集約 Issue をまとめて更新する。修正は gh-issue-autofix が受け持つ。
 
 ## 呼び方
 
@@ -20,7 +20,7 @@ Codex の security-audit-sync-issues が作った集約 Issue（`[yyyy-mm-dd] �
 
 - 監査したプロジェクトの直下で実行する。
 - 集約 Issue を省くと、`origin` のリポジトリの開いている集約 Issue のうち、タイトルの日付が最も新しいもの（同じ日付なら作成が新しいもの）を使う。最初の引数が項目の番号なら、集約 Issue を省いたものとして扱う。見つからなければユーザーに聞く。自動で選んだときは、調べ始める前にその集約 Issue の URL とタイトルを伝える。
-- 番号を省くと、要検証の項目をすべて対象にする。調べ始める前に、要検証の番号・題名・判定に必要な確認を一覧で見せ、外す項目がないかをユーザーに確かめる。
+- 番号を省くと、要検証・未検証・未完了の工程・範囲の項目をすべて対象にする。調べ始める前に、区分ごとに番号・題名（未完了の工程・範囲は範囲）と、要検証は判定に必要な確認、未検証は停止した工程、未完了の工程・範囲は停止した工程と再開に必要なものを一覧で見せ、外す項目がないかをユーザーに確かめる。停止した工程が `Issue 反映` の項目は、ラベルや権限などの反映の保留で、Verifier が調べても決着しないことを添える。
 
 ## 守ること
 
@@ -54,7 +54,7 @@ Codex の security-audit-sync-issues が作った集約 Issue（`[yyyy-mm-dd] �
 5. 作業ツリーに依存を入れる。対象プロジェクトの README・CI に従い、ロックファイルを変えない形で、ライフサイクルスクリプトを止めて入れる（`npm ci --ignore-scripts` など）。入れられなければ、コマンドの実行と画面の確認が要る項目には「実行では確かめられない」と返す。
 6. 作業ツリーの `.env*`・設定ファイル・docker-compose を読み、接続先と外部連携を [ui-behavior-check](../ui-behavior-check/SKILL.md) の手順 2 の基準で確かめて、結果を `<run>/ledger/env-check.md` に書く（値は書かない）。開発用で外部へ送らないとわからなければ、`run` と `browser` は受けない。
 7. 集約 Issue の本文を `<run>/issues/summary.md` に、リポジトリの Issue の一覧（`gh api --hostname <host> --paginate --slurp "repos/<owner>/<repo>/issues?state=all&per_page=100"` から `pull_request` のある項目を除いたもの）を `<run>/issues/issues.json` に、全 Issue のコメント（`repos/<owner>/<repo>/issues/comments?per_page=100` を全ページ）を `<run>/issues/comments.json` に保存する。`VERIFY items <run>/issues/summary.md > <run>/ledger/start.json` で調査開始時の控えを取る。
-8. 対象を決める。番号を省いたときは `start.json` の `needs_validation` を一覧で見せ、外す項目を確かめる。
+8. 対象を決める。番号を省いたときは `start.json` の `default_targets`（要検証・未検証・未完了の工程・範囲の順）を一覧で見せ、外す項目を確かめる。
 
 ## 1. 調査（Verifier、並列）
 

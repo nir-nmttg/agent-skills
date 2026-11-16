@@ -14,7 +14,7 @@ function details(id, title, extra = []) {
   return [`<details><summary><b>${id}</b> ${title}</summary>`, "", "- **概要**: 説明。", ...extra, `- **ID**: \`fp-${id}\``, "", "</details>", ""];
 }
 
-function body({ confirmed = [], needs = ["A02", "A03"], rejected = [], incomplete = [], notes = [], extra = {}, incompleteNote = [] } = {}) {
+function body({ confirmed = [], needs = ["A02", "A03"], unverified = [], rejected = [], incomplete = [], notes = [], extra = {}, incompleteNote = [] } = {}) {
   const section = (name, ids, header, note = []) => {
     if (ids.length === 0) return [`## ${name}（0件）`, "", "0件。", ""];
     return [
@@ -39,10 +39,7 @@ function body({ confirmed = [], needs = ["A02", "A03"], rejected = [], incomplet
     "",
     ...section("確定", confirmed, "| No. | 影響評価 | 題名 | 対応状況 |"),
     ...section("要検証", needs, "| No. | 領域 | 題名 | 判定に必要な確認 |"),
-    "## 未検証（0件）",
-    "",
-    "0件。",
-    "",
+    ...section("未検証", unverified, "| No. | 領域 | 題名 | 停止した工程 |"),
     ...section("棄却", rejected, "| No. | 領域 | 題名 |"),
     ...section("未完了の工程・範囲", incomplete, "| No. | 範囲 | 停止した工程 | 再開に必要なもの |", incompleteNote),
     "## 調査の補足",
@@ -94,7 +91,7 @@ test("pick はタイトルの日付が最も新しい集約 Issue を選び、�
 
 test("items と same で、調査開始時からの項目の変化を見つける", () => {
   const start = items(body({ needs: ["A02", "A03"] }));
-  assert.deepEqual(start.needs_validation, ["A02", "A03"]);
+  assert.deepEqual(start.default_targets, ["A02", "A03"]);
   const now = body({ needs: ["A02", "A03"], extra: { A03: ["- **人の追記**: 足した。"] } });
   assert.deepEqual(same(start, now, ["A02", "A03", "A09"]), [
     ["A02", "same"],
@@ -104,6 +101,13 @@ test("items と same で、調査開始時からの項目の変化を見つけ�
   const r = run(["same", tmp("s.json", JSON.stringify(start)), tmp("b.md", now), "A02", "A03"]);
   assert.equal(r.code, 1);
   assert.equal(r.out, "A02 same\nA03 changed");
+});
+
+test("items は番号を省いたときの対象を要検証・未検証・未完了の工程・範囲の順に出す", () => {
+  const all = items(body({ confirmed: ["A01"], needs: ["A05"], unverified: ["A03"], rejected: ["A04"], incomplete: ["U01", "U02"] }));
+  assert.deepEqual(all.default_targets, ["A05", "A03", "U01", "U02"]);
+  const noIncomplete = body({ needs: ["A02"] }).replace(/## 未完了の工程・範囲[\s\S]*?(?=## 調査の補足)/, "");
+  assert.deepEqual(items(noIncomplete).default_targets, ["A02"]);
 });
 
 test("check-body は対象の移動・件数・追記の行だけの変更を通す", () => {
