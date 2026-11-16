@@ -24,14 +24,14 @@ Claude Code は Opus 5.5 の推論レベル high で動かすことを推奨す�
 
    | 前提 | 使うスキル |
    | --- | --- |
-   | `perl` | plan-cross-review・architecture-alignment-cross-review・implementation-cross-review・haiku-implementation・gh-issue-autofix・codebase-cleanup-workflow・security-audit-verify-items |
+   | `perl` | plan-cross-review・haiku-implementation・architecture-alignment-cross-review・implementation-cross-review・codebase-cleanup-workflow・gh-issue-autofix・security-audit-verify-items |
    | `jq` | haiku-implementation・gh-issue-autofix・security-audit-verify-items、クロスレビューの Codex の担当（architecture-alignment-cross-review の Sol を含む） |
    | `codex` のログイン | クロスレビューの Codex の担当（architecture-alignment-cross-review の Sol を含む） |
    | メインが auto モード | haiku-implementation、codebase-cleanup-workflow（ないときは Haiku に実装を任せない） |
    | `gh` のログイン | gh-todo・gh-issue-autofix・security-audit-sync-issues・security-audit-verify-items、haiku-check で CI のログを見るとき |
    | Claude デスクトップアプリ | session-status-emoji |
    | 組み込みブラウザか Claude in Chrome | browser-readonly-research |
-   | 組み込みブラウザ | gh-issue-autofix・ui-behavior-check（ないときは動作確認を未検証にする）、security-audit-verify-items（ないときは画面での裏付けができない） |
+   | 組み込みブラウザ | ui-behavior-check・gh-issue-autofix（ないときは動作確認を未検証にする）、security-audit-verify-items（ないときは画面での裏付けができない） |
    | 権限の確認が出ない権限モード（auto モードなど） | gh-issue-autofix（無人で動かすとき） |
    | Python 3.9 以降 | Codex の minor-version-upgrade・rename-files-by-content |
    | `node`・Cloudflare の `security-audit`・サブエージェント | security-audit-sync-issues（security-audit-verify-items は `node` とサブエージェントだけ） |
@@ -79,8 +79,8 @@ Claude Code は Opus 5.5 の推論レベル high で動かすことを推奨す�
 | --- | --- |
 | [whats-next](.claude/skills/whats-next/SKILL.md) | 進捗と次のアクションを 1 つ示し、承認後に進める |
 | [gh-todo](.claude/skills/gh-todo/SKILL.md) | レビュー依頼・メンション・自分の Issue / PR を一覧にする |
-| [browser-readonly-research](.claude/skills/browser-readonly-research/SKILL.md) | Web ページを読むだけで調べてまとめる |
 | [gh-issue-autofix](.claude/skills/gh-issue-autofix/SKILL.md) | `agent:autofix` ラベルの Issue を 1 件、質問せずに対応し、同じラベルのドラフト PR にする |
+| [browser-readonly-research](.claude/skills/browser-readonly-research/SKILL.md) | Web ページを読むだけで調べてまとめる |
 | [skills-update](.claude/skills/skills-update/SKILL.md) | このスキル集を最新に取り込み、Claude Code・Codex へリンクし直して、使えるスキルを確かめる |
 
 ## Codex 用スキル一覧
