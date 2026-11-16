@@ -1,6 +1,12 @@
 # agent-skills
 
 Claude Code と Codex 向けの、特定のプロジェクトに依存しない汎用スキル集。\
+導入すると、Claude Code に普段どおり頼むだけで、次のように作業が進む。
+
+- 設計と差分を、GPT-6 Astra と Fable 5.2 がレビューする。
+- 実装と、テスト・lint などの確認を、Haiku 5.5 が受け持つ。
+- Claude が結果を自然な日本語で報告する。
+
 作業ごとに、次のエージェントのスキルを使う。
 
 | 作業 | Claude Code | Codex |
@@ -23,18 +29,28 @@ Claude Code は Opus 5.5 の推論レベル high で動かすことを推奨す�
 
 ## はじめに
 
-1. メインの checkout の直下でリンクする（git worktree からは実行できない）。\
-   Claude Code は `~/.claude/skills/`・`~/.claude/agents/`（`CLAUDE_CONFIG_DIR` があればその配下）、Codex は `~/.agents/skills/` にリンクされ、`--claude` / `--codex` で片方だけにできる。\
-   既存の同名ファイルや、別の場所への有効なリンクは上書きしない。\
-   スキルの追加・改名・削除のあとも再実行し、反映されなければ新しいセッションを始めるか Codex を再起動する。\
-   導入したあとは、Claude Code から skills-update を呼べば、取り込み・リンク・確認を 1 回で済ませられる。
+1. メインの checkout の直下でリンクする。
 
    ```bash
    scripts/link-skills.sh
    ```
 
+   Claude Code 用は `~/.claude/skills/`・`~/.claude/agents/`、Codex 用は `~/.agents/skills/` にリンクされる。\
+   スキルの追加・改名・削除のあとも再実行し、反映されなければ新しいセッションを始めるか Codex を再起動する。\
+   導入したあとは、Claude Code から skills-update を呼べば、取り込み・リンク・確認を 1 回で済ませられる。
+
+   <details>
+   <summary>リンクの細かい動き</summary>
+
+   - git worktree からは実行できない。
+   - `CLAUDE_CONFIG_DIR` があれば、Claude Code 用はその配下にリンクする。
+   - `--claude` / `--codex` で片方だけにできる。
+   - 既存の同名ファイルや、別の場所への有効なリンクは上書きしない。
+
+   </details>
+
 2. skills-preflight（[Claude Code](.claude/skills/skills-preflight/SKILL.md)・[Codex](.agents/skills/skills-preflight/SKILL.md)）で、必要なコマンド・ログイン・リンクを確かめる（Claude Code では足りないコマンドとリンクを了承を得てから入れる）。\
-   主な前提は次のとおり（細かい条件は各 SKILL.md にある）。
+   自動で使われるクロスレビューと、Haiku への実装の委任には、次の前提が要る（細かい条件は各 SKILL.md にある）。
 
    | 前提 | 使うスキル |
    | --- | --- |
@@ -42,6 +58,14 @@ Claude Code は Opus 5.5 の推論レベル high で動かすことを推奨す�
    | `jq` | haiku-implementation・gh-issue-autofix、クロスレビューの Codex の担当（architecture-alignment-cross-review の Sol を含む） |
    | `codex` のログイン | クロスレビューの Codex の担当（architecture-alignment-cross-review の Sol を含む） |
    | メインが auto モード | haiku-implementation、codebase-cleanup-workflow（ないときは Haiku に実装を任せない） |
+
+   ほかの前提は、次のスキルや場面でだけ要る（自動で使われるスキルの分も含む）。
+
+   <details>
+   <summary>スキルや場面ごとの前提</summary>
+
+   | 前提 | 使うスキル |
+   | --- | --- |
    | `gh` のログイン | gh-todo・gh-issue-autofix、haiku-check で CI のログを見るとき |
    | Claude デスクトップアプリ | session-status-emoji |
    | 組み込みブラウザか Claude in Chrome | browser-readonly-research |
@@ -49,6 +73,8 @@ Claude Code は Opus 5.5 の推論レベル high で動かすことを推奨す�
    | 権限の確認が出ない権限モード（auto モードなど） | gh-issue-autofix（無人で動かすとき） |
    | Python 3.9 以降 | Codex の minor-version-upgrade・rename-files-by-content |
    | 対象が git リポジトリで、未コミットの変更がない | codebase-cleanup-workflow |
+
+   </details>
 
 ## Claude Code 用スキル一覧
 
