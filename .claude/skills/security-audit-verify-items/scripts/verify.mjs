@@ -273,11 +273,14 @@ function git(worktree, args) {
   return r.status === 0 ? r.stdout : null;
 }
 
-// 作業ツリーの未追跡の .env*（対象リポジトリからコピーしたもの）の値。秘密でないありふれた値は除く
+// 秘密でないことがはっきりしている値（環境名・ログの段階・真偽値）
+const PLAIN_VALUES = /^(development|production|staging|test|testing|local|debug|info|warn|warning|error|true|false)$/i;
+
+// 作業ツリーの未追跡の .env*（対象リポジトリからコピーしたもの）の値。秘密でないありふれた値は除く。列挙できなければ null
 function envValues(worktree) {
   const out = [];
   const list = git(worktree, ["ls-files", "-z", "--others", "--", ":(glob).env*", ":(glob)**/.env*"]);
-  if (list === null) return out;
+  if (list === null) return null;
   for (const file of list.split("\0").filter(Boolean)) {
     if (/(^|\/)node_modules\//.test(file)) continue;
     let text;
@@ -290,7 +293,7 @@ function envValues(worktree) {
       const m = /^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/.exec(line);
       if (!m) continue;
       const v = m[2].trim().replace(/^(['"])(.*)\1$/, "$2");
-      if (v.length < 8 || /^[A-Za-z]+$/.test(v) || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?\/?$/.test(v)) continue;
+      if (v.length < 8 || PLAIN_VALUES.test(v) || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?\/?$/.test(v)) continue;
       out.push({ file, key: m[1], value: v });
     }
   }
@@ -298,13 +301,15 @@ function envValues(worktree) {
 }
 
 function worktreeArg(worktree) {
-  if (git(worktree, ["rev-parse", "--is-inside-work-tree"]) === null) fail(`--worktree が git の作業ツリーではありません: ${worktree}`);
+  if (git(worktree, ["rev-parse", "--is-inside-work-tree"])?.trim() !== "true") fail(`--worktree が git の作業ツリーではありません: ${worktree}`);
   return worktree;
 }
 
 export function checkSecrets(text, worktree) {
   const reasons = [];
-  for (const { file, key, value } of envValues(worktree)) if (text.includes(value)) reasons.push(`env_value_present:${file}:${key}`);
+  const values = envValues(worktree);
+  if (values === null) reasons.push("env_list_failed");
+  for (const { file, key, value } of values ?? []) if (text.includes(value)) reasons.push(`env_value_present:${file}:${key}`);
   for (const re of TOKEN_PATTERNS) if (re.test(text)) reasons.push(`token_like:${re.source.replace(/^\(\?<!\[A-Za-z0-9\]\)/, "").slice(0, 12)}`);
   if (/\{\{[A-Z_]+:[^}]*\}\}/.test(text)) reasons.push("placeholder_left");
   return [...new Set(reasons)];
@@ -344,19 +349,29 @@ export function checkIssue(draft, fingerprint, sha, worktree) {
   });
   if (shas.length !== 1 || shas[0] !== sha) reasons.push("source_sha_mismatch");
   if (count(/^<!-- security-audit:completed-at=/) > 0) reasons.push("completed_at_present");
-  const linkRe = /https?:\/\/[^\s<>"']+?\/blob\/([^\s/<>"']+)\/([^\s#<>"'?]+)(?:#L(\d+)(?:-L(\d+))?)?/g;
+  // リンクの前半（ref まで）を見つけ、パスは Markdown の閉じ括弧と釣り合う分だけを取る。次の走査はパスの直後から始める
+  const linkRe = /https?:\/\/[^\s<>"'()]+?\/blob\/([^\s/<>"'()]+)\//g;
+  const anchorRe = /#L(\d+)(?:-L(\d+))?/y;
   let pinned = 0;
   let m;
   while ((m = linkRe.exec(draft))) {
-    const [, ref, rawPath, from, to] = m;
-    const url = m[0].replace(/\)+$/, "");
+    const ref = m[1];
+    const rest = draft.slice(linkRe.lastIndex).match(/^[^\s#<>"'?]*/)[0];
+    const rawPath = trimPath(rest);
+    let after = linkRe.lastIndex + rawPath.length;
+    anchorRe.lastIndex = after;
+    const a = anchorRe.exec(draft);
+    const [from, to] = a ? [a[1], a[2]] : [];
+    if (a) after = anchorRe.lastIndex;
+    const url = draft.slice(m.index, after);
+    linkRe.lastIndex = after;
     if (ref !== sha) {
       reasons.push(`link_not_pinned:${url}`);
       continue;
     }
     let file;
     try {
-      file = decodeURIComponent(trimPath(rawPath));
+      file = decodeURIComponent(rawPath);
     } catch {
       reasons.push(`link_path_invalid:${url}`);
       continue;
