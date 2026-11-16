@@ -9,7 +9,6 @@ Claude Code と Codex 向けの、特定のプロジェクトに依存しない�
 | [整備（リファクタリング）](#リファクタリング用スキル) | 振る舞いを変えずにコード・テスト・文書を整える | — |
 | [GitHub の対応・Web の調査など](#指定して使うスキル) | Issue / PR の一覧と自動対応、Web の調査、このスキル集の更新 | — |
 | [依存の更新](#codex-用スキル一覧) | — | ランタイムと依存を更新する |
-| [セキュリティ監査](#セキュリティ監査) | 別のリポジトリ（security-audit-workflow）に分けた | 別のリポジトリに分けた |
 | [開発以外](#開発以外のスキル) | — | ファイルを内容から改名する |
 
 Claude は作業の一部を次のサブエージェントや Codex CLI に任せ、指示・採否・反映を受け持つ。
@@ -138,10 +137,12 @@ Codex 用は `$スキル名` で指定したときだけ使う。
 | --- | --- | --- |
 | [rename-files-by-content](.agents/skills/rename-files-by-content/SKILL.md) | Codex | ファイルを内容から `YYYY-MM-DD_名前` に改名する |
 
-## セキュリティ監査
+## 関連リポジトリ
 
-セキュリティ監査のスキル（Codex の security-audit-sync-issues と、Claude Code の security-audit-verify-items）は、単独で配れるよう [security-audit-workflow](https://github.com/nir-nmttg/security-audit-workflow) に分けた。\
-監査で `agent:autofix` が付いた修正 Issue は、このスキル集の gh-issue-autofix で自動で対応させ、ドラフト PR にできる。
+| リポジトリ | 内容 |
+| --- | --- |
+| [security-audit-workflow](https://github.com/nir-nmttg/security-audit-workflow) | Cloudflare の security-audit で監査し、結果を GitHub の Issue にまとめて調べ直す、Claude Code・Codex 向けのスキル集（`agent:autofix` が付いた修正 Issue は gh-issue-autofix で対応できる） |
+| [README.md を長期記憶にする AGENTS.md](https://gist.github.com/nir-nmttg/84d8e13fa9904cbfe56d05b1a7e90970) | 各ディレクトリの README.md を、設計判断・注意点・責務境界を蓄える長期記憶として、AI に作業前に読ませ、作業後に更新させる AGENTS.md の例 |
 
 ## スキルの追加・変更
 
