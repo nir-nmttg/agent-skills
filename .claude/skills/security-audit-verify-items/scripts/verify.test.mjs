@@ -176,7 +176,7 @@ function repo() {
   fs.writeFileSync(path.join(dir, "app", "a.rb"), "line1\nline2\nline3\n");
   g("add", ".");
   g("-c", "user.email=t@example.com", "-c", "user.name=t", "commit", "-q", "-m", "init");
-  fs.writeFileSync(path.join(dir, ".env"), "SECRET_KEY='abcdefgh12345'\nSHORT=abc\nNODE_ENV=development\nURL=http://localhost:3000\n");
+  fs.writeFileSync(path.join(dir, ".env"), "SECRET_KEY='abcdefgh12345'\nSHORT=abc\nNODE_ENV=development\nURL=http://localhost:3000\nDB_PASSWORD=ExampleSecretPassword\n");
   fs.mkdirSync(path.join(dir, "app", "(auth)"));
   fs.writeFileSync(path.join(dir, "app", "(auth)", "page.tsx"), "a\nb\nc\n");
   g("add", "app");
@@ -237,6 +237,25 @@ test("check-issue は .env の値とトークンらしい文字列を止める",
   const token = draft(sha, { extra: `ghp_${"x".repeat(30)}` });
   assert.equal(checkIssue(token, "fp-A02", sha, dir).length, 1);
   assert.ok(checkIssue(token, "fp-A02", sha, dir)[0].startsWith("token_like:"));
+});
+
+test("check-issue は英字だけの秘密の値も止める", () => {
+  const { dir, sha } = repo();
+  assert.deepEqual(checkIssue(draft(sha, { extra: "ExampleSecretPassword で入れた" }), "fp-A02", sha, dir), ["env_value_present:.env:DB_PASSWORD"]);
+});
+
+test("check-issue は隣り合うリンクのそれぞれを検査する", () => {
+  const { dir, sha } = repo();
+  const two = draft(sha, { extra: `[a](https://github.com/o/r/blob/${sha}/app/a.rb)、[b](https://github.com/o/r/blob/main/app/a.rb)` });
+  assert.deepEqual(checkIssue(two, "fp-A02", sha, dir), ["link_not_pinned:https://github.com/o/r/blob/main/app/a.rb"]);
+  const paren = draft(sha, { extra: `[c](https://github.com/o/r/blob/${sha}/app/(auth)/page.tsx)` });
+  assert.deepEqual(checkIssue(paren, "fp-A02", sha, dir), []);
+});
+
+test("check-secrets は bare リポジトリを作業ツリーとして受け付けない", () => {
+  const bare = fs.mkdtempSync(path.join(os.tmpdir(), "verify-items-bare-"));
+  spawnSync("git", ["init", "-q", "--bare", bare]);
+  assert.equal(run(["check-secrets", tmp("x.md", "x"), "--worktree", bare]).code, 3);
 });
 
 test("check-secrets は本文の秘密らしい文字列と置き換え忘れを止める", () => {
