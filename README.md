@@ -2,7 +2,7 @@
 
 Claude Code と Codex 向けの、特定のプロジェクトに依存しない汎用スキル集。\
 Claude Code は開発と整備（リファクタリング）に、Codex は依存の更新に使う。\
-セキュリティ監査は両方を組み合わせ、Codex で監査し、見つかった問題の修正（自動対応）は Claude Code で行う（要検証の調べ直しはどちらでもできる）。\
+セキュリティ監査は両方を組み合わせ、Codex で監査し、見つかった問題の修正（自動対応）は Claude Code で行う（集約 Issue の項目の調べ直しはどちらでもできる）。\
 開発以外の作業に使うスキルもある。\
 Claude は作業の一部を Haiku 5.5・Fable 5.2・Opus 5.5 のサブエージェントや Codex CLI（GPT-6 Astra・GPT-6.1 Sol）に任せ、指示・採否・反映を受け持つ。\
 Claude Code は Opus 5.5 の推論レベル high で動かすことを推奨する。
@@ -31,10 +31,10 @@ Claude Code は Opus 5.5 の推論レベル high で動かすことを推奨す�
    | `gh` のログイン | gh-todo・gh-issue-autofix・security-audit-sync-issues・security-audit-verify-items、haiku-check で CI のログを見るとき |
    | Claude デスクトップアプリ | session-status-emoji |
    | 組み込みブラウザか Claude in Chrome | browser-readonly-research |
-   | 組み込みブラウザ | gh-issue-autofix・ui-behavior-check（ないときは動作確認を未検証にする） |
-   | 権限の確認が出ない権限モード（auto モードなど） | gh-issue-autofix・Claude Code の security-audit-verify-items（無人で動かすとき） |
+   | 組み込みブラウザ | gh-issue-autofix・ui-behavior-check（ないときは動作確認を未検証にする）、Claude Code の security-audit-verify-items（ないときは画面での裏付けができない） |
+   | 権限の確認が出ない権限モード（auto モードなど） | gh-issue-autofix（無人で動かすとき） |
    | Python 3.9 以降 | Codex の minor-version-upgrade・rename-files-by-content |
-   | `node`・Cloudflare の `security-audit`・サブエージェント | security-audit-sync-issues（security-audit-verify-items は `node` とサブエージェントだけ） |
+   | `node`・Cloudflare の `security-audit`・サブエージェント | security-audit-sync-issues |
    | 対象が git リポジトリで、未コミットの変更がない | codebase-cleanup-workflow |
 
 ## Claude Code 用スキル一覧
@@ -106,7 +106,7 @@ Codex 用は `$スキル名`、Claude Code 用は `/スキル名` で指定し�
 | スキル | エージェント | できること |
 | --- | --- | --- |
 | security-audit-sync-issues | [Codex](.agents/skills/security-audit-sync-issues/SKILL.md) | 自律監査で確定所見の修正 Issue と全判定の集約 Issue を作成・更新し、修正 Issue を集約 Issue のサブ Issue にして、自動修正できる項目にラベルを付ける |
-| security-audit-verify-items | [Codex](.agents/skills/security-audit-verify-items/SKILL.md)・[Claude Code](.claude/skills/security-audit-verify-items/SKILL.md) | 集約 Issue の要検証のうち手元で確かめられるものを調べ直し、確定は修正 Issue にしてサブ Issue に加え、棄却・判断できないも集約 Issue に反映する |
+| security-audit-verify-items | [Codex](.agents/skills/security-audit-verify-items/SKILL.md)・[Claude Code](.claude/skills/security-audit-verify-items/SKILL.md) | 集約 Issue の指定した項目を対話しながら調べ直し、確定は修正 Issue にしてサブ Issue に加え、集約 Issue を更新する |
 
 ### 監査から修正の PR までの手順
 
@@ -115,12 +115,10 @@ Codex 用は `$スキル名`、Claude Code 用は `/スキル名` で指定し�
 1. **監査する**: 監査するプロジェクトの直下で、Codex から `$security-audit-sync-issues` を呼ぶ。\
    確定所見が修正 Issue に、全判定が集約 Issue になる。\
    修正 Issue は集約 Issue のサブ Issue になり、自動で直せるものに `agent:autofix` が付く。
-2. **調べ直す**: 同じリポジトリで、Codex から `$security-audit-verify-items` を、または Claude Code から `/security-audit-verify-items` を呼ぶ。\
-   どちらもロックを共有するので、同じリポジトリで同時には動かない。\
-   最新の集約 Issue の要検証のうち、手元で確かめられるもの（判定に必要な確認に `ローカル検証` か `その他` を含むもの）を順に調べ直す。\
-   確定は修正 Issue になり、棄却・判断できないも集約 Issue に残る。\
-   仕様確認や環境・権限の確認だけが要る項目は、調べずに要検証のまま残す。\
-   予定実行で動かすときは、Codex なら 1 つの予定実行で 1. を終えてから、Claude Code なら 1. が終わってから呼ぶ（同じリポジトリで 2 つを同時に動かさない）。
+2. **調べ直す（必要なとき）**: 同じリポジトリで、Codex から `$security-audit-verify-items <集約 Issue> <番号>` を、または Claude Code から `/security-audit-verify-items <集約 Issue> <番号>` を呼ぶ。\
+   要検証・未検証・未完了の工程・範囲など、区分を問わず指定した項目を、ユーザーと対話しながら調べ直す。\
+   確定なら修正 Issue になり、集約 Issue が更新される。\
+   確定でなければ、集約 Issue をどう更新するかを確かめてから書く。
 3. **自動で対応させる**: 対応させる Issue を自分にアサインし（番号を渡すなら不要）、同じリポジトリで Claude Code から `/gh-issue-autofix` を呼ぶ。\
    質問せずに進めるので、無人で動かすときは権限の確認が出ない権限モード（auto モードなど）のセッションで呼ぶ。\
    Issue の問題が成り立たないとわかったときは、修正を作らずに根拠を Issue にコメントして止まる（Codex が確定とした所見を Claude の目で確かめ直す）。\
@@ -130,7 +128,7 @@ Codex 用は `$スキル名`、Claude Code 用は `/スキル名` で指定し�
 ## スキルの追加・変更
 
 作り方と変更時の確認は [AGENTS.md](AGENTS.md) にある。\
-スキルの作業用ファイルは、このリポジトリの `artifacts/<スキル名>/`（gitignore 済み）に置く（security-audit-sync-issues の監査結果と security-audit-verify-items の作業ツリーは `~/security-audit-skill/` 配下）。
+スキルの作業用ファイルは、このリポジトリの `artifacts/<スキル名>/`（gitignore 済み）に置く（security-audit-sync-issues の監査結果は `~/security-audit-skill/` 配下）。
 
 ## ライセンス
 
