@@ -11,8 +11,6 @@ argument-hint: "[<集約 Issue の URL か番号>] [<項目の番号（A03・U01
 
 Codex の security-audit-sync-issues が作った集約 Issue（`[yyyy-mm-dd] セキュリティ監査の調査・判定一覧`）の、ユーザーが指定した項目（省くと要検証のすべて）を、このセッションで調べ直す。区分は問わない（要検証・未検証・未完了の工程・範囲など）。確定と判断したら修正 Issue にし、集約 Issue を結果に合わせて更新する。確定でなければ、ユーザーと相談して集約 Issue の更新を決める。修正は gh-issue-autofix が受け持つ。
 
-Codex の [security-audit-verify-items](../../../.agents/skills/security-audit-verify-items/SKILL.md) と同じことを Claude Code で行う。
-
 ## 呼び方
 
 ```text

@@ -1,6 +1,0 @@
-interface:
-  short_description: "[<集約 Issue>] [<番号…>] 集約 Issue の項目（省くと要検証のすべて）を対話しながら調べ直し、確定を修正 Issue にする"
-  default_prompt: "$security-audit-verify-items を使って、このリポジトリの最新の集約 Issue の要検証を順に調べ直してください。"
-
-policy:
-  allow_implicit_invocation: false
