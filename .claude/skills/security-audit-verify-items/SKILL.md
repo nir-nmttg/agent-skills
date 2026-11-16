@@ -1,27 +1,28 @@
 ---
 name: security-audit-verify-items
-description: セキュリティ監査の集約 Issue の指定した項目をユーザーと対話しながら調べ直し、確定は修正 Issue にしてサブ Issue に加え、集約 Issue を更新する。
+description: セキュリティ監査の集約 Issue の指定した項目（省くと要検証のすべて）をユーザーと対話しながら調べ直し、確定は修正 Issue にしてサブ Issue に加え、集約 Issue を更新する。
 disable-model-invocation: true
-argument-hint: "<集約 Issue の URL か番号> <項目の番号（A03・U01 など。複数可）>"
+argument-hint: "[<集約 Issue の URL か番号>] [<項目の番号（A03・U01 など。複数可）>]"
 ---
 
 # 集約 Issue の項目を調べ直す
 
 引数: $ARGUMENTS
 
-Codex の security-audit-sync-issues が作った集約 Issue（`[yyyy-mm-dd] セキュリティ監査の調査・判定一覧`）の、ユーザーが指定した項目を、このセッションで調べ直す。区分は問わない（要検証・未検証・未完了の工程・範囲など）。確定と判断したら修正 Issue にし、集約 Issue を結果に合わせて更新する。確定でなければ、ユーザーと相談して集約 Issue の更新を決める。修正は gh-issue-autofix が受け持つ。
+Codex の security-audit-sync-issues が作った集約 Issue（`[yyyy-mm-dd] セキュリティ監査の調査・判定一覧`）の、ユーザーが指定した項目（省くと要検証のすべて）を、このセッションで調べ直す。区分は問わない（要検証・未検証・未完了の工程・範囲など）。確定と判断したら修正 Issue にし、集約 Issue を結果に合わせて更新する。確定でなければ、ユーザーと相談して集約 Issue の更新を決める。修正は gh-issue-autofix が受け持つ。
 
 Codex の [security-audit-verify-items](../../../.agents/skills/security-audit-verify-items/SKILL.md) と同じことを Claude Code で行う。
 
 ## 呼び方
 
 ```text
-/security-audit-verify-items <集約 Issue の URL か番号> <項目の番号（A03・U01 など。複数可）>
+/security-audit-verify-items [<集約 Issue の URL か番号>] [<項目の番号（A03・U01 など。複数可）>]
 ```
 
 - 監査したプロジェクトの直下で実行する。
-- 集約 Issue か番号が欠けていたら、ユーザーに聞く。
-- 番号が複数なら、指定された順に 1 つずつ調べ、項目ごとに判断を伝える。
+- 集約 Issue を省くと、`origin` のリポジトリの開いている集約 Issue のうち、タイトルの日付が最も新しいもの（同じ日付なら作成が新しいもの）を使う。最初の引数が項目の番号なら、集約 Issue を省いたものとして扱う。見つからなければユーザーに聞く。自動で選んだときは、調べ始める前にその集約 Issue の URL とタイトルを伝える。
+- 番号を省くと、要検証の項目をすべて対象にする。調べ始める前に、要検証の番号・題名・判定に必要な確認を一覧で見せ、外す項目がないかをユーザーに確かめる。
+- 対象が複数なら、指定された順（番号を省いたときは一覧表の順）に 1 項目ずつ、進め方の 1〜6 を終えて判断を伝えてから次の項目へ進む。
 
 ## 守ること
 
@@ -31,7 +32,7 @@ Codex の [security-audit-verify-items](../../../.agents/skills/security-audit-v
 - どちらの Issue にも、秘密・実データ・攻撃ペイロード・詳しい再現手順は書かない。
 - 本番の環境・データには触れない。手元で動かすのは、接続先が開発用（localhost・127.0.0.1・Docker Compose のサービス名など）で、メール・決済・Webhook などを外部へ送らない設定とわかるときだけにする。わからなければユーザーに聞く。
 - security-audit-sync-issues が同じ実行を再開すると集約 Issue の監査用の区画を組み直すので、このスキルで書いた更新が消えることがある。冒頭の監査の完了状況が未完了の集約 Issue に書くときは、そのことをユーザーに伝える。
-- Issue の作成・編集・ラベル付与は、ユーザーが指定した項目の分だけ行う。
+- Issue の作成・編集・ラベル付与は、対象の項目の分だけ行う。
 - 用語: **番号** は集約 Issue の一覧表の No.（`A03`・`U01` など）。**ID** は項目の詳細の **ID** の箇条の値で、確定・要検証・棄却では fingerprint、未検証では項目 ID、未完了の工程・範囲では監査単位 ID。`U` の番号は security-audit-sync-issues が本文を書くたびに振り直すので、未完了の工程・範囲の項目は、番号に加えて範囲と ID の箇条で特定する。
 
 ## 進め方
@@ -54,4 +55,4 @@ Codex の [security-audit-verify-items](../../../.agents/skills/security-audit-v
    - 一覧表と詳細は、その集約 Issue の今の列と箇条に合わせて書く。
    - 冒頭の件数の行のあとに、`**<日付> 追記（手動）**:` で始まる 1 行で、何をしたかを書く。
    - 監査用の区画のマーカー（`security-audit:summary-*`）と、上で移す・直す項目のほかは変えない。
-7. **報告する**: 項目ごとの判断と根拠、作った修正 Issue の URL、付けたラベル、集約 Issue の変更点、未確認事項を伝える。
+7. **報告する**: 項目ごとの判断と根拠、作った修正 Issue の URL、付けたラベル、集約 Issue の変更点、未確認事項、調べ残した番号（集約 Issue の URL とあわせて）を伝える。
