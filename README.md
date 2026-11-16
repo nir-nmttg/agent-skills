@@ -1,10 +1,26 @@
 # agent-skills
 
 Claude Code と Codex 向けの、特定のプロジェクトに依存しない汎用スキル集。\
-Claude Code は開発と整備（リファクタリング）に、Codex は依存の更新に使う。\
-セキュリティ監査は両方を組み合わせ、Codex で監査し、集約 Issue の項目の調べ直しと、見つかった問題の修正（自動対応）は Claude Code で行う。\
-開発以外の作業に使うスキルもある。\
-Claude は作業の一部を Haiku 5.5・Fable 5.2・Opus 5.5 のサブエージェントや Codex CLI（GPT-6 Astra・GPT-6.1 Sol）に任せ、指示・採否・反映を受け持つ。\
+作業ごとに、次のエージェントのスキルを使う。
+
+| 作業 | Claude Code | Codex |
+| --- | --- | --- |
+| [開発](#自動で使われるスキル) | 設計・実装・確認・レビュー・報告 | — |
+| [整備（リファクタリング）](#リファクタリング用スキル) | 振る舞いを変えずにコード・テスト・文書を整える | — |
+| [GitHub の対応・Web の調査など](#指定して使うスキル) | Issue / PR の一覧と自動対応、Web の調査、このスキル集の更新 | — |
+| [依存の更新](#codex-用スキル一覧) | — | ランタイムと依存を更新する |
+| [セキュリティ監査](#セキュリティ監査スキル) | 集約 Issue の項目の調べ直しと、修正 Issue の自動対応 | 監査と Issue 化 |
+| [開発以外](#開発以外のスキル) | — | ファイルを内容から改名する |
+
+Claude は作業の一部を次のサブエージェントや Codex CLI に任せ、指示・採否・反映を受け持つ。
+
+| 任せる先 | 任せること | スキル |
+| --- | --- | --- |
+| Haiku 5.5 | 実装と、テスト・lint・CI ログなどの確認 | haiku-implementation・haiku-check |
+| GPT-6 Astra（Codex CLI）と Fable 5.2 | 設計と差分のレビュー | plan-cross-review・implementation-cross-review |
+| GPT-6.1 Sol（Codex CLI）と Opus 5.5 | 差分が既存の設計に沿っているかの確認 | architecture-alignment-cross-review |
+| Opus 5.5 | 集約 Issue の項目の調べ直し | security-audit-verify-items |
+
 Claude Code は Opus 5.5 の推論レベル high で動かすことを推奨する。
 
 ## はじめに
@@ -24,14 +40,14 @@ Claude Code は Opus 5.5 の推論レベル high で動かすことを推奨す�
 
    | 前提 | 使うスキル |
    | --- | --- |
-   | `perl` | plan-cross-review・architecture-alignment-cross-review・implementation-cross-review・haiku-implementation・gh-issue-autofix・codebase-cleanup-workflow・security-audit-verify-items |
+   | `perl` | plan-cross-review・haiku-implementation・architecture-alignment-cross-review・implementation-cross-review・codebase-cleanup-workflow・gh-issue-autofix・security-audit-verify-items |
    | `jq` | haiku-implementation・gh-issue-autofix・security-audit-verify-items、クロスレビューの Codex の担当（architecture-alignment-cross-review の Sol を含む） |
    | `codex` のログイン | クロスレビューの Codex の担当（architecture-alignment-cross-review の Sol を含む） |
    | メインが auto モード | haiku-implementation、codebase-cleanup-workflow（ないときは Haiku に実装を任せない） |
    | `gh` のログイン | gh-todo・gh-issue-autofix・security-audit-sync-issues・security-audit-verify-items、haiku-check で CI のログを見るとき |
    | Claude デスクトップアプリ | session-status-emoji |
    | 組み込みブラウザか Claude in Chrome | browser-readonly-research |
-   | 組み込みブラウザ | gh-issue-autofix・ui-behavior-check（ないときは動作確認を未検証にする）、security-audit-verify-items（ないときは画面での裏付けができない） |
+   | 組み込みブラウザ | ui-behavior-check・gh-issue-autofix（ないときは動作確認を未検証にする）、security-audit-verify-items（ないときは画面での裏付けができない） |
    | 権限の確認が出ない権限モード（auto モードなど） | gh-issue-autofix（無人で動かすとき） |
    | Python 3.9 以降 | Codex の minor-version-upgrade・rename-files-by-content |
    | `node`・Cloudflare の `security-audit`・サブエージェント | security-audit-sync-issues（security-audit-verify-items は `node` とサブエージェントだけ） |
@@ -44,7 +60,32 @@ Claude Code は Opus 5.5 の推論レベル high で動かすことを推奨す�
 
 ### 自動で使われるスキル
 
-条件に当たると、頼まれなくても使う。
+条件に当たると、頼まれなくても使う。\
+作業の流れのどこで使うかは次のとおり。
+
+```mermaid
+flowchart LR
+  subgraph start[セッション開始]
+    S[session-status-emoji]
+  end
+  subgraph design[設計]
+    P[plan-cross-review]
+  end
+  subgraph impl[実装]
+    I[haiku-implementation]
+  end
+  subgraph check[確認]
+    T[haiku-check] --> A[architecture-alignment-cross-review] --> U[ui-behavior-check]
+  end
+  subgraph review[レビュー]
+    R[implementation-cross-review]
+  end
+  subgraph report[報告]
+    J[japanese-report]
+  end
+  S --> P --> I --> T
+  U --> R --> J
+```
 
 | スキル | できること | 使う場面 |
 | --- | --- | --- |
@@ -61,15 +102,15 @@ Claude Code は Opus 5.5 の推論レベル high で動かすことを推奨す�
 
 指定したときだけ使い、振る舞いを変えずにコード・テスト・文書を整える。
 
-| スキル | できること |
-| --- | --- |
-| [codebase-cleanup-workflow](.claude/skills/codebase-cleanup-workflow/SKILL.md) | 下の 6 本を順に使い、工程ごとに Haiku の確認と Astra・Fable のレビューを挟んで作業ブランチにコミットする |
-| [architecture-alignment-refactor](.claude/skills/architecture-alignment-refactor/SKILL.md) | 設計方針から外れた責務分担や依存関係を直す |
-| [overengineering-refactor](.claude/skills/overengineering-refactor/SKILL.md) | 過剰な抽象化・汎用化・防御的実装や未使用コードを取り除く |
-| [code-structure-refactor](.claude/skills/code-structure-refactor/SKILL.md) | 責務の混在や重複を、分割・共通化で直す |
-| [test-suite-refactor](.claude/skills/test-suite-refactor/SKILL.md) | 検出力を保ったまま、テストの重複を整理する |
-| [code-order-refactor](.claude/skills/code-order-refactor/SKILL.md) | メソッドや関数を読みやすい順に並べ替える |
-| [docs-align-with-code](.claude/skills/docs-align-with-code/SKILL.md) | 実装に合わせて文書を更新する |
+| 工程 | スキル | できること |
+| --- | --- | --- |
+| 1〜6 | [codebase-cleanup-workflow](.claude/skills/codebase-cleanup-workflow/SKILL.md) | 下の 6 本を順に使い、工程ごとに Haiku の確認と Astra・Fable のレビューを挟んで作業ブランチにコミットする |
+| 1 | [architecture-alignment-refactor](.claude/skills/architecture-alignment-refactor/SKILL.md) | 設計方針から外れた責務分担や依存関係を直す |
+| 2 | [overengineering-refactor](.claude/skills/overengineering-refactor/SKILL.md) | 過剰な抽象化・汎用化・防御的実装や未使用コードを取り除く |
+| 3 | [code-structure-refactor](.claude/skills/code-structure-refactor/SKILL.md) | 責務の混在や重複を、分割・共通化で直す |
+| 4 | [test-suite-refactor](.claude/skills/test-suite-refactor/SKILL.md) | 検出力を保ったまま、テストの重複を整理する |
+| 5 | [code-order-refactor](.claude/skills/code-order-refactor/SKILL.md) | メソッドや関数を読みやすい順に並べ替える |
+| 6 | [docs-align-with-code](.claude/skills/docs-align-with-code/SKILL.md) | 実装に合わせて文書を更新する |
 
 ### 指定して使うスキル
 
@@ -79,8 +120,8 @@ Claude Code は Opus 5.5 の推論レベル high で動かすことを推奨す�
 | --- | --- |
 | [whats-next](.claude/skills/whats-next/SKILL.md) | 進捗と次のアクションを 1 つ示し、承認後に進める |
 | [gh-todo](.claude/skills/gh-todo/SKILL.md) | レビュー依頼・メンション・自分の Issue / PR を一覧にする |
-| [browser-readonly-research](.claude/skills/browser-readonly-research/SKILL.md) | Web ページを読むだけで調べてまとめる |
 | [gh-issue-autofix](.claude/skills/gh-issue-autofix/SKILL.md) | `agent:autofix` ラベルの Issue を 1 件、質問せずに対応し、同じラベルのドラフト PR にする |
+| [browser-readonly-research](.claude/skills/browser-readonly-research/SKILL.md) | Web ページを読むだけで調べてまとめる |
 | [skills-update](.claude/skills/skills-update/SKILL.md) | このスキル集を最新に取り込み、Claude Code・Codex へリンクし直して、使えるスキルを確かめる |
 
 ## Codex 用スキル一覧
@@ -111,6 +152,14 @@ Codex 用は `$スキル名`、Claude Code 用は `/スキル名` で指定し�
 ### 監査から修正の PR までの手順
 
 上の 2 本と、Claude Code の [gh-issue-autofix](.claude/skills/gh-issue-autofix/SKILL.md) をつなぐと、監査 → Issue 化 → 自動対応 → ドラフト PR まで進められる。
+
+```mermaid
+flowchart LR
+  A["① 監査する<br>Codex: security-audit-sync-issues"] -->|"修正 Issue（agent:autofix）"| C["③ 自動で対応させる<br>Claude Code: gh-issue-autofix"]
+  A -. 必要なとき .-> B["② 調べ直す<br>Claude Code: security-audit-verify-items"]
+  B -->|確定した修正 Issue| C
+  C -->|ドラフト PR| D["④ レビューしてマージする<br>人"]
+```
 
 1. **監査する**: 監査するプロジェクトの直下で、Codex から `$security-audit-sync-issues` を呼ぶ。\
    確定所見が修正 Issue に、全判定が集約 Issue になる。\
