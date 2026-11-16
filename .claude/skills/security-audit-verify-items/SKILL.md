@@ -10,7 +10,7 @@ allowed-tools: Bash(bash *security-audit-verify-items/scripts/prepare.sh*), Bash
 
 引数: $ARGUMENTS
 
-Codex の security-audit-sync-issues が作った集約 Issue（`[yyyy-mm-dd] セキュリティ監査の調査・判定一覧`）の、ユーザーが指定した項目（省くと要検証・未検証・未完了の工程・範囲のすべて）を調べ直す。区分は問わない（要検証・未検証・未完了の工程・範囲など）。項目ごとの調査は Verifier サブエージェントに並列で任せ、すべての結果をユーザーと確かめてから、確定を修正 Issue にし、集約 Issue をまとめて更新する。修正は gh-issue-autofix が受け持つ。
+Codex の security-audit-sync-issues が作った集約 Issue（`[yyyy-mm-dd] セキュリティ監査の調査・判定一覧`）の、ユーザーが指定した項目（省くと要検証・未検証・未完了の工程・範囲のすべて）を調べ直す。項目ごとの調査は Verifier サブエージェントに並列で任せ、すべての結果をユーザーと確かめてから、確定を修正 Issue にし、集約 Issue をまとめて更新する。修正は gh-issue-autofix が受け持つ。
 
 ## 呼び方
 
