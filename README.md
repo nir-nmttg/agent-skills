@@ -147,7 +147,7 @@ Codex 用は `$スキル名`、Claude Code 用は `/スキル名` で指定し�
 | スキル | エージェント | できること |
 | --- | --- | --- |
 | security-audit-sync-issues | [Codex](.agents/skills/security-audit-sync-issues/SKILL.md) | 自律監査で確定所見の修正 Issue と全判定の集約 Issue を作成・更新し、修正 Issue を集約 Issue のサブ Issue にして、自動修正できる項目にラベルを付ける |
-| security-audit-verify-items | [Claude Code](.claude/skills/security-audit-verify-items/SKILL.md) | 集約 Issue の項目（省くと要検証のすべて）を Verifier に並列で調べさせ、ユーザーと確かめてから修正 Issue と集約 Issue をまとめて更新する |
+| security-audit-verify-items | [Claude Code](.claude/skills/security-audit-verify-items/SKILL.md) | 集約 Issue の項目（省くと要検証・未検証・未完了の工程・範囲のすべて）を Verifier に並列で調べさせ、ユーザーと確かめてから修正 Issue と集約 Issue をまとめて更新する |
 
 ### 監査から修正の PR までの手順
 
@@ -166,7 +166,7 @@ flowchart LR
    修正 Issue は集約 Issue のサブ Issue になり、自動で直せるものに `agent:autofix` が付く。
 2. **調べ直す（必要なとき）**: 同じリポジトリで、Claude Code から `/security-audit-verify-items [<集約 Issue>] [<番号>]` を呼ぶ。\
    要検証・未検証・未完了の工程・範囲など、区分を問わず指定した項目を、Verifier サブエージェントが並列で調べる。\
-   集約 Issue を省くと最新のものを使い、番号を省くと要検証のすべてを一覧で確かめてから調べる。\
+   集約 Issue を省くと最新のものを使い、番号を省くと要検証・未検証・未完了の工程・範囲のすべてを一覧で確かめてから調べる。\
    コマンドの実行・画面での確認・ユーザーへの質問は、呼んだセッションが 1 つずつ受け持つ。\
    すべての結果をユーザーと確かめてから、確定を修正 Issue にし、集約 Issue をまとめて更新する。
 3. **自動で対応させる**: 対応させる Issue を自分にアサインし（番号を渡すなら不要）、同じリポジトリで Claude Code から `/gh-issue-autofix` を呼ぶ。\

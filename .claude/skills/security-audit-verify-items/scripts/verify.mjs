@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // security-audit-verify-items の定型の検査。親（Supervisor）が GitHub に書く前に使う。
 //   pick                                  標準入力の gh issue list の JSON から、最新の集約 Issue の番号を出す
-//   items <本文>                           項目ごとの区分・ID・全文を JSON で出す（調査開始時の控えに使う）
+//   items <本文>                           項目ごとの区分・ID・全文と、番号を省いたときの対象を JSON で出す（調査開始時の控えに使う）
 //   same <控えの JSON> <本文> <番号...>      項目の全文が控えと同じかを番号ごとに出す（違えば終了コード 1）
 //   check-body <前の本文> <後の本文> --targets A03,U01 [--new A20,A21] [--remove A04]
 //                                         対象の項目・件数・追記の行のほかが変わっていないかを確かめる（外れたら終了コード 1）
@@ -18,6 +18,8 @@ import path from "node:path";
 const MAX_CHARS = 60000;
 const SECTIONS = { 確定: "confirmed", 要検証: "needs_validation", 未検証: "unverified", 棄却: "rejected", "未完了の工程・範囲": "incomplete" };
 const REQUIRED = ["確定", "要検証", "未検証", "棄却"];
+// 番号を省いたときに調べる区分（この順に並べる）
+const DEFAULT_SECTIONS = ["要検証", "未検証", "未完了の工程・範囲"];
 const TITLE = /^\[(\d{4}-\d{2}-\d{2})\] セキュリティ監査の調査・判定一覧$/;
 const SHA = /^[0-9a-f]{40}(?:[0-9a-f]{24})?$/;
 const NUMBER = /^[AU]\d{2,}$/;
@@ -194,7 +196,7 @@ export function pick(list) {
 
 export function items(text) {
   const p = parse(text);
-  const out = { needs_validation: p.sections["要検証"].rows, items: {} };
+  const out = { default_targets: DEFAULT_SECTIONS.flatMap((name) => p.sections[name]?.rows ?? []), items: {} };
   for (const [num, it] of p.items) out.items[num] = { section: it.section, id: it.id, text: it.text };
   return out;
 }
