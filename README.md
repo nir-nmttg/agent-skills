@@ -9,7 +9,7 @@ Claude Code と Codex 向けの、特定のプロジェクトに依存しない�
 | [整備（リファクタリング）](#リファクタリング用スキル) | 振る舞いを変えずにコード・テスト・文書を整える | — |
 | [GitHub の対応・Web の調査など](#指定して使うスキル) | Issue / PR の一覧と自動対応、Web の調査、このスキル集の更新 | — |
 | [依存の更新](#codex-用スキル一覧) | — | ランタイムと依存を更新する |
-| [セキュリティ監査](#セキュリティ監査スキル) | 集約 Issue の項目の調べ直しと、修正 Issue の自動対応 | 監査と Issue 化 |
+| [セキュリティ監査](#セキュリティ監査) | 別のリポジトリ（security-audit-workflow）に分けた | 別のリポジトリに分けた |
 | [開発以外](#開発以外のスキル) | — | ファイルを内容から改名する |
 
 Claude は作業の一部を次のサブエージェントや Codex CLI に任せ、指示・採否・反映を受け持つ。
@@ -19,7 +19,6 @@ Claude は作業の一部を次のサブエージェントや Codex CLI に任�
 | Haiku 5.5 | 実装と、テスト・lint・CI ログなどの確認 | haiku-implementation・haiku-check |
 | GPT-6 Astra（Codex CLI）と Fable 5.2 | 設計と差分のレビュー | plan-cross-review・implementation-cross-review |
 | GPT-6.1 Sol（Codex CLI）と Opus 5.5 | 差分が既存の設計に沿っているかの確認 | architecture-alignment-cross-review |
-| Opus 5.5 | 集約 Issue の項目の調べ直し | security-audit-verify-items |
 
 Claude Code は Opus 5.5 の推論レベル high で動かすことを推奨する。
 
@@ -40,17 +39,16 @@ Claude Code は Opus 5.5 の推論レベル high で動かすことを推奨す�
 
    | 前提 | 使うスキル |
    | --- | --- |
-   | `perl` | plan-cross-review・haiku-implementation・architecture-alignment-cross-review・implementation-cross-review・codebase-cleanup-workflow・gh-issue-autofix・security-audit-verify-items |
-   | `jq` | haiku-implementation・gh-issue-autofix・security-audit-verify-items、クロスレビューの Codex の担当（architecture-alignment-cross-review の Sol を含む） |
+   | `perl` | plan-cross-review・haiku-implementation・architecture-alignment-cross-review・implementation-cross-review・codebase-cleanup-workflow・gh-issue-autofix |
+   | `jq` | haiku-implementation・gh-issue-autofix、クロスレビューの Codex の担当（architecture-alignment-cross-review の Sol を含む） |
    | `codex` のログイン | クロスレビューの Codex の担当（architecture-alignment-cross-review の Sol を含む） |
    | メインが auto モード | haiku-implementation、codebase-cleanup-workflow（ないときは Haiku に実装を任せない） |
-   | `gh` のログイン | gh-todo・gh-issue-autofix・security-audit-sync-issues・security-audit-verify-items、haiku-check で CI のログを見るとき |
+   | `gh` のログイン | gh-todo・gh-issue-autofix、haiku-check で CI のログを見るとき |
    | Claude デスクトップアプリ | session-status-emoji |
    | 組み込みブラウザか Claude in Chrome | browser-readonly-research |
-   | 組み込みブラウザ | ui-behavior-check・gh-issue-autofix（ないときは動作確認を未検証にする）、security-audit-verify-items（ないときは画面での裏付けができない） |
+   | 組み込みブラウザ | ui-behavior-check・gh-issue-autofix（ないときは動作確認を未検証にする） |
    | 権限の確認が出ない権限モード（auto モードなど） | gh-issue-autofix（無人で動かすとき） |
    | Python 3.9 以降 | Codex の minor-version-upgrade・rename-files-by-content |
-   | `node`・Cloudflare の `security-audit`・サブエージェント | security-audit-sync-issues（security-audit-verify-items は `node` とサブエージェントだけ） |
    | 対象が git リポジトリで、未コミットの変更がない | codebase-cleanup-workflow |
 
 ## Claude Code 用スキル一覧
@@ -140,45 +138,15 @@ Codex 用は `$スキル名` で指定したときだけ使う。
 | --- | --- | --- |
 | [rename-files-by-content](.agents/skills/rename-files-by-content/SKILL.md) | Codex | ファイルを内容から `YYYY-MM-DD_名前` に改名する |
 
-## セキュリティ監査スキル
+## セキュリティ監査
 
-Codex 用は `$スキル名`、Claude Code 用は `/スキル名` で指定したときだけ使う。
-
-| スキル | エージェント | できること |
-| --- | --- | --- |
-| security-audit-sync-issues | [Codex](.agents/skills/security-audit-sync-issues/SKILL.md) | 自律監査で確定所見の修正 Issue と全判定の集約 Issue を作成・更新し、修正 Issue を集約 Issue のサブ Issue にして、自動修正できる項目にラベルを付ける |
-| security-audit-verify-items | [Claude Code](.claude/skills/security-audit-verify-items/SKILL.md) | 集約 Issue の項目（省くと要検証・未検証・未完了の工程・範囲のすべて）を Verifier に並列で調べさせ、ユーザーと確かめてから修正 Issue と集約 Issue をまとめて更新する |
-
-### 監査から修正の PR までの手順
-
-上の 2 本と、Claude Code の [gh-issue-autofix](.claude/skills/gh-issue-autofix/SKILL.md) をつなぐと、監査 → Issue 化 → 自動対応 → ドラフト PR まで進められる。
-
-```mermaid
-flowchart LR
-  A["① 監査する<br>Codex: security-audit-sync-issues"] -->|"修正 Issue（agent:autofix）"| C["③ 自動で対応させる<br>Claude Code: gh-issue-autofix"]
-  A -. 必要なとき .-> B["② 調べ直す<br>Claude Code: security-audit-verify-items"]
-  B -->|確定した修正 Issue| C
-  C -->|ドラフト PR| D["④ レビューしてマージする<br>人"]
-```
-
-1. **監査する**: 監査するプロジェクトの直下で、Codex から `$security-audit-sync-issues` を呼ぶ。\
-   確定所見が修正 Issue に、全判定が集約 Issue になる。\
-   修正 Issue は集約 Issue のサブ Issue になり、自動で直せるものに `agent:autofix` が付く。
-2. **調べ直す（必要なとき）**: 同じリポジトリで、Claude Code から `/security-audit-verify-items [<集約 Issue>] [<番号>]` を呼ぶ。\
-   指定した項目（省くと要検証・未検証・未完了の工程・範囲のすべて）を、Verifier サブエージェントが並列で調べる。\
-   集約 Issue を省くと最新のものを使い、番号を省いたときは調べる前に対象を一覧で確かめる。\
-   コマンドの実行・画面での確認・ユーザーへの質問は、呼んだセッションが 1 つずつ受け持つ。\
-   すべての結果をユーザーと確かめてから、確定を修正 Issue にし、集約 Issue をまとめて更新する。
-3. **自動で対応させる**: 対応させる Issue を自分にアサインし（番号を渡すなら不要）、同じリポジトリで Claude Code から `/gh-issue-autofix` を呼ぶ。\
-   質問せずに進めるので、無人で動かすときは権限の確認が出ない権限モード（auto モードなど）のセッションで呼ぶ。\
-   Issue の問題が成り立たないとわかったときは、修正を作らずに根拠を Issue にコメントして止まる（Codex が確定とした所見を Claude の目で確かめ直す）。\
-   1 回で 1 件をドラフト PR にするので、残りは繰り返し呼ぶ。
-4. **レビューしてマージする**: ドラフト PR を人がレビューし、Ready への変更とマージを行う。
+セキュリティ監査のスキル（Codex の security-audit-sync-issues と、Claude Code の security-audit-verify-items）は、単独で配れるよう [security-audit-workflow](https://github.com/nir-nmttg/security-audit-workflow) に分けた。\
+監査で `agent:autofix` が付いた修正 Issue は、このスキル集の gh-issue-autofix で自動で対応させ、ドラフト PR にできる。
 
 ## スキルの追加・変更
 
 作り方と変更時の確認は [AGENTS.md](AGENTS.md) にある。\
-スキルの作業用ファイルは、このリポジトリの `artifacts/<スキル名>/`（gitignore 済み）に置く（security-audit-sync-issues の監査結果は `~/security-audit-skill/` 配下）。
+スキルの作業用ファイルは、このリポジトリの `artifacts/<スキル名>/`（gitignore 済み）に置く。
 
 ## ライセンス
 
