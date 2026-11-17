@@ -1,6 +1,6 @@
 ---
 name: implementation-cross-review
-description: Claude の実装（git の差分）を Codex CLI の GPT-6 Astra と Fable 5.2 に同じ依頼でレビューさせて直す。「実装を Codex にレビューしてもらって」「Fable でレビューして」などの依頼で使う。依頼がなくても、動作が変わりうる変更と文書の変更は、完了報告・コミット・PR の前に使い、迷ったら使う（除外は本文）。
+description: Claude の実装（git の差分）を Codex CLI の GPT-6.2 Astra と Fable 5.2 に同じ依頼でレビューさせて直す。「実装を Codex にレビューしてもらって」「Fable でレビューして」などの依頼で使う。依頼がなくても、動作が変わりうる変更と文書の変更は、完了報告・コミット・PR の前に使い、迷ったら使う（除外は本文）。
 argument-hint: "[--only astra|sol|fable|opus] [--base <ref> | --commit <sha> | --uncommitted] [補足]"
 allowed-tools: Bash(bash *implementation-cross-review/scripts/new-run.sh*), Bash(bash *implementation-cross-review/scripts/prepare.sh*), Bash(bash *implementation-cross-review/scripts/review.sh*), mcp__ccd_session_mgmt__get_usage, Read, Grep, Glob, Write(//**/artifacts/implementation-cross-review/**), Edit(//**/artifacts/implementation-cross-review/**)
 ---
@@ -10,7 +10,7 @@ allowed-tools: Bash(bash *implementation-cross-review/scripts/new-run.sh*), Bash
 引数: $ARGUMENTS
 Claude の推論レベル: ${CLAUDE_EFFORT}
 
-Claude が実装した変更を、Astra（Codex CLI の GPT-6 Astra）と Fable（`fable-reviewer`）に**同じ依頼で**レビューさせ、その指摘を Claude が吟味する。同じ観点を別のモデルで見て、単一モデルの見落としを補う。どちらも要件と差分から実際の動きを読み解くので、実装者の先入観が入らない。正しさや要件との一致に加えて、データ・認可・お金・外部への送信・移行・並行処理など壊れると影響の大きい部分では、壊れ方も重点的に見る。動作を決めない文書だけの変更は、軽い担当の Sol（GPT-6.1 Sol）だけで見る。担当が結果を返さないときは、同じ側の軽い担当（Astra は Sol、Fable は Opus（`opus-reviewer`））で代わりに動かす。直したあとの再レビューは、直した部分の確認に絞って、1 回目と同じ重さの Codex の担当 1 体に任せる。差分の取り出し・プロンプトの組み立て・Codex の呼び出しはスクリプトに任せ、Claude は「要件をまとめる」「指摘を判断する」「採用した指摘を直す」だけを行う。結果は `artifacts/implementation-cross-review/` に保存される。
+Claude が実装した変更を、Astra（Codex CLI の GPT-6.2 Astra）と Fable（`fable-reviewer`）に**同じ依頼で**レビューさせ、その指摘を Claude が吟味する。同じ観点を別のモデルで見て、単一モデルの見落としを補う。どちらも要件と差分から実際の動きを読み解くので、実装者の先入観が入らない。正しさや要件との一致に加えて、データ・認可・お金・外部への送信・移行・並行処理など壊れると影響の大きい部分では、壊れ方も重点的に見る。動作を決めない文書だけの変更は、軽い担当の Sol（GPT-6.2 Sol）だけで見る。担当が結果を返さないときは、同じ側の軽い担当（Astra は Sol、Fable は Opus（`opus-reviewer`））で代わりに動かす。直したあとの再レビューは、直した部分の確認に絞って、1 回目と同じ重さの Codex の担当 1 体に任せる。差分の取り出し・プロンプトの組み立て・Codex の呼び出しはスクリプトに任せ、Claude は「要件をまとめる」「指摘を判断する」「採用した指摘を直す」だけを行う。結果は `artifacts/implementation-cross-review/` に保存される。
 
 ## 自分の判断で使うとき
 
@@ -101,7 +101,7 @@ bash "${CLAUDE_SKILL_DIR}/scripts/prepare.sh" [--cd <dir>] [--base <ref> | --com
 
 続けて、動かす担当を**同じメッセージで**動かす。**すべて終わるまでファイルを編集しない**（どのレビュアーも作業ツリーを読むため）。
 
-Astra は Bash ツールを **`run_in_background: true`** で実行する（推論レベルが高いと数十分かかることがある）。Sol で動かすときは `--effort` の前に `--model gpt-6.1-sol` を加える。
+Astra は Bash ツールを **`run_in_background: true`** で実行する（推論レベルが高いと数十分かかることがある）。Sol で動かすときは `--effort` の前に `--model gpt-6.2-sol` を加える。
 
 ```bash
 bash "${CLAUDE_SKILL_DIR}/scripts/review.sh" --effort ${CLAUDE_EFFORT} <実行フォルダ>
@@ -128,7 +128,7 @@ Agent ツールには次を指定する。
 - Fable の返答は、そのまま `<実行フォルダ>/review-fable.md`（Opus なら `review-opus.md`）に Write で保存する。Astra（または Sol）の結果は `<実行フォルダ>/review.md` に保存される。
 - `--effort` には上の「Claude の推論レベル」をそのまま渡す。空や `auto` のときは省略してよい（スクリプトが high にする）。
 - Codex（Astra / Sol）は読み取り専用のサンドボックスと 1M コンテキストで動き、個人設定（MCP サーバーやプラグイン）は読み込まない。Fable・Opus は Read / Grep / Glob しか使えず、この会話・auto memory・ユーザー用の CLAUDE.md・MCP は読み込まない（作業場所のルートの CLAUDE.md・`.claude/CLAUDE.md`・AGENTS.md は `prompt.md` に入る）。どちらもコードを書き換えない。
-- 担当が結果を返さなければ、上の「代わり」のとおり 1 回だけ動かす。Sol は同じ実行フォルダに `--model gpt-6.1-sol` を加えて `run_in_background: true` で、Opus は Agent ツールの指定を上と同じにして `opus-reviewer` で動かす。Codex のやり直しは前のログを上書きするので、先に失敗の理由（エラーの要点）を控える。失敗の理由は 5. で `decisions.md` の実行状態に書き、報告では代わりの担当の名前で書く。
+- 担当が結果を返さなければ、上の「代わり」のとおり 1 回だけ動かす。Sol は同じ実行フォルダに `--model gpt-6.2-sol` を加えて `run_in_background: true` で、Opus は Agent ツールの指定を上と同じにして `opus-reviewer` で動かす。Codex のやり直しは前のログを上書きするので、先に失敗の理由（エラーの要点）を控える。失敗の理由は 5. で `decisions.md` の実行状態に書き、報告では代わりの担当の名前で書く。
 - `codex` や `fable-reviewer`・`opus-reviewer` が失敗しても、全部の結果が出揃ってから、成功した分で判断して失敗を報告で伝える。`codex` が見つからない・ログインしていないときは、`brew install --cask codex` と `codex login` を案内する。`fable-reviewer`・`opus-reviewer` が見つからないときは、エージェントがリンクされていない（このスキル集の `scripts/link-skills.sh --claude` で `~/.claude/agents` にリンクする）か、リンクする前に始めたセッション。Haiku に書かせた変更で、動かしたレビューがどれも結果を返さなかったら、未レビューと明記し、完了を保留してユーザーに確認する。
 
 ### 5. 指摘を判断する

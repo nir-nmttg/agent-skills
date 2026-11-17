@@ -1,6 +1,6 @@
 ---
 name: plan-cross-review
-description: Claude が考えた設計（会話中の案や設計書）を Codex CLI の GPT-6 Astra と Fable 5.2 に同じ依頼でレビューさせる。「この設計を Codex にレビューしてもらって」「Fable で設計をレビューして」などの依頼で使う。依頼がなくても、作り方の判断を含む設計や実装計画は、提示や実装の前に使い、迷ったら使う（除外は本文）。
+description: Claude が考えた設計（会話中の案や設計書）を Codex CLI の GPT-6.2 Astra と Fable 5.2 に同じ依頼でレビューさせる。「この設計を Codex にレビューしてもらって」「Fable で設計をレビューして」などの依頼で使う。依頼がなくても、作り方の判断を含む設計や実装計画は、提示や実装の前に使い、迷ったら使う（除外は本文）。
 argument-hint: "[--only astra|sol|fable|opus] [--cd <dir>] [設計書のパス] [補足]"
 allowed-tools: Bash(bash *plan-cross-review/scripts/new-run.sh*), Bash(bash *plan-cross-review/scripts/prepare.sh*), Bash(bash *plan-cross-review/scripts/review.sh*), mcp__ccd_session_mgmt__get_usage, Read, Grep, Glob, Write(//**/artifacts/plan-cross-review/**), Edit(//**/artifacts/plan-cross-review/**)
 ---
@@ -10,7 +10,7 @@ allowed-tools: Bash(bash *plan-cross-review/scripts/new-run.sh*), Bash(bash *pla
 引数: $ARGUMENTS
 Claude の推論レベル: ${CLAUDE_EFFORT}
 
-Claude が考えた設計を、Astra（Codex CLI の GPT-6 Astra）と Fable（`fable-reviewer`）に**同じ依頼で**レビューさせ、その指摘を Claude が吟味する。同じ観点を別のモデルで見て、単一モデルの見落としを補う。どちらも要件と設計から読み解くので、実装者の不安に注意が偏らない。要件との一致や前提の誤りに加えて、データ・認可・お金・外部への送信・移行・並行処理など壊れると影響の大きい部分では、壊れ方と戻しやすさも重点的に見る。担当が結果を返さないときは、同じ側の軽い担当（Astra は Sol（GPT-6.1 Sol）、Fable は Opus（`opus-reviewer`））で代わりに動かす。直したあとの再レビューは、直した部分の確認に絞って Astra 1 体に任せる。プロンプトの組み立てと Codex の呼び出しはスクリプトに任せ、Claude は「要件と設計書をまとめる」「指摘を判断する」だけを行う。結果は `artifacts/plan-cross-review/` に保存される。
+Claude が考えた設計を、Astra（Codex CLI の GPT-6.2 Astra）と Fable（`fable-reviewer`）に**同じ依頼で**レビューさせ、その指摘を Claude が吟味する。同じ観点を別のモデルで見て、単一モデルの見落としを補う。どちらも要件と設計から読み解くので、実装者の不安に注意が偏らない。要件との一致や前提の誤りに加えて、データ・認可・お金・外部への送信・移行・並行処理など壊れると影響の大きい部分では、壊れ方と戻しやすさも重点的に見る。担当が結果を返さないときは、同じ側の軽い担当（Astra は Sol（GPT-6.2 Sol）、Fable は Opus（`opus-reviewer`））で代わりに動かす。直したあとの再レビューは、直した部分の確認に絞って Astra 1 体に任せる。プロンプトの組み立てと Codex の呼び出しはスクリプトに任せ、Claude は「要件と設計書をまとめる」「指摘を判断する」だけを行う。結果は `artifacts/plan-cross-review/` に保存される。
 
 ## 自分の判断で使うとき
 
@@ -105,7 +105,7 @@ bash "${CLAUDE_SKILL_DIR}/scripts/prepare.sh" [--cd <dir>] <実行フォルダ>
 
 続けて、動かす担当を**同じメッセージで**動かす。**すべて終わるまで、要件・設計書と読み先のコードを編集しない。**
 
-Astra は Bash ツールを **`run_in_background: true`** で実行する（推論レベルが高いと数十分かかることがある）。Sol で動かすときは `--effort` の前に `--model gpt-6.1-sol` を加える。
+Astra は Bash ツールを **`run_in_background: true`** で実行する（推論レベルが高いと数十分かかることがある）。Sol で動かすときは `--effort` の前に `--model gpt-6.2-sol` を加える。
 
 ```bash
 bash "${CLAUDE_SKILL_DIR}/scripts/review.sh" --effort ${CLAUDE_EFFORT} <実行フォルダ>
@@ -133,7 +133,7 @@ Agent ツールには次を指定する。
 - `--effort` には上の「Claude の推論レベル」をそのまま渡す。空や `auto` のときは省略してよい（スクリプトが high にする）。
 - Codex（Astra / Sol）は読み取り専用のサンドボックスと 1M コンテキストで動き、個人設定（MCP サーバーやプラグイン）は読み込まない。Fable・Opus は Read / Grep / Glob しか使えず、この会話・auto memory・ユーザー用の CLAUDE.md・MCP は読み込まない。
 - `prepare.sh` が失敗したら、原因（要件や設計書の書き忘れなど）を直して実行し直す。直せないときは、そのことを伝えてレビューなしで設計を提示する。
-- 担当が結果を返さなければ、上の「代わり」のとおり 1 回だけ動かす。Sol は同じ実行フォルダに `--model gpt-6.1-sol` を加えて `run_in_background: true` で、Opus は Agent ツールの指定を上と同じにして `opus-reviewer` で動かす。Codex のやり直しは前のログを上書きするので、先に失敗の理由（エラーの要点）を控える。失敗の理由は 5. で `decisions.md` の実行状態に書き、報告では代わりの担当の名前で書く。
+- 担当が結果を返さなければ、上の「代わり」のとおり 1 回だけ動かす。Sol は同じ実行フォルダに `--model gpt-6.2-sol` を加えて `run_in_background: true` で、Opus は Agent ツールの指定を上と同じにして `opus-reviewer` で動かす。Codex のやり直しは前のログを上書きするので、先に失敗の理由（エラーの要点）を控える。失敗の理由は 5. で `decisions.md` の実行状態に書き、報告では代わりの担当の名前で書く。
 - 片方が失敗したら、全部の結果が出揃ってから、成功した分で判断して失敗を報告する。どれも結果を返さなかったら、そのことを伝えてレビューなしで設計を提示し、実行状態を `decisions.md` に残す。
 - `codex` が見つからない・ログインしていないときは、`brew install --cask codex` と `codex login` を案内する。`fable-reviewer`・`opus-reviewer` が見つからないときは、エージェントがリンクされていない（このスキル集の `scripts/link-skills.sh --claude` で `~/.claude/agents` にリンクする）か、リンクする前に始めたセッション。
 
