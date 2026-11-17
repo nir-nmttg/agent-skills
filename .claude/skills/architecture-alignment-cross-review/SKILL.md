@@ -1,6 +1,6 @@
 ---
 name: architecture-alignment-cross-review
-description: Claude の実装（git の差分）が対象プロジェクトの既存の設計（置き場所・責務・依存の向き・共通の仕組み）に沿っているかを GPT-6.1 Sol と Opus 5.5 に確かめさせて直す。「既存の設計に沿っているか見て」などの依頼で使う。依頼がなくても、構造を選ぶ実装はテストの後・implementation-cross-review の前に使う。
+description: Claude の実装（git の差分）が対象プロジェクトの既存の設計（置き場所・責務・依存の向き・共通の仕組み）に沿っているかを GPT-6.2 Sol と Opus 5.5 に確かめさせて直す。「既存の設計に沿っているか見て」などの依頼で使う。依頼がなくても、構造を選ぶ実装はテストの後・implementation-cross-review の前に使う。
 argument-hint: "[--base <ref> | --commit <sha> | --uncommitted] [補足]"
 allowed-tools: Bash(bash *architecture-alignment-cross-review/scripts/new-run.sh*), Bash(bash *architecture-alignment-cross-review/scripts/prepare.sh*), Bash(bash *architecture-alignment-cross-review/scripts/review.sh*), Read, Grep, Glob, Write(//**/artifacts/architecture-alignment-cross-review/**), Edit(//**/artifacts/architecture-alignment-cross-review/**)
 ---
@@ -10,7 +10,7 @@ allowed-tools: Bash(bash *architecture-alignment-cross-review/scripts/new-run.sh
 引数: $ARGUMENTS
 Claude の推論レベル: ${CLAUDE_EFFORT}
 
-Claude が実装した変更が、対象プロジェクトの既存の設計（明文化された方針と、複数の実装から読み取れる慣習）に沿っているかを、Sol（Codex CLI の GPT-6.1 Sol）と Opus（`opus-reviewer`）に**同じ依頼で**確かめさせ、根拠のある逸脱を Claude が直す。正しさ・バグ・セキュリティは implementation-cross-review が見るので、ここでは扱わない。設計に合わせる直しは責務やファイルの移動になりやすいので、正しさのレビューより先に形を整える。差分の取り出し・プロンプトの組み立て・Codex の呼び出しはスクリプトに任せ、Claude は「決定事項をまとめる」「指摘を確かめて判断する」「採用した指摘を直す」だけを行う。結果は `artifacts/architecture-alignment-cross-review/` に保存される。
+Claude が実装した変更が、対象プロジェクトの既存の設計（明文化された方針と、複数の実装から読み取れる慣習）に沿っているかを、Sol（Codex CLI の GPT-6.2 Sol）と Opus（`opus-reviewer`）に**同じ依頼で**確かめさせ、根拠のある逸脱を Claude が直す。正しさ・バグ・セキュリティは implementation-cross-review が見るので、ここでは扱わない。設計に合わせる直しは責務やファイルの移動になりやすいので、正しさのレビューより先に形を整える。差分の取り出し・プロンプトの組み立て・Codex の呼び出しはスクリプトに任せ、Claude は「決定事項をまとめる」「指摘を確かめて判断する」「採用した指摘を直す」だけを行う。結果は `artifacts/architecture-alignment-cross-review/` に保存される。
 
 ## 自分の判断で使うとき
 

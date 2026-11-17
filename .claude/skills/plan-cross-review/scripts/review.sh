@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# prepare.sh で作った prompt.md を Codex CLI（既定は GPT-6 Astra）に読み取り専用でレビューさせ、review.md に保存する。
+# prepare.sh で作った prompt.md を Codex CLI（既定は GPT-6.2 Astra）に読み取り専用でレビューさせ、review.md に保存する。
 # Codex の呼び出しは implementation-cross-review の review.sh に任せ、見出しだけを差し替える。
 #
 # 使い方: review.sh [--model <id>] --effort <low|medium|high|xhigh|max> <実行フォルダ>

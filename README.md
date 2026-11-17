@@ -3,7 +3,7 @@
 Claude Code と Codex 向けの、特定のプロジェクトに依存しない汎用スキル集。\
 導入すると、Claude Code に普段どおり頼むだけで、次のように作業が進む。
 
-- 設計と差分を、GPT-6 Astra と Fable 5.2 がレビューする。
+- 設計と差分を、GPT-6.2 Astra と Fable 5.2 がレビューする。
 - 実装と、テスト・lint などの確認を、Haiku 5.5 が受け持つ。
 - Claude が結果を自然な日本語で報告する。
 
@@ -22,8 +22,8 @@ Claude は作業の一部を次のサブエージェントや Codex CLI に任�
 | 任せる先 | 任せること | スキル |
 | --- | --- | --- |
 | Haiku 5.5 | 実装と、テスト・lint・CI ログなどの確認 | haiku-implementation・haiku-check |
-| GPT-6 Astra（Codex CLI）と Fable 5.2 | 設計と差分のレビュー | plan-cross-review・implementation-cross-review |
-| GPT-6.1 Sol（Codex CLI）と Opus 5.5 | 差分が既存の設計に沿っているかの確認 | architecture-alignment-cross-review |
+| GPT-6.2 Astra（Codex CLI）と Fable 5.2 | 設計と差分のレビュー | plan-cross-review・implementation-cross-review |
+| GPT-6.2 Sol（Codex CLI）と Opus 5.5 | 差分が既存の設計に沿っているかの確認 | architecture-alignment-cross-review |
 
 Claude Code は Opus 5.5 の推論レベル high で動かすことを推奨する。
 
