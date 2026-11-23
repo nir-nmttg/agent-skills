@@ -4,7 +4,7 @@ Claude Code と Codex 向けの、特定のプロジェクトに依存しない�
 導入すると、Claude Code に普段どおり頼むだけで、次のように作業が進む。
 
 - 設計と差分を、GPT-6.2 Astra と Fable 5.2 がレビューする。
-- 実装と、テスト・lint などの確認を、Haiku 5.5 が受け持つ。
+- コードの検索・実装と、テスト・lint などの確認を、Haiku 5.5 が受け持つ。
 - Claude が結果を自然な日本語で報告する。
 
 作業ごとに、次のエージェントのスキルを使う。
@@ -21,7 +21,7 @@ Claude は作業の一部を次のサブエージェントや Codex CLI に任�
 
 | 任せる先 | 任せること | スキル |
 | --- | --- | --- |
-| Haiku 5.5 | 実装と、テスト・lint・CI ログなどの確認 | haiku-implementation・haiku-check |
+| Haiku 5.5 | コードの検索、実装と、テスト・lint・CI ログなどの確認 | haiku-explore・haiku-implementation・haiku-check |
 | GPT-6.2 Astra（Codex CLI）と Fable 5.2 | 設計と差分のレビュー | plan-cross-review・implementation-cross-review |
 | GPT-6.2 Sol（Codex CLI）と Opus 5.5 | 差分が既存の設計に沿っているかの確認 | architecture-alignment-cross-review |
 
@@ -92,7 +92,7 @@ flowchart LR
     S[session-status-emoji]
   end
   subgraph design[設計]
-    P[plan-cross-review]
+    E[haiku-explore] --> P[plan-cross-review]
   end
   subgraph impl[実装]
     I[haiku-implementation]
@@ -106,13 +106,15 @@ flowchart LR
   subgraph report[報告]
     J[japanese-report]
   end
-  S --> P --> I --> T
+  S --> E
+  P --> I --> T
   U --> R --> J
 ```
 
 | スキル | できること | 使う場面 |
 | --- | --- | --- |
 | [session-status-emoji](.claude/skills/session-status-emoji/SKILL.md) | セッション名に作業の段階の絵文字を付ける | デスクトップアプリの全セッション |
+| [haiku-explore](.claude/skills/haiku-explore/SKILL.md) | コードの広い検索を Haiku 5.5 に任せ、結論と場所だけを受け取る | 場所の見当がつかない検索 |
 | [plan-cross-review](.claude/skills/plan-cross-review/SKILL.md) | 設計を Astra と Fable にレビューさせる | 設計・実装計画を示す前 |
 | [haiku-implementation](.claude/skills/haiku-implementation/SKILL.md) | 実装を Haiku 5.5 に任せ、手分けして進める | 指示書に書けて確かめられる実装 |
 | [haiku-check](.claude/skills/haiku-check/SKILL.md) | テスト・lint・CI ログの確認を Haiku 5.5 に任せる | 状態を変えない確認 |
