@@ -101,7 +101,7 @@ fi
 
 agents_src="$repo_root/.claude/agents"
 agents_dir="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/agents"
-agent_users="haiku-implementation, haiku-check, plan-cross-review, architecture-alignment-cross-review, implementation-cross-review, gh-issue-autofix, codebase-cleanup-workflow"
+agent_users="haiku-explore, haiku-implementation, haiku-check, plan-cross-review, architecture-alignment-cross-review, implementation-cross-review, gh-issue-autofix, codebase-cleanup-workflow"
 unlinked_agents=()
 for f in "$agents_src"/*.md; do
   [[ -f $f ]] || continue
@@ -147,6 +147,7 @@ skill_needs() {
     architecture-alignment-cross-review) echo "git perl agents-link" ;;
     haiku-implementation) echo "git jq perl agents-link haiku-implementation-link" ;;
     haiku-check) echo "git agents-link" ;;
+    haiku-explore) echo "agents-link" ;;
     codebase-cleanup-workflow) echo "git perl agents-link" ;;
     gh-todo) echo "gh gh-login" ;;
     gh-issue-autofix) echo "git jq perl gh gh-login agents-link" ;;
