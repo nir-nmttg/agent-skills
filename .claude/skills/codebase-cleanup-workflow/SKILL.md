@@ -1,6 +1,6 @@
 ---
 name: codebase-cleanup-workflow
-description: 設計整合・過剰実装の除去・責務分割と共通化・テスト整理・宣言順整理・文書同期の 6 スキルを順に適用し、工程ごとに Haiku の確認と Astra・Fable のレビューを挟んで全体を整える。
+description: 設計整合・過剰実装の除去・責務分割と共通化・テスト整理・宣言順整理・文書同期の 6 スキルを順に適用し、工程ごとに Haiku の確認とクロスレビューを挟んで全体を整える。
 disable-model-invocation: true
 argument-hint: "[--resume <実行フォルダ>] [--steps <工程番号>] [対象のパス・範囲・上限]"
 allowed-tools: Bash(bash *codebase-cleanup-workflow/scripts/start.sh*), Read, Grep, Glob, Write(//**/artifacts/codebase-cleanup-workflow/**), Edit(//**/artifacts/codebase-cleanup-workflow/**)

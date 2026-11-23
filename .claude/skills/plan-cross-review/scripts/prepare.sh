@@ -72,17 +72,9 @@ fi
   echo "コードを読む場所: $source"
   printf '</scope>\n'
   print_project_instructions "$root"
-  printf '\n<requirements>\n'
-  cat "$run_dir/requirements.md"
-  printf '\n</requirements>\n'
-  if [[ -n $followup ]]; then
-    printf '\n<fixes>\n'
-    cat "$run_dir/fixes.md"
-    printf '\n</fixes>\n'
-  fi
-  printf '\n<design>\n'
-  cat "$run_dir/design.md"
-  printf '\n</design>\n'
+  print_tagged requirements "$run_dir/requirements.md"
+  if [[ -n $followup ]]; then print_tagged fixes "$run_dir/fixes.md"; fi
+  print_tagged design "$run_dir/design.md"
   if [[ -n $followup ]]; then
     printf '\n<design-diff>\n'
     cat "$run_dir/design-diff.patch"

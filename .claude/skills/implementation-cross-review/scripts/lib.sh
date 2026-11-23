@@ -128,3 +128,76 @@ collect_fix_diff() {
   scope="確認のレビュー（前回: $(basename "$prev")）"
   commits=$(g log --format='%h %s' "$prev_head..HEAD")
 }
+
+# 差分をこの大きさまでプロンプトに埋め込む。超えたらファイルを読ませる
+MAX_EMBED_BYTES=200000
+
+# print_tagged <タグ> <ファイル>  ファイルの中身を <タグ> で囲んで出力する
+print_tagged() {
+  printf '\n<%s>\n' "$1"
+  cat "$2"
+  printf '\n</%s>\n' "$1"
+}
+
+# print_patch <タグ> <差分のファイル> <バイト数>  差分を <タグ> に埋め込む。大きすぎればファイルを区切って読むよう案内する
+print_patch() {
+  printf '\n<%s>\n' "$1"
+  if (($3 <= MAX_EMBED_BYTES)); then
+    cat "$2"
+  else
+    echo "差分が大きい（${3} バイト）ため埋め込んでいません。$2 を区切りながら読んでください。"
+  fi
+  printf '</%s>\n' "$1"
+}
+
+# print_diff_scope <workdir> <run_dir>  1 回目のレビューの <scope> を出力する（collect_diff が設定した変数を使う）
+print_diff_scope() {
+  printf '\n\n<scope>\n'
+  echo "リポジトリ: $1"
+  echo "範囲: $scope"
+  echo "コードを読む場所: $source"
+  echo "差分のファイル: $2/diff.patch"
+  if [[ -n $commits ]]; then printf '\nコミット:\n%s\n' "$commits"; fi
+  if [[ -n $stat ]]; then printf '\n変更ファイル:\n%s\n' "$stat"; fi
+  if ((${#untracked[@]})); then printf '\n未追跡の新規ファイル:\n'; printf '%s\n' "${untracked[@]}"; fi
+  printf '</scope>\n'
+}
+
+# print_fix_scope <workdir> <run_dir>  確認のレビューの <scope> を出力する（collect_fix_diff が設定した変数を使う）
+print_fix_scope() {
+  printf '\n\n<scope>\n'
+  echo "リポジトリ: $1"
+  echo "範囲: $scope"
+  echo "コードを読む場所: $1"
+  echo "修正の差分のファイル: $2/fix.patch"
+  if [[ -n $commits ]]; then printf '\n前回のレビューのあとのコミット:\n%s\n' "$commits"; fi
+  printf '</scope>\n'
+}
+
+# finish_review <workdir> <run_dir> <スナップショットのツリー ID（取れなければ空）>
+# 1 回目のレビューの実行情報を保存し、<run_dir>/prompt.md.tmp を prompt.md にして、範囲と保存先を出力する
+# （collect_diff が設定した source・scope・files・lines を使う）
+finish_review() {
+  echo "$source" >"$2/source.txt"
+  echo "${scope}（$files ファイル、$lines 行）" >"$2/scope.txt"
+  if [[ -n $3 ]]; then
+    echo "$3" >"$2/snapshot.txt"
+    echo "$1" >"$2/repo.txt"
+    git -C "$1" rev-parse HEAD >"$2/head.txt"
+  fi
+  mv "$2/prompt.md.tmp" "$2/prompt.md"
+  echo "範囲: ${scope}（$files ファイル、$lines 行）"
+  echo "コードを読む場所: $source"
+  echo "プロンプト: $2/prompt.md"
+}
+
+# finish_followup <workdir> <run_dir>  確認のレビューの実行情報を保存し、prompt.md にして、範囲と保存先を出力する
+# （collect_fix_diff が設定した scope・files・lines を使う）
+finish_followup() {
+  echo "$1" >"$2/source.txt"
+  echo "${scope}（修正 $files ファイル、$lines 行）" >"$2/scope.txt"
+  mv "$2/prompt.md.tmp" "$2/prompt.md"
+  echo "範囲: ${scope}（修正 $files ファイル、$lines 行）"
+  echo "コードを読む場所: $1"
+  echo "プロンプト: $2/prompt.md"
+}

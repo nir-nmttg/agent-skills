@@ -63,14 +63,8 @@ toplevel=$(git -C "$workdir" rev-parse --show-toplevel 2>/dev/null) || { echo "�
 workdir=$toplevel
 git -C "$workdir" rev-parse -q --verify HEAD >/dev/null || { echo "エラー: $workdir にはまだコミットがありません" >&2; exit 1; }
 
-# 大きすぎる差分はプロンプトに埋め込まず、ファイルを読ませる
-max_bytes=200000
-
 print_constraints() {
-  [[ -s $run_dir/constraints.md ]] || return 0
-  printf '\n<constraints>\n'
-  cat "$run_dir/constraints.md"
-  printf '\n</constraints>\n'
+  [[ ! -s $run_dir/constraints.md ]] || print_tagged constraints "$run_dir/constraints.md"
 }
 
 if [[ -n $followup ]]; then
@@ -79,33 +73,13 @@ if [[ -n $followup ]]; then
 
   {
     cat "$prompt_file"
-    printf '\n\n<scope>\n'
-    echo "リポジトリ: $workdir"
-    echo "範囲: $scope"
-    echo "コードを読む場所: $workdir"
-    echo "修正の差分のファイル: $run_dir/fix.patch"
-    if [[ -n $commits ]]; then printf '\n前回のレビューのあとのコミット:\n%s\n' "$commits"; fi
-    printf '</scope>\n'
+    print_fix_scope "$workdir" "$run_dir"
     print_project_instructions "$workdir"
     print_constraints
-    printf '\n<fixes>\n'
-    cat "$run_dir/fixes.md"
-    printf '\n</fixes>\n\n<fix-diff>\n'
-    if ((size <= max_bytes)); then
-      cat "$run_dir/fix.patch"
-    else
-      echo "差分が大きい（${size} バイト）ため埋め込んでいません。$run_dir/fix.patch を区切りながら読んでください。"
-    fi
-    printf '</fix-diff>\n'
+    print_tagged fixes "$run_dir/fixes.md"
+    print_patch fix-diff "$run_dir/fix.patch" "$size"
   } >"$run_dir/prompt.md.tmp"
-
-  echo "$workdir" >"$run_dir/source.txt"
-  echo "${scope}（修正 $files ファイル、$lines 行）" >"$run_dir/scope.txt"
-  mv "$run_dir/prompt.md.tmp" "$run_dir/prompt.md"
-
-  echo "範囲: ${scope}（修正 $files ファイル、$lines 行）"
-  echo "コードを読む場所: $workdir"
-  echo "プロンプト: $run_dir/prompt.md"
+  finish_followup "$workdir" "$run_dir"
   exit 0
 fi
 
@@ -118,35 +92,9 @@ tree_id=$(snapshot "$workdir" 2>/dev/null) || { tree_id=""; echo "注意: 作業
 
 {
   cat "$prompt_file"
-  printf '\n\n<scope>\n'
-  echo "リポジトリ: $workdir"
-  echo "範囲: $scope"
-  echo "コードを読む場所: $source"
-  echo "差分のファイル: $run_dir/diff.patch"
-  if [[ -n $commits ]]; then printf '\nコミット:\n%s\n' "$commits"; fi
-  if [[ -n $stat ]]; then printf '\n変更ファイル:\n%s\n' "$stat"; fi
-  if ((${#untracked[@]})); then printf '\n未追跡の新規ファイル:\n'; printf '%s\n' "${untracked[@]}"; fi
-  printf '</scope>\n'
+  print_diff_scope "$workdir" "$run_dir"
   print_project_instructions "$source"
   print_constraints
-  printf '\n<diff>\n'
-  if ((size <= max_bytes)); then
-    cat "$run_dir/diff.patch"
-  else
-    echo "差分が大きい（${size} バイト）ため埋め込んでいません。$run_dir/diff.patch を区切りながら読んでください。"
-  fi
-  printf '</diff>\n'
+  print_patch diff "$run_dir/diff.patch" "$size"
 } >"$run_dir/prompt.md.tmp"
-
-echo "$source" >"$run_dir/source.txt"
-echo "${scope}（$files ファイル、$lines 行）" >"$run_dir/scope.txt"
-if [[ -n $tree_id ]]; then
-  echo "$tree_id" >"$run_dir/snapshot.txt"
-  echo "$workdir" >"$run_dir/repo.txt"
-  git -C "$workdir" rev-parse HEAD >"$run_dir/head.txt"
-fi
-mv "$run_dir/prompt.md.tmp" "$run_dir/prompt.md"
-
-echo "範囲: ${scope}（$files ファイル、$lines 行）"
-echo "コードを読む場所: $source"
-echo "プロンプト: $run_dir/prompt.md"
+finish_review "$workdir" "$run_dir" "$tree_id"

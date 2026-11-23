@@ -7,7 +7,7 @@
 #
 # 状態は未コミット・未追跡を含み（.gitignore 対象は除く）、本物のインデックスに触れずに記録する。
 # git リポジトリでないフォルダでは、実行フォルダだけを作り、変わったファイルは確かめられないと知らせる。
-# 保存先は ${HAIKU_CHECK_DIR}（既定: このリポジトリ直下の artifacts/haiku-check）/<日時>-<リポジトリ名>/。
+# 保存先は ${HAIKU_CHECK_DIR}（既定: このリポジトリ直下の artifacts/haiku-check）/<日時>-<リポジトリ名>.<乱数>/。
 set -euo pipefail
 
 usage() { sed -n '4,6p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 1; }
@@ -35,8 +35,10 @@ case $cmd in
     top=$(git -C "$workdir" rev-parse --show-toplevel 2>/dev/null) && workdir=$top || { is_git=""; workdir=$(cd -P "$workdir" && pwd); }
     # ~/.claude/skills のシンボリックリンク経由で呼ばれても、リンク先のリポジトリに保存する
     repo_root=$(cd -P "$(dirname "$0")/../../../.." && pwd)
-    run_dir="${HAIKU_CHECK_DIR:-$repo_root/artifacts/haiku-check}/$(date +%Y%m%d-%H%M%S)-$(basename "$workdir")"
-    mkdir -p "$run_dir"
+    root=${HAIKU_CHECK_DIR:-$repo_root/artifacts/haiku-check}
+    mkdir -p "$root"
+    # 同じリポジトリで同時に始めても、ログが混ざらないよう原子的に作る
+    run_dir=$(mktemp -d "$root/$(date +%Y%m%d-%H%M%S)-$(basename "$workdir").XXXXXX")
     echo "$workdir" >"$run_dir/repo"
     echo "作業場所: $workdir"
     echo "ログの保存先: $run_dir"

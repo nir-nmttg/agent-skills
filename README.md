@@ -129,7 +129,7 @@ flowchart LR
 
 | 工程 | スキル | できること |
 | --- | --- | --- |
-| 1〜6 | [codebase-cleanup-workflow](.claude/skills/codebase-cleanup-workflow/SKILL.md) | 下の 6 本を順に使い、工程ごとに Haiku の確認と Astra・Fable のレビューを挟んで作業ブランチにコミットする |
+| 1〜6 | [codebase-cleanup-workflow](.claude/skills/codebase-cleanup-workflow/SKILL.md) | 下の 6 本を順に使い、工程ごとに Haiku の確認とクロスレビューを挟んで作業ブランチにコミットする |
 | 1 | [architecture-alignment-refactor](.claude/skills/architecture-alignment-refactor/SKILL.md) | 設計方針から外れた責務分担や依存関係を直す |
 | 2 | [overengineering-refactor](.claude/skills/overengineering-refactor/SKILL.md) | 過剰な抽象化・汎用化・防御的実装や未使用コードを取り除く |
 | 3 | [code-structure-refactor](.claude/skills/code-structure-refactor/SKILL.md) | 責務の混在や重複を、分割・共通化で直す |

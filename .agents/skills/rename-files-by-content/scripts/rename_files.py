@@ -52,10 +52,6 @@ def directory_flags():
     return os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
 
 
-def relative_name(parts):
-    return "/".join(parts)
-
-
 def inventory(root):
     files = []
     skipped = []
@@ -81,22 +77,20 @@ def inventory(root):
                 skipped.append({"source": name, "reason": "確認できません: {}".format(exc)})
     finally:
         os.close(root_fd)
-    files.sort(key=lambda item: item["source"])
-    skipped.sort(key=lambda item: item["source"])
     return {"root": str(root), "recursive": False, "files": files, "skipped": skipped}
 
 
-def source_parts(value):
+def validate_source(value):
     if not isinstance(value, str) or not value or "\x00" in value:
         raise PlanError("source は空でない相対パスにしてください。")
-    parts = tuple(value.split("/"))
+    parts = value.split("/")
     if any(part in ("", ".", "..") for part in parts) or Path(value).is_absolute():
         raise PlanError("source に絶対パス、空の要素、.、.. は使えません: {!r}".format(value))
     if len(parts) != 1:
         raise PlanError("対象は指定フォルダの直下のファイルだけです: {!r}".format(value))
     if value.startswith("."):
         raise PlanError("隠しファイルは対象外です: {!r}".format(value))
-    return parts
+    return value
 
 
 def validate_fingerprint(value, source):
@@ -142,25 +136,8 @@ def validate_target(value, source):
         raise PlanError("target の日付が実在しません: {!r}".format(source)) from exc
 
 
-class Directories:
-    """root から symlink を通らずに開いた親ディレクトリを保持する。"""
-
-    def __init__(self, root):
-        self.handles = {(): os.open(str(root), directory_flags())}
-
-    def get(self, parts):
-        if parts not in self.handles:
-            parent = self.get(parts[:-1])
-            self.handles[parts] = os.open(parts[-1], directory_flags(), dir_fd=parent)
-        return self.handles[parts]
-
-    def close(self):
-        for handle in self.handles.values():
-            os.close(handle)
-
-
-def verify_source(item, parent_fd):
-    info = os.stat(item["parts"][-1], dir_fd=parent_fd, follow_symlinks=False)
+def verify_source(item, root_fd):
+    info = os.stat(item["source"], dir_fd=root_fd, follow_symlinks=False)
     if not stat.S_ISREG(info.st_mode):
         raise PlanError("通常ファイルではありません: {!r}".format(item["source"]))
     if fingerprint(info) != item["fingerprint"]:
@@ -182,20 +159,16 @@ def already_named(source_name, target):
     return match is not None and int(match.group(1)) >= 2 and match.group(1) == format(int(match.group(1)), "02d")
 
 
-def allocate(items, directories):
-    occupied = {}
+def allocate(items, root_fd):
+    with os.scandir(root_fd) as entries:
+        occupied = {name_key(entry.name) for entry in entries}
     for item in items:
-        parent = item["parts"][:-1]
-        if parent not in occupied:
-            parent_fd = directories.get(parent)
-            with os.scandir(parent_fd) as entries:
-                occupied[parent] = {name_key(entry.name) for entry in entries}
         target = item["requested_target"]
         if target is None:
             item["status"] = "pending"
             item["target"] = None
             continue
-        if already_named(item["parts"][-1], target):
+        if already_named(item["source"], target):
             item["status"] = "unchanged"
             item["target"] = item["source"]
             continue
@@ -203,14 +176,14 @@ def allocate(items, directories):
         stem = target[:-len(suffix)] if suffix else target
         candidate = target
         number = 2
-        while name_key(candidate) in occupied[parent]:
+        while name_key(candidate) in occupied:
             candidate = "{}_{:02d}{}".format(stem, number, suffix)
             number += 1
         if len(candidate.encode("utf-8")) > MAX_NAME_BYTES:
             raise PlanError("衝突回避の連番を付けると 240 byte を超えます。target を短くしてください: {!r}".format(item["source"]))
-        occupied[parent].add(name_key(candidate))
+        occupied.add(name_key(candidate))
         item["status"] = "planned"
-        item["target"] = relative_name(parent + (candidate,))
+        item["target"] = candidate
 
 
 def load_plan(path):
@@ -229,8 +202,7 @@ def load_plan(path):
     for row, entry in enumerate(plan["files"], 1):
         if not isinstance(entry, dict) or any(key not in entry for key in ("source", "fingerprint", "target", "reason")):
             raise PlanError("files の {} 行目には source/fingerprint/target/reason が必要です。".format(row))
-        parts = source_parts(entry["source"])
-        source = relative_name(parts)
+        source = validate_source(entry["source"])
         if source in seen:
             raise PlanError("source が重複しています: {!r}".format(source))
         seen.add(source)
@@ -238,23 +210,22 @@ def load_plan(path):
         validate_target(entry["target"], source)
         if not isinstance(entry["reason"], str):
             raise PlanError("reason は文字列にしてください: {!r}".format(source))
-        items.append({"source": source, "parts": parts, "fingerprint": expected, "requested_target": entry["target"], "reason": entry["reason"]})
+        items.append({"source": source, "fingerprint": expected, "requested_target": entry["target"], "reason": entry["reason"]})
     return root, items
 
 
-def apply_one(item, parent_fd):
+def apply_one(item, root_fd):
     """上書きしない hard link を作り、両側を確認してから元の名前を削除する。"""
-    verify_source(item, parent_fd)
-    source_name = item["parts"][-1]
-    target_name = item["target"].split("/")[-1]
-    os.link(source_name, target_name, src_dir_fd=parent_fd, dst_dir_fd=parent_fd, follow_symlinks=False)
+    verify_source(item, root_fd)
+    source, target = item["source"], item["target"]
+    os.link(source, target, src_dir_fd=root_fd, dst_dir_fd=root_fd, follow_symlinks=False)
     # link 後の失敗では作成先を残す。元の内容を失う rollback はしない。
     try:
-        linked = os.stat(target_name, dir_fd=parent_fd, follow_symlinks=False)
+        linked = os.stat(target, dir_fd=root_fd, follow_symlinks=False)
         if not stat.S_ISREG(linked.st_mode) or fingerprint(linked) != item["fingerprint"]:
             raise PlanError("作成先の同一性を確認できません。作成先を残しました。")
-        verify_source(item, parent_fd)
-        os.unlink(source_name, dir_fd=parent_fd)
+        verify_source(item, root_fd)
+        os.unlink(source, dir_fd=root_fd)
     except (OSError, PlanError) as exc:
         raise PlanError("改名を完了できません。作成先を残しました: {}".format(exc)) from exc
 
@@ -263,17 +234,17 @@ def apply_plan(path, execute):
     mode = "apply" if execute else "dry-run"
     counts = {"planned": 0, "renamed": 0, "unchanged": 0, "pending": 0, "error": 0}
     root = None
-    directories = None
+    root_fd = None
     try:
         root, items = load_plan(path)
-        directories = Directories(root)
+        root_fd = os.open(str(root), directory_flags())
         # 全行・全 source・全割当を検証し終えるまで変更しない。
         for item in items:
-            verify_source(item, directories.get(item["parts"][:-1]))
-        allocate(items, directories)
+            verify_source(item, root_fd)
+        allocate(items, root_fd)
     except (OSError, PlanError, RecursionError) as exc:
-        if directories is not None:
-            directories.close()
+        if root_fd is not None:
+            os.close(root_fd)
         counts["error"] = 1
         emit({"type": "error", "status": "error", "reason": "事前検証に失敗しました。変更はありません: {}".format(exc)})
         emit({"type": "summary", "root": str(root) if root else None, "mode": mode, "counts": counts})
@@ -283,7 +254,7 @@ def apply_plan(path, execute):
             result = {"type": "file", "source": item["source"], "target": item["target"], "status": item["status"], "reason": item["reason"]}
             if execute and item["status"] == "planned":
                 try:
-                    apply_one(item, directories.get(item["parts"][:-1]))
+                    apply_one(item, root_fd)
                     result["status"] = "renamed"
                 except (OSError, PlanError, NotImplementedError) as exc:
                     result["status"] = "error"
@@ -291,7 +262,7 @@ def apply_plan(path, execute):
             counts[result["status"]] += 1
             emit(result)
     finally:
-        directories.close()
+        os.close(root_fd)
     emit({"type": "summary", "root": str(root), "mode": mode, "counts": counts})
     return 1 if counts["error"] else 0
 
@@ -309,7 +280,7 @@ def main():
         return apply_plan(args.plan, args.apply)
     try:
         emit(inventory(directory_root(args.directory)))
-    except (OSError, PlanError, RecursionError) as exc:
+    except (OSError, PlanError) as exc:
         print("エラー: {}".format(exc), file=sys.stderr)
         return 1
     return 0

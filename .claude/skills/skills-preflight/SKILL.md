@@ -1,6 +1,6 @@
 ---
 name: skills-preflight
-description: このリポジトリのスキルに必要なコマンド・ログイン・外部スキルがそろっているかを確認し、足りないコマンドとリンクを了承を得てから入れる。
+description: このリポジトリのスキルに必要なコマンド・ログイン・リンクがそろっているかを確認し、足りないコマンドとリンクを了承を得てから入れる。
 disable-model-invocation: true
 allowed-tools: Bash(bash *skills-preflight/scripts/check.sh*)
 ---
