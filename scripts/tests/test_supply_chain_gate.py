@@ -30,7 +30,6 @@ SKILLS = REPO / ".agents" / "skills"
 MINOR = "minor-version-upgrade"
 TEMP_ROOT = str(Path(tempfile.gettempdir()).resolve())
 REVIEWS = ("coverage", "sources", "artifacts", "advisories", "authenticity", "compatibility")
-STATIC_REVIEWS = REVIEWS
 
 
 def timestamp(delta=timedelta()):
@@ -283,24 +282,6 @@ class GateTests(unittest.TestCase):
             yield fixture
         finally:
             fixture.close()
-
-    def test_approved_plan_exports_snapshot_once_and_check_never_executes(self):
-        with self.fixture() as f:
-            f.ready()
-            f.require_ok(f.command("check"))
-            self.assertFalse(f.marker.exists())
-            result = f.require_ok(f.command("run"))
-            self.assertEqual(json.loads(result.stdout)["status"], "static_ready")
-            report = json.loads((f.run_dir / "execution-output/static-result.json").read_text())
-            self.assertFalse(report["runtime_verified"])
-            self.assertEqual((f.run_dir / report["candidate_snapshot"] / "app/index.js").read_bytes(),
-                             (f.candidate / "app/index.js").read_bytes())
-            self.assertEqual(f.invocations(), [])
-            self.assertEqual(f.state()["execution_status"], "succeeded")
-            self.assertEqual(f.state()["exit_code"], 0)
-            self.assertNotEqual(f.command("run").returncode, 0)
-            self.assertNotEqual(f.command("check").returncode, 0)
-
 
     def test_legacy_execution_configuration_is_rejected_before_any_launch(self):
         for mutation in ("empty", "host-interpreter", "complete-legacy", "explicit-strict"):
@@ -1116,6 +1097,8 @@ class StaticGateTests(unittest.TestCase):
             f.ready()
             # 静的承認に隔離のpassを偽装しない。
             self.assertNotIn("isolation", f.state()["reviews"])
+            f.require_ok(f.command("check"))
+            self.assertFalse(trap_marker.exists())
             result = f.require_ok(f.command("run"))
             self.assertEqual(json.loads(result.stdout)["status"], "static_ready")
             report = json.loads((f.run_dir / "execution-output/static-result.json").read_text())
@@ -1126,6 +1109,7 @@ class StaticGateTests(unittest.TestCase):
                             <= set(report["not_performed"]))
             snapshot = f.run_dir / report["candidate_snapshot"]
             self.assertEqual((snapshot / "app/never-run.py").read_bytes(), trap.read_bytes())
+            self.assertEqual((snapshot / "app/index.js").read_bytes(), (f.candidate / "app/index.js").read_bytes())
             self.assertEqual(report["source_manifest"]["files"]["app/never-run.py"],
                              {"sha256": sha256(trap.read_bytes()), "mode": 0o751})
             self.assertEqual(stat.S_IMODE(trap.stat().st_mode), 0o751)
@@ -1134,11 +1118,12 @@ class StaticGateTests(unittest.TestCase):
             self.assertFalse(trap_marker.exists())
             self.assertFalse(f.marker.exists())
             self.assertEqual(f.state()["execution_status"], "succeeded")
+            self.assertEqual(f.state()["exit_code"], 0)
             self.assertNotEqual(f.command("run").returncode, 0)
             self.assertNotEqual(f.command("check").returncode, 0)
 
     def test_static_still_requires_every_non_isolation_review_with_evidence(self):
-        for missing in STATIC_REVIEWS:
+        for missing in REVIEWS:
             with self.subTest(missing=missing), self.fixture() as f:
                 self.static(f)
                 f.flush()
@@ -1167,8 +1152,12 @@ class StaticGateTests(unittest.TestCase):
                 if marker is not None:
                     f.plan["verification_mode"] = marker
                 f.ready()
+                f.require_ok(f.command("check"))
+                self.assertFalse(f.marker.exists())
                 f.require_ok(f.command("run"))
                 self.assertFalse(f.marker.exists())
+                self.assertEqual(f.state()["exit_code"], 0)
+                self.assertNotEqual(f.command("check").returncode, 0)
         for marker in ("strict", "skip-tests", None, 1):
             with self.subTest(invalid_marker=marker), self.fixture() as f:
                 f.plan["verification_mode"] = marker
@@ -1177,29 +1166,31 @@ class StaticGateTests(unittest.TestCase):
                 self.assertFalse(f.marker.exists())
 
 
-    def test_seven_day_wait_is_required_for_default_and_explicit_static_plans(self):
-        for explicit in (False, True):
-            for age, succeeds in ((timedelta(days=7), True),
-                                  (timedelta(days=7) - timedelta(minutes=1), False),
-                                  (timedelta(days=1), False)):
-                with self.subTest(explicit=explicit, age=age), self.fixture() as f:
-                    if explicit:
-                        self.static(f)
-                    f.plan["candidates"][0]["published_at"] = timestamp(-age)
-                    f.ready()
-                    if succeeds:
-                        f.require_ok(f.command("run"))
-                    else:
-                        f.blocked("check")
-                        f.blocked()
-                    self.assertFalse(f.marker.exists())
-            for value in (None, timestamp(timedelta(days=1))):
-                with self.subTest(explicit=explicit, published=value), self.fixture() as f:
-                    if explicit:
-                        self.static(f)
-                    f.plan["candidates"][0]["published_at"] = value
-                    f.ready()
+    def test_seven_day_wait_is_required_even_with_legacy_static_marker(self):
+        for age, succeeds in ((timedelta(days=7), True),
+                              (timedelta(days=7) - timedelta(minutes=1), False),
+                              (timedelta(days=1), False)):
+            with self.subTest(age=age), self.fixture() as f:
+                f.plan["candidates"][0]["published_at"] = timestamp(-age)
+                f.ready()
+                if succeeds:
+                    f.require_ok(f.command("run"))
+                else:
+                    f.blocked("check")
                     f.blocked()
+                self.assertFalse(f.marker.exists())
+        for value in (None, timestamp(timedelta(days=1))):
+            with self.subTest(published=value), self.fixture() as f:
+                f.plan["candidates"][0]["published_at"] = value
+                f.ready()
+                f.blocked()
+        # 旧形式の static の印があっても待機を短縮しない
+        with self.subTest(legacy_static_marker=True), self.fixture() as f:
+            self.static(f)
+            f.plan["candidates"][0]["published_at"] = timestamp(-timedelta(days=1))
+            f.ready()
+            f.blocked("check")
+            f.blocked()
 
 
     def test_exact_seven_day_boundary_and_post_snapshot_recheck(self):
@@ -1433,7 +1424,7 @@ class StaticGateTests(unittest.TestCase):
                 f.run_dir = Path(fixed_run)
                 f.marker = f.run_dir / "execution-output/invocations.jsonl"
                 f.ready()
-                self.assertTrue(all(f.state()["reviews"][name]["status"] == "pass" for name in STATIC_REVIEWS))
+                self.assertTrue(all(f.state()["reviews"][name]["status"] == "pass" for name in REVIEWS))
                 self.assertNotIn("isolation", f.state()["reviews"])
                 result = f.require_ok(f.command("run"))
                 self.assertEqual(json.loads(result.stdout)["status"], "static_ready")
