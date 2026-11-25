@@ -44,7 +44,7 @@ if [[ -n $prev ]]; then
   echo "$prev" >"$dir/previous.txt"
   echo "$dir" >"$prev/followup.txt"
   echo "要件（前回から写した）: $dir/requirements.md"
-  echo "設計書（前回から写した。直した節を Edit する）: $dir/design.md"
+  echo "設計書（前回から写した。Read してから、直した節を Edit する）: $dir/design.md"
   echo "修正の一覧: $dir/fixes.md"
 else
   echo "要件: $dir/requirements.md"

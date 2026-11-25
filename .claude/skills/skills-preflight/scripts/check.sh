@@ -24,6 +24,15 @@ fi
 link_note=""
 $main_checkout || link_note="（git worktree からは実行できないので、メインの checkout で実行する）"
 
+# git で追跡しているファイルの一覧。link-skills.sh は追跡していないスキル・エージェントを新しくリンクしないので、
+# リンクの確認から外す（不足として数えると、直せない不足になる）。git で判定できないときは、すべて追跡しているとみなす
+tracked_files="" check_tracked=false
+if [[ -e $repo_root/.git ]] && has git && tracked_files=$(git -C "$repo_root" ls-files 2>/dev/null); then
+  check_tracked=true
+fi
+# tracked <絶対パス>
+tracked() { $check_tracked || return 0; grep -qxF -- "${1#"$repo_root"/}" <<<"$tracked_files"; }
+
 rows=()      # 結果の表の行
 missing=()   # 足りないもの（キー）
 fixes=()     # 対処方法の行
@@ -105,6 +114,7 @@ agent_users="haiku-explore, haiku-implementation, haiku-check, plan-cross-review
 unlinked_agents=()
 for f in "$agents_src"/*.md; do
   [[ -f $f ]] || continue
+  tracked "$f" || continue
   name=$(basename "$f")
   [[ -L $agents_dir/$name && $(readlink "$agents_dir/$name") == "$f" ]] || unlinked_agents+=("${name%.md}")
 done
@@ -115,7 +125,9 @@ else
     "\`$repo_root/scripts/link-skills.sh --claude\`${link_note}（初めて \`~/.claude/agents\` を作ったときは、新しいセッションで使う）"
 fi
 # haiku-implementer の hook は、ユーザー用のスキルのリンクから guard.sh を呼ぶ
-if [[ -L $link_dir/haiku-implementation && $(readlink "$link_dir/haiku-implementation") == "$skills_dir/haiku-implementation" ]]; then
+if ! tracked "$skills_dir/haiku-implementation/SKILL.md"; then
+  : # 追跡していないので link-skills.sh はリンクしない（下の「git で追跡していないスキル」に出る）
+elif [[ -L $link_dir/haiku-implementation && $(readlink "$link_dir/haiku-implementation") == "$skills_dir/haiku-implementation" ]]; then
   add haiku-implementation-link ok "\`~/.claude/skills/haiku-implementation\` のリンク" "リンク済み" "haiku-implementation（hook の guard.sh）"
 else
   add haiku-implementation-link ng "\`~/.claude/skills/haiku-implementation\` のリンク" "未リンク" "haiku-implementation（hook の guard.sh）" \
@@ -129,6 +141,7 @@ for skill in "$skills_dir"/*/; do
   skill=${skill%/}
   name=$(basename "$skill")
   [[ -f $skill/SKILL.md ]] || continue
+  tracked "$skill/SKILL.md" || continue
   [[ -L $link_dir/$name && $(readlink "$link_dir/$name") == "$skill" ]] || unlinked+=("$name")
 done
 if ((${#unlinked[@]} == 0)); then
@@ -136,6 +149,24 @@ if ((${#unlinked[@]} == 0)); then
 else
   add links warn "\`~/.claude/skills\` へのリンク（任意）" "未リンク: ${unlinked[*]}" "他のフォルダで使うとき" \
     "（他のフォルダでも使うなら）\`$repo_root/scripts/link-skills.sh\`"
+fi
+
+# --- git で追跡していないスキル（新しくリンクされず、すでにあるリンクは残る） --------
+
+if $check_tracked; then
+  untracked=()
+  for entry in "$repo_root"/.claude/skills/*/SKILL.md "$repo_root"/.agents/skills/*/SKILL.md "$repo_root"/.claude/agents/*.md; do
+    [[ -f $entry ]] || continue
+    tracked "$entry" && continue
+    rel=${entry#"$repo_root"/}
+    untracked+=("${rel%/SKILL.md}")
+  done
+  if ((${#untracked[@]} == 0)); then
+    add untracked ok "git で追跡していないスキル" "なし" "リンク・クロスレビュー"
+  else
+    add untracked warn "git で追跡していないスキル" "${untracked[*]}" "リンク・クロスレビュー" \
+      "link-skills.sh は新しくリンクしない（すでにあるリンクは残る）。意図したものでなければ、\`git status\` で中身を確かめてから、そのディレクトリ（エージェントは .md ファイル）を消し、 \`$repo_root/scripts/link-skills.sh\`${link_note} を実行すると、切れたリンクとして片付く"
+  fi
 fi
 
 # --- スキルごとの使える / 使えない ---------------------------------------------

@@ -7,6 +7,7 @@
 #   - 同名で切れたリンクは、別の場所を指していても張り直す（リポジトリを移したとき）
 #   - 同名の別ファイル・ディレクトリや、別の場所への切れていないリンクがあれば、触らずに警告する
 #   - 削除したスキル・エージェントを指したまま切れているリンクは取り除く
+#   - git で追跡していないスキル・エージェントは新しくリンクしない（すでにあるリンクは残して知らせる）
 #   - git worktree の中で実行したときは、何もせずにメインの checkout で実行し直すよう案内する
 set -euo pipefail
 
@@ -36,11 +37,29 @@ if git_dir=$(git -C "$repo_root" rev-parse --path-format=absolute --git-dir 2>/d
   echo "  $(dirname "$common_dir")/scripts/link-skills.sh" >&2
   exit 1
 fi
+# git で追跡しているファイルの一覧（リポジトリのルートからの相対パス）。ほかのツールが作った取り込んでいないコピーを、
+# ほかのフォルダや Codex のレビュアーに見せないために使う。git の管理下でない（アーカイブで取得した）ときは、
+# すべてリンクする。git の管理下なのに判定できないときは、リンクを変えずに止める
+check_tracked=false
+tracked_files=""
+if [[ -e "$repo_root/.git" ]]; then
+  if ! command -v git >/dev/null 2>&1 || ! tracked_files=$(git -C "$repo_root" ls-files); then
+    echo "エラー: git で追跡しているかを判定できないため、リンクを変えずに終えます（git の状態を確かめてから実行し直してください）" >&2
+    exit 1
+  fi
+  check_tracked=true
+fi
+# tracked <リポジトリのルートからの相対パス>
+tracked() {
+  $check_tracked || return 0
+  grep -qxF -- "$1" <<<"$tracked_files"
+}
+
 # link_entries <src_dir> <dest_dir> <label> <skills | agents>
 # skills は SKILL.md のあるフォルダを、agents は <名前>.md のファイルを、同じ名前でリンクする
 link_entries() {
   local src_dir=$1 dest_dir=$2 label=$3 kind=$4
-  local entry name dest current link
+  local entry name dest current link rel what
 
   echo "[$label] $dest_dir"
   mkdir -p "$dest_dir"
@@ -53,6 +72,19 @@ link_entries() {
     fi
     name=$(basename "$entry")
     dest="$dest_dir/$name"
+
+    rel=${entry#"$repo_root"/}
+    [[ $kind == agents ]] || rel=$rel/SKILL.md
+    if ! tracked "$rel"; then
+      if [[ -L "$dest" && "$dest" -ef "$entry" ]]; then
+        what=ディレクトリ
+        [[ $kind == skills ]] || what=ファイル
+        echo "skip $name: git で追跡していないが、リンク済みです（不要なら、git status で中身を確かめてから${what}を消し、再実行すると切れたリンクとして片付きます）" >&2
+      else
+        echo "skip $name: git で追跡していません（git add するとリンクされます）" >&2
+      fi
+      continue
+    fi
 
     if [[ -L "$dest" ]]; then
       current=$(readlink "$dest")
@@ -67,6 +99,13 @@ link_entries() {
       fi
       if [[ "$current" != "$src_dir"/* ]]; then
         echo "skip $name: 別の場所へのリンクがあります（${current}）" >&2
+        continue
+      fi
+      # このリポジトリの別のエントリを指すリンクでも、指す先を追跡していなければ張り替えない（ユーザーが選んだリンクかもしれない）
+      rel=${current#"$repo_root"/}
+      [[ ! -d "$current" ]] || rel=$rel/SKILL.md
+      if ! tracked "$rel"; then
+        echo "skip $name: git で追跡していない ${rel%/SKILL.md} を指すリンクがあります（張り替えるなら、そのリンクを消してから再実行）" >&2
         continue
       fi
     elif [[ -e "$dest" ]]; then
