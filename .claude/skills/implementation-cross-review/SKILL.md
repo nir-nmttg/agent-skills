@@ -127,7 +127,7 @@ Agent ツールには次を指定する。
   ```
 
 - どちらも終わると通知が来るので、それまで待つ。ポーリングはしない。
-- Fable（または Opus）の結果は、5. の decisions.md の表に出どころ付きで残す（全文は保存しない）。Astra（または Sol）の結果は `<実行フォルダ>/review.md` に保存される。
+- Fable（または Opus）の結果は、5. の decisions.md の表に出どころ付きで残す。Astra（または Sol）の結果は `<実行フォルダ>/review.md` に保存される。
 - `--effort` には上の「Claude の推論レベル」をそのまま渡す。空や `auto` のときは省略してよい（スクリプトが high にする）。
 - Codex（Astra / Sol）は読み取り専用のサンドボックスと 1M コンテキストで動き、個人設定（MCP サーバー・プラグイン・`~/.agents/skills` のスキル）は読み込まない。Fable・Opus は Read / Grep / Glob しか使えず、この会話・auto memory・ユーザー用の CLAUDE.md・MCP は読み込まない（作業場所のルートの CLAUDE.md・`.claude/CLAUDE.md`・AGENTS.md は `prompt.md` に入る）。どちらもコードを書き換えない。
 - 担当が結果を返さなければ、`${CLAUDE_SKILL_DIR}/references/reviewers.md` の「代わりの担当」のとおり 1 回だけ動かす。
@@ -203,7 +203,7 @@ Astra（または Sol）を動かしたら、スクリプトの出力の先頭�
 
 ## 再レビューの手順
 
-再レビューは、上の「再レビュー」の条件に当たるときだけ行う。確認のレビューは、前回（1 回目）の実行フォルダを指定して新しい実行フォルダを作るところから始め、修正の一覧の書き方・判断と報告の違い・ゼロからレビューし直すときの扱いは `${CLAUDE_SKILL_DIR}/references/followup.md` を読んで従う。ゼロからレビューし直すときは `--followup` を付けない。「再レビューは 1 回まで」と出たら、references/followup.md のとおり扱う（作成済みのフォルダでまだレビューしていなければ、そのフォルダで続ける）。
+`${CLAUDE_SKILL_DIR}/references/followup.md` を読んで従う。確認のレビューの実行フォルダは、前回（1 回目）の実行フォルダを指定して次のコマンドで作る（ゼロからレビューし直すときは `--followup` を付けない）。
 
 ```bash
 bash "${CLAUDE_SKILL_DIR}/scripts/new-run.sh" --followup <前回の実行フォルダ> <slug>-r2

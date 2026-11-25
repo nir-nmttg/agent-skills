@@ -39,7 +39,7 @@ if git_dir=$(git -C "$repo_root" rev-parse --path-format=absolute --git-dir 2>/d
 fi
 # git で追跡しているファイルの一覧（リポジトリのルートからの相対パス）。ほかのツールが作った取り込んでいないコピーを、
 # ほかのフォルダや Codex のレビュアーに見せないために使う。git の管理下でない（アーカイブで取得した）ときは、
-# 今までどおりすべてリンクする。git の管理下なのに判定できないときは、リンクを変えずに止める
+# すべてリンクする。git の管理下なのに判定できないときは、リンクを変えずに止める
 check_tracked=false
 tracked_files=""
 if [[ -e "$repo_root/.git" ]]; then
