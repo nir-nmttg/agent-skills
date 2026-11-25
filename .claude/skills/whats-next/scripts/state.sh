@@ -59,9 +59,10 @@ if [[ -n "$branch" ]] && command -v gh >/dev/null 2>&1 && gh auth status >/dev/n
   pr=$(gh pr view --json number,title,url,state,isDraft,reviewDecision,mergeable,statusCheckRollup --jq '
     def ci: [.statusCheckRollup[]? | [.conclusion, .state, .status] | map(select(. != null and . != "")) | first] as $s
       | if ($s | length) == 0 then "なし"
-        elif any($s[]; . == "FAILURE" or . == "ERROR" or . == "TIMED_OUT" or . == "CANCELLED") then "失敗あり"
-        elif any($s[]; . == "IN_PROGRESS" or . == "QUEUED" or . == "PENDING" or . == "EXPECTED") then "実行中"
-        else "成功" end;
+        elif any($s[]; . == "FAILURE" or . == "ERROR" or . == "TIMED_OUT" or . == "CANCELLED" or . == "STARTUP_FAILURE" or . == "ACTION_REQUIRED") then "失敗あり"
+        elif any($s[]; . == "IN_PROGRESS" or . == "QUEUED" or . == "PENDING" or . == "EXPECTED" or . == "WAITING" or . == "REQUESTED") then "実行中"
+        elif all($s[]; . == "SUCCESS" or . == "NEUTRAL" or . == "SKIPPED") then "成功"
+        else "不明" end;
     "- PR: [#\(.number) \(.title)](\(.url))（\(.state)\(if .isDraft then "・draft" else "" end)、レビュー: \(if (.reviewDecision // "") == "" then "なし" else .reviewDecision end)、CI: \(ci)、マージ可否: \(.mergeable)）"
   ' 2>/dev/null)
   echo "${pr:-- PR: なし}"

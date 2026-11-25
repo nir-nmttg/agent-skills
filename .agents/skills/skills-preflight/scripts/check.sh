@@ -12,6 +12,13 @@ repo_root=$(cd -P "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)
 skills_dir="$repo_root/.agents/skills"
 link_dir="$HOME/.agents/skills"
 
+# git で追跡しているファイルの一覧。link-skills.sh は追跡していないスキルを新しくリンクしない。
+# git で判定できないときは、すべて追跡しているとみなす（set -e で止まらないよう、if の中で判定する）
+check_tracked=false tracked_files="" untracked_found=false
+if [[ -e $repo_root/.git ]] && command -v git >/dev/null 2>&1 && tracked_files=$(git -C "$repo_root" ls-files 2>/dev/null); then
+  check_tracked=true
+fi
+
 # パスに表の区切りや改行があっても Markdown を崩さない。
 cell() {
   local value=$1
@@ -59,6 +66,11 @@ for skill in "$skills_dir"/*/; do
   else
     link='⚠️ 未リンク'
   fi
+  if $check_tracked && ! grep -qxF -- ".agents/skills/$name/SKILL.md" <<<"$tracked_files"; then
+    untracked_found=true
+    definition="$definition（⚠️ git で追跡していません）"
+    link="${link}（追跡していないので link-skills.sh は新しくリンクしない）"
+  fi
   printf '| %s | %s | %s | %s |\n' "$(cell "$name")" "$definition" "$config" "$link"
 done
 if (( count == 0 )); then
@@ -66,4 +78,7 @@ if (( count == 0 )); then
 fi
 printf '\n定義・設定の内容、スキル固有の依存関係、対象プロジェクトの検証環境は別途確認が必要です。\n'
 printf 'リンクを反映する場合: `%s/scripts/link-skills.sh --codex`（worktree ではメインの checkout から実行）\n' "$(cell "$repo_root")"
+if $untracked_found; then
+  printf 'git で追跡していないスキルは、link-skills.sh が新しくリンクしません（すでにあるリンクは残ります）。意図したものでなければ、git status で中身を確かめてからそのディレクトリを消し、link-skills.sh を実行すると、切れたリンクとして片付きます。\n'
+fi
 exit 0

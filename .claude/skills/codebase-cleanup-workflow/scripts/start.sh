@@ -41,6 +41,8 @@ if [[ -n $changes ]]; then
 fi
 
 start_sha=$(git rev-parse HEAD)
+# 同じリポジトリの worktree どうしでも同じ値になる、git の共通ディレクトリ（前回の整備を探すのに使う）
+common=$(cd -P "$(git rev-parse --git-common-dir)" && pwd)
 orig_branch=$(git branch --show-current)
 stamp=$(date +%Y%m%d-%H%M%S)
 branch="codebase-cleanup/$stamp"
@@ -60,6 +62,7 @@ cat >"$dir/progress.md" <<EOF
 # 整備の進捗
 
 - 対象: \`$top\`
+- リポジトリ: \`$common\`
 - 元のブランチ: \`${orig_branch:-（detached HEAD）}\`
 - 作業ブランチ: \`$branch\`
 - 開始時の SHA: \`$start_sha\`
@@ -86,6 +89,9 @@ cat >"$dir/progress.md" <<EOF
 ## 保留・未探索
 
 EOF
+# 前回の整備を探すときに読む値（Claude が書き足す progress.md の文言に頼らない）
+printf '%s\n' "$common" >"$dir/repo-common.txt"
+printf '%s\n' "$start_sha" >"$dir/start-sha.txt"
 
 if ! git switch --quiet -c "$branch"; then
   # post-checkout hook の失敗では、切り替わったうえで失敗が返る。記録は残して止める
@@ -98,9 +104,30 @@ if ! git switch --quiet -c "$branch"; then
   exit 1
 fi
 
+# 同じリポジトリのいちばん新しい前回の整備（今回の実行フォルダを除く）。repo-common.txt がない古い記録は、progress.md の「対象」で見分ける。
+# 探索のまとめがあり、開始時の SHA が今の HEAD の祖先のものだけを使う（別の履歴や、探索の前に止まった実行を基準にしない）
+previous=""
+runs=("$root"/*/)
+for ((i = ${#runs[@]} - 1; i >= 0; i--)); do
+  p=${runs[i]%/}
+  [[ $p != "$dir" && -f $p/progress.md ]] || continue
+  [[ -s $p/exploration.md ]] || continue
+  if [[ -f $p/repo-common.txt ]]; then
+    [[ $(cat "$p/repo-common.txt") == "$common" ]] || continue
+    prev_sha=$(cat "$p/start-sha.txt" 2>/dev/null || true)
+  else
+    grep -qxF -- "- 対象: \`$top\`" "$p/progress.md" || continue
+    prev_sha=$(sed -n 's/^- 開始時の SHA: `\([0-9a-f]*\)`$/\1/p' "$p/progress.md" | head -1)
+  fi
+  [[ -n $prev_sha ]] && git merge-base --is-ancestor "$prev_sha" HEAD 2>/dev/null || continue
+  previous=$p
+  break
+done
+
 echo "対象: $top"
 echo "作業ブランチ: ${branch}（元: ${orig_branch:-detached HEAD}）"
 echo "開始時の SHA: $start_sha"
 echo "実行フォルダ: $dir"
 echo "進捗: $dir/progress.md"
 echo "探索のまとめ: $dir/exploration.md"
+[[ -z $previous ]] || echo "前回の整備: $previous"

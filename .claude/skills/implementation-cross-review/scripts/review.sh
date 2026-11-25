@@ -59,8 +59,12 @@ started=$SECONDS
 echo "Codex でレビュー中: model=$model effort=$effort 範囲=$scope" >&2
 rm -f "$run_dir/review.md"
 status=0
+# 個人のスキル（~/.agents/skills）をレビュアーに見せないよう、HOME を空のフォルダにして起動する。
+# 認証とセッションの記録（codex resume）は、元の CODEX_HOME を使う
+codex_home=${CODEX_HOME:-$HOME/.codex}
+mkdir -p "$run_dir/home"
 # 実行フォルダはスキル集のリポジトリの下にあるので、展開したソースで git が親のリポジトリを見つけないようにする
-GIT_CEILING_DIRECTORIES=$run_dir codex "${args[@]}" --output-last-message "$run_dir/review.md" - <"$run_dir/prompt.md" \
+HOME="$run_dir/home" CODEX_HOME="$codex_home" GIT_CEILING_DIRECTORIES=$run_dir codex "${args[@]}" --output-last-message "$run_dir/review.md" - <"$run_dir/prompt.md" \
   >"$run_dir/events.jsonl" 2>"$run_dir/codex.log" || status=$?
 
 if ((status != 0)) || [[ ! -s $run_dir/review.md ]]; then

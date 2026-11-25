@@ -9,7 +9,7 @@
 # - Grep / Glob: path が実行フォルダの中でなければ止める（省略するとメインの作業フォルダが対象になるので止める）。
 #   読み取りだけなので、リンクした依存フォルダ（実体はもとのリポジトリ）の中も見かけのパスで判定して通す
 # - Bash: 先頭が「cd <実行フォルダの中> &&」でなければ止める（サブエージェントの Bash は毎回メインの作業フォルダで始まる）。
-#   リポジトリの状態を変える git コマンドと、依存パッケージを入れる・更新するコマンドも止める
+#   リポジトリの状態を変える git コマンドと、依存パッケージを入れる・更新するコマンドも止める（git branch は一覧と今のブランチの表示だけ通す）
 # 判定できないときも止める（hook は 2 以外の終了コードだと素通りになるため）。
 set -uo pipefail
 
@@ -77,6 +77,8 @@ case $tool in
     ;;
   Bash)
     cmd=$(field .tool_input.command) || exit 2
+    # 判定は行ごとに行うので、シェルと同じく \ と改行の継続を取り除いてから判定する（継続行にまたがる git と更新のサブコマンドも止める）
+    cmd=${cmd//$'\\\n'/}
     cd_re='^[[:space:]]*cd[[:space:]]+("[^"]+"|'"'"'[^'"'"']+'"'"'|[^[:space:];&|]+)[[:space:]]*&&'
     [[ $cmd =~ $cd_re ]] ||
       deny "Bash は毎回メインの作業フォルダで始まります（cd は引き継がれません）。先頭に「cd <作業場所> &&」を付けてください。${workplace_hint}"
@@ -88,8 +90,13 @@ case $tool in
     # コマンド名の前は行頭・区切り・空白・パス（.venv/bin/pip など）。git のオプションの解析は避け、
     # 同じ単純コマンドの中に禁止のサブコマンドが単語として現れたら止める（git log --grep commit なども止まるが、事故防止を優先する）
     sep='(^|[;&|(`[:space:]/])'
+    # 一覧と今のブランチの表示だけの git branch（区切りから区切りまでが、この形に完全に一致するもの）は、
+    # 先に取り除いてから下の判定にかける。改行で並べた別の git branch や、コマンド置換（`...`・$(...)）を引数に含む形など、
+    # 想定外の形は残って止まる（`...` の中の git branch は、読み取りの形でも止まる）
+    git_cmd=$(perl -0777 -pe 's{(^|[;&|(\n])[ \t]*git(?:[ \t]+-C[ \t]+(?:"[^"\n`\$]*"|\x27[^\x27\n]*\x27|[^ \t;&|()`\$\n"\x27]+))?[ \t]+branch(?:[ \t]+(?:--show-current|-a|--all|-r|--remotes|-l|--list|-v|-vv|--verbose))*[ \t]*(?=$|[;&|)\n])}{$1}g' <<<"$cmd") ||
+      deny "haiku-implementation の guard.sh: コマンドを判定できないため止めました"
     git_re="${sep}git([[:space:]][^;&|]*)?[[:space:]](commit|push|pull|fetch|remote|submodule|notes|am|stash|checkout|switch|reset|rebase|merge|cherry-pick|revert|tag|worktree|clean|branch|update-ref|config|gc|prune)([[:space:]]|$)"
-    grep -Eq "$git_re" <<<"$cmd" &&
+    grep -Eq "$git_re" <<<"$git_cmd" &&
       deny "リポジトリの状態を変える git コマンドは使えません（worktree は .git をもとのリポジトリと共有しています）。必要なら報告に書いてください"
     opts='([[:space:]]+-[^[:space:]]+)*'
     pkg_re="${sep}((npm|pnpm)${opts}[[:space:]]+(install|i|ci|add|update|up|upgrade|uninstall|remove|rm|un)|yarn${opts}[[:space:]]+(add|install|remove|upgrade|up)|bundle${opts}[[:space:]]+(install|update|add)|gem${opts}[[:space:]]+install|pip3?${opts}[[:space:]]+(install|uninstall)|python3?${opts}[[:space:]]+-m[[:space:]]+pip${opts}[[:space:]]+(install|uninstall)|uv${opts}[[:space:]]+(add|remove|sync|lock|pip[[:space:]]+(install|uninstall|sync))|poetry${opts}[[:space:]]+(add|remove|install|update|lock|sync)|composer${opts}[[:space:]]+(install|require|update|remove)|cargo${opts}[[:space:]]+(add|install|update|remove)|go${opts}[[:space:]]+get|brew${opts}[[:space:]]+(install|upgrade))([[:space:]]|$)"

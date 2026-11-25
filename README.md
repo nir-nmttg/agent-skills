@@ -46,6 +46,7 @@ Claude Code は Opus 5.5 の推論レベル high で動かすことを推奨す�
    - `CLAUDE_CONFIG_DIR` があれば、Claude Code 用はその配下にリンクする。
    - `--claude` / `--codex` で片方だけにできる。
    - 既存の同名ファイルや、別の場所への有効なリンクは上書きしない。
+   - git で追跡していないスキル・エージェントは新しくリンクしない（すでにあるリンクは残して知らせる）。
 
    </details>
 
@@ -117,11 +118,11 @@ flowchart LR
 | [haiku-explore](.claude/skills/haiku-explore/SKILL.md) | コードの広い検索を Haiku 5.5 に任せ、結論と場所だけを受け取る | 場所の見当がつかない検索 |
 | [plan-cross-review](.claude/skills/plan-cross-review/SKILL.md) | 設計を Astra と Fable にレビューさせる | 設計・実装計画を示す前 |
 | [haiku-implementation](.claude/skills/haiku-implementation/SKILL.md) | 実装を Haiku 5.5 に任せ、手分けして進める | 指示書に書けて確かめられる実装 |
-| [haiku-check](.claude/skills/haiku-check/SKILL.md) | テスト・lint・CI ログの確認を Haiku 5.5 に任せる | 状態を変えない確認 |
+| [haiku-check](.claude/skills/haiku-check/SKILL.md) | テスト・lint・CI ログの確認を Haiku 5.5 に任せる | 長い出力を読まないと結論が出ない確認 |
 | [architecture-alignment-cross-review](.claude/skills/architecture-alignment-cross-review/SKILL.md) | 差分が既存の設計に沿っているかを Sol と Opus に確かめさせて直す | 構造を選ぶ実装のテストの後 |
 | [ui-behavior-check](.claude/skills/ui-behavior-check/SKILL.md) | 開発サーバーを起動し、画面を操作して動作を確かめる | Web の画面に出る変更の後 |
 | [implementation-cross-review](.claude/skills/implementation-cross-review/SKILL.md) | 差分を Astra と Fable にレビューさせて直す | 完了報告・コミット・PR の前 |
-| [japanese-report](.claude/skills/japanese-report/SKILL.md) | 報告を自然な日本語で書く | 結果を報告する前 |
+| [japanese-report](.claude/skills/japanese-report/SKILL.md) | 報告を自然な日本語で書く | 結果を報告する前、英語の指示のあと |
 
 ### リファクタリング用スキル
 
